@@ -1,6 +1,7 @@
 import * as three from "three"
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {DxfFetcher} from "./DxfFetcher"
+import {DxfScene} from "./DxfScene"
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -29,7 +30,6 @@ export class DxfViewer {
 
         //XXX auto resize not implemented
         renderer.setSize(options.canvasWidth, options.canvasHeight)
-        console.log(options.clearColor)//XXX
         renderer.setClearColor(options.clearColor, options.clearAlpha)
 
         this.canvas = renderer.domElement
@@ -52,6 +52,7 @@ export class DxfViewer {
         controls.mouseButtons = {
             LEFT: three.MOUSE.PAN
         }
+        controls.zoomSpeed = 3
         controls.addEventListener("change", this.Render.bind(this))
 
         this.Render()
@@ -66,7 +67,11 @@ export class DxfViewer {
         //XXX load and preprocess in web worker
         console.log(url)//XXX
         const dxf = await new DxfFetcher(url).Fetch()
-        console.log(dxf)//XXX
+        // console.log(dxf)//XXX
+
+        this.dxfScene = new DxfScene()
+        this.dxfScene.Build(dxf)
+        // console.log(this.dxfScene)//XXX
     }
 
     Render() {
