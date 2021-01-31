@@ -72,9 +72,13 @@ export class DxfScene {
         for (const v of entity.vertices) {
             if (prev !== null) {
                 batch.PushVertex(this._TransformVertex(prev))
+                batch.PushVertex(this._TransformVertex(v))
             }
             prev = v
-            batch.PushVertex(this._TransformVertex(v))
+        }
+        if (entity.shape) {
+            batch.PushVertex(this._TransformVertex(entity.vertices[entity.vertices.length - 1]))
+            batch.PushVertex(this._TransformVertex(entity.vertices[0]))
         }
     }
 
@@ -132,7 +136,9 @@ export class DxfScene {
         const scene = {
             vertices: new ArrayBuffer(verticesSize * Float32Array.BYTES_PER_ELEMENT),
             batches: [],
-            layers: []
+            layers: [],
+            origin: this.origin,
+            bounds: this.bounds
         }
         const vertices = new Float32Array(scene.vertices)
         let offset = 0

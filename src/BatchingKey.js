@@ -3,7 +3,7 @@ export class BatchingKey {
     /**
      * @param layerName {String?} Layer name, null if not bound to a layer.
      * @param isInstanced {Boolean}
-     * @param geometryType {number} One of BatchingKey.GeometryType
+     * @param geometryType {number?} One of BatchingKey.GeometryType.
      * @param color {number} Color ARGB value.
      * @param lineType {number?} Line type ID, null for non-lines. Zero is default type (solid
      *  line).

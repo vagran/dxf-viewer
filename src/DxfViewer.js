@@ -2,6 +2,7 @@ import * as three from "three"
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {DxfFetcher} from "./DxfFetcher"
 import {DxfScene} from "./DxfScene"
+import {BatchingKey} from "./BatchingKey";
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -21,7 +22,8 @@ export class DxfViewer {
         const scene = this.scene = new three.Scene()
         const renderer = this.renderer = new three.WebGLRenderer({
             alpha: options.canvasAlpha,
-            premultipliedAlpha: options.canvasPremultipliedAlpha
+            premultipliedAlpha: options.canvasPremultipliedAlpha,
+            antialias: options.antialias
         })
         const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
         camera.position.z = 1
@@ -29,7 +31,9 @@ export class DxfViewer {
         camera.position.y = 0
 
         //XXX auto resize not implemented
-        renderer.setSize(options.canvasWidth, options.canvasHeight)
+        this.canvasWidth = options.canvasWidth
+        this.canvasHeight = options.canvasHeight
+        renderer.setSize(this.canvasWidth, this.canvasHeight)
         renderer.setClearColor(options.clearColor, options.clearAlpha)
 
         this.canvas = renderer.domElement
@@ -38,14 +42,29 @@ export class DxfViewer {
         domContainer.appendChild(renderer.domElement)
 
         //XXX
-        const shape = new three.Shape([ new three.Vector2(0, 0),
-                                        new three.Vector2(1, 0),
-                                        new three.Vector2(0, 1)])
+        // {
+        //     const shape = new three.Shape([new three.Vector2(0, 0),
+        //                                    new three.Vector2(1, 0),
+        //                                    new three.Vector2(0, 1)])
+        //
+        //     const geometry = new three.ShapeGeometry(shape)
+        //     const material = new three.MeshBasicMaterial({color: 0x00ff00})
+        //     const mesh = new three.Mesh(geometry, material)
+        //     scene.add(mesh)
+        // }
 
-        const geometry = new three.ShapeGeometry(shape)
-        const material = new three.MeshBasicMaterial({ color: 0x00ff00 })
-        const mesh = new three.Mesh(geometry, material)
-        scene.add(mesh)
+        //XXX
+        // {
+        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
+        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
+        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        //     const geometry = new three.BufferGeometry()
+        //     geometry.setAttribute("position", verticesBufferAttr)
+        //     const material = this._CreateSimpleColorMaterial(0xff0000)
+        //     const obj = new three.LineSegments(geometry, material)
+        //     obj.frustumCulled = false
+        //     scene.add(obj)
+        // }
 
         const controls = this.controls = new OrbitControls(camera, renderer.domElement)
         controls.enableRotate = false
@@ -56,6 +75,8 @@ export class DxfViewer {
         controls.addEventListener("change", this.Render.bind(this))
 
         this.Render()
+
+        this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
     }
 
     GetCanvas() {
@@ -72,10 +93,103 @@ export class DxfViewer {
         this.dxfScene = new DxfScene()
         this.dxfScene.Build(dxf)
         // console.log(this.dxfScene)//XXX
+
+        const scene = this.dxfScene.scene//XXX receive from worker
+        // console.log(scene)//XXX
+        for (const batch of scene.batches) {
+            let obj
+            if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
+                obj = this._CreateLinesBatch(scene, batch)
+            } else {
+                //XXX console.warn("Unhandled batch geometry type: " + batch.key.geometryType)
+                continue
+            }
+            this.scene.add(obj)
+        }
+
+        this._SetView(
+            {
+                x: scene.bounds.minX + (scene.bounds.maxX - scene.bounds.minX) / 2 - scene.origin.x,
+                y: scene.bounds.minY + (scene.bounds.maxY - scene.bounds.minY) / 2 - scene.origin.y
+            },
+            (scene.bounds.maxX - scene.bounds.minX) * 1.2)
+        this.Render()
     }
 
     Render() {
         this.renderer.render(this.scene, this.camera)
+    }
+
+    _SetView(center, width) {
+        const aspect = this.canvasWidth / this.canvasHeight
+        const height = width / aspect
+        const cam = this.camera
+        cam.left = center.x - width / 2
+        cam.right = center.x + width / 2
+        cam.top = center.y + height / 2
+        cam.bottom = center.y - height / 2
+        cam.zoom = 1
+        cam.updateProjectionMatrix()
+    }
+
+    _GetSimpleColorMaterial(color) {
+        const key = new BatchingKey(null, null, null, color, 0)
+        let entry = this.materials.find({key})
+        if (entry !== null) {
+            return entry.material
+        }
+        entry = {
+            key,
+            material: this._CreateSimpleColorMaterial(color)
+        }
+        this.materials.insert(entry)
+        return entry.material
+    }
+
+    /** @param color {Number} Color RGB numeric value. */
+    _CreateSimpleColorMaterial(color) {
+        return new three.RawShaderMaterial({
+            uniforms: {
+                color: {
+                    value: new three.Color(color)
+                }
+            },
+            vertexShader: `
+            precision highp float;
+            precision highp int;
+            attribute vec2 position;
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+            
+            void main() {
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 0.0, 1.0);
+            }
+            `,
+            fragmentShader: `
+            precision highp float;
+            precision highp int;
+            uniform vec3 color;
+            
+            void main() {
+                gl_FragColor = vec4(color, 1.0);
+            }
+            
+            `
+        })
+    }
+
+    _CreateLinesBatch(scene, batch) {
+        const verticesArray =
+            new Float32Array(scene.vertices,
+                             batch.verticesOffset * Float32Array.BYTES_PER_ELEMENT,
+                             batch.verticesCount)
+        const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        const geometry = new three.BufferGeometry()
+        geometry.setAttribute("position", verticesBufferAttr)
+        const material = this._GetSimpleColorMaterial(batch.key.color)
+        const obj = new three.LineSegments(geometry, material)
+        obj.frustumCulled = false
+        return obj
     }
 }
 
@@ -94,5 +208,7 @@ DxfViewer.DefaultOptions = {
     /** Use alpha channel in a framebuffer. */
     canvasAlpha: false,
     /** Assume premultiplied alpha in a framebuffer. */
-    canvasPremultipliedAlpha: true
+    canvasPremultipliedAlpha: true,
+    /** Use antialiasing. May degrade performance on poor hardware. */
+    antialias: true
 }
