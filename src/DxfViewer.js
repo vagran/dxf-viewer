@@ -2,7 +2,8 @@ import * as three from "three"
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {DxfFetcher} from "./DxfFetcher"
 import {DxfScene} from "./DxfScene"
-import {BatchingKey} from "./BatchingKey";
+import {BatchingKey} from "./BatchingKey"
+import {DxfWorker} from "./DxfWorker"
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -83,19 +84,21 @@ export class DxfViewer {
         return this.canvas
     }
 
-    /** Load DXF into the viewer. Old content is discarded, state is reset. */
-    async Load(url) {
-        //XXX load and preprocess in web worker
-        console.log(url)//XXX
-        const dxf = await new DxfFetcher(url).Fetch()
-        // console.log(dxf)//XXX
-
-        this.dxfScene = new DxfScene()
-        this.dxfScene.Build(dxf)
-        // console.log(this.dxfScene)//XXX
-
-        const scene = this.dxfScene.scene//XXX receive from worker
-        // console.log(scene)//XXX
+    /** Load DXF into the viewer. Old content is discarded, state is reset.
+     * @param url DXF file URL.
+     * @param progressCbk {Function?} (phase, processedSize, totalSize)
+     *  Possible phase values:
+     *  * "fetch"
+     *  * "parse"
+     *  * "prepare"
+     * @param workerFactory {Function?} Factory for worker creation. The worker script should
+     *  invoke DxfViewer.SetupWorker() function.
+     */
+    async Load(url, progressCbk = null, workerFactory = null) {
+        const worker = new DxfWorker(workerFactory ? workerFactory() : null)
+        const scene = await worker.Load(url, progressCbk)
+        await worker.Destroy()
+        
         for (const batch of scene.batches) {
             let obj
             if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
@@ -118,6 +121,10 @@ export class DxfViewer {
 
     Render() {
         this.renderer.render(this.scene, this.camera)
+    }
+
+    Destroy() {
+        //XXX
     }
 
     _SetView(center, width) {
@@ -211,4 +218,8 @@ DxfViewer.DefaultOptions = {
     canvasPremultipliedAlpha: true,
     /** Use antialiasing. May degrade performance on poor hardware. */
     antialias: true
+}
+
+DxfViewer.SetupWorker = function () {
+    new DxfWorker(self, true)
 }

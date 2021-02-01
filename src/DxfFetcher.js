@@ -9,7 +9,8 @@ export class DxfFetcher {
         this.url = url
     }
 
-    async Fetch() {
+    /** @param progressCbk {Function} (phase, receivedSize, totalSize) */
+    async Fetch(progressCbk = null) {
         const response = await fetch(this.url)
         const totalSize = +response.headers.get('Content-Length')
 
@@ -25,8 +26,9 @@ export class DxfFetcher {
             }
             chunks.push(value)
             receivedSize += value.length
-            //XXX progress receivedSize
-            // console.log(`Received ${receivedSize} of ${totalSize}`)
+            if (progressCbk !== null) {
+                progressCbk("fetch", receivedSize, totalSize)
+            }
         }
 
         const binData = new Uint8Array(receivedSize)
@@ -38,6 +40,9 @@ export class DxfFetcher {
         const text = new TextDecoder("utf-8").decode(binData)
 
         console.log("Parsing started")//XXX
+        if (progressCbk !== null) {
+            progressCbk("parse", 0, null)
+        }
         const parser = new DxfParser()
         const dxf = parser.parseSync(text)
         console.log("Parsing done")//XXX
