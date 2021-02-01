@@ -11,7 +11,6 @@ export class DxfWorker {
      */
     constructor(worker, isWorker = false) {
         this.worker = worker
-        this.isWorker = isWorker
         if (isWorker) {
             worker.onmessage = this._ProcessRequest.bind(this)
         } else if (worker) {
@@ -38,7 +37,9 @@ export class DxfWorker {
 
     async Destroy() {
         if (this.worker) {
-            return this._SendRequest(DxfWorker.WorkerMsg.DESTROY)
+            await this._SendRequest(DxfWorker.WorkerMsg.DESTROY)
+            /* close() in the worker is not enough, instance is still visible in dev tools. */
+            this.worker.terminate()
         }
     }
 
@@ -53,6 +54,7 @@ export class DxfWorker {
         }
         this.worker.postMessage(resp, transfers)
         if (msg.type === DxfWorker.WorkerMsg.DESTROY) {
+            this.worker.onmessage = null
             this.worker.close()
             this.worker = null
         }
@@ -61,9 +63,13 @@ export class DxfWorker {
     async _ProcessRequestMessage(type, data, transfers, seq) {
         switch (type) {
         case DxfWorker.WorkerMsg.LOAD: {
-            return await this._Load(
+            const scene = await this._Load(
                 data.url,
                 (phase, size, totalSize) => this._SendProgress(seq, phase, size, totalSize))
+            //XXX handle all buffers
+            transfers.push(scene.vertices)
+            transfers.push(scene.indices)
+            return scene
         }
         case DxfWorker.WorkerMsg.DESTROY:
             return null

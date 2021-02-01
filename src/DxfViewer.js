@@ -1,7 +1,5 @@
 import * as three from "three"
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
-import {DxfFetcher} from "./DxfFetcher"
-import {DxfScene} from "./DxfScene"
 import {BatchingKey} from "./BatchingKey"
 import {DxfWorker} from "./DxfWorker"
 
@@ -67,6 +65,23 @@ export class DxfViewer {
         //     scene.add(obj)
         // }
 
+        //XXX
+        // {
+        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
+        //     const _indicesArray = new Uint16Array([0, 0, 0, 1, 2, 3])
+        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
+        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        //     const indicesArray = new Uint16Array(_indicesArray.buffer, 2 * 2, 4)
+        //     const indicesBufferAttr = new three.BufferAttribute(indicesArray, 1)
+        //     const geometry = new three.BufferGeometry()
+        //     geometry.setAttribute("position", verticesBufferAttr)
+        //     geometry.setIndex(indicesBufferAttr)
+        //     const material = this._CreateSimpleColorMaterial(0xff0000)
+        //     const obj = new three.LineSegments(geometry, material)
+        //     obj.frustumCulled = false
+        //     scene.add(obj)
+        // }
+
         const controls = this.controls = new OrbitControls(camera, renderer.domElement)
         controls.enableRotate = false
         controls.mouseButtons = {
@@ -98,16 +113,22 @@ export class DxfViewer {
         const worker = new DxfWorker(workerFactory ? workerFactory() : null)
         const scene = await worker.Load(url, progressCbk)
         await worker.Destroy()
-        
+
         for (const batch of scene.batches) {
-            let obj
-            if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
-                obj = this._CreateLinesBatch(scene, batch)
+            let objs = []
+            /*if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
+                objs.push(this._CreateLinesBatch(scene, batch))
+            } else*/ if (batch.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
+                for (const obj of this._CreateIndexedLinesBatches(scene, batch)) {
+                    objs.push(obj)
+                }
             } else {
                 //XXX console.warn("Unhandled batch geometry type: " + batch.key.geometryType)
                 continue
             }
-            this.scene.add(obj)
+            for (const obj of objs) {
+                this.scene.add(obj)
+            }
         }
 
         this._SetView(
@@ -162,6 +183,7 @@ export class DxfViewer {
                 }
             },
             vertexShader: `
+            
             precision highp float;
             precision highp int;
             attribute vec2 position;
@@ -173,6 +195,7 @@ export class DxfViewer {
             }
             `,
             fragmentShader: `
+            
             precision highp float;
             precision highp int;
             uniform vec3 color;
@@ -180,7 +203,6 @@ export class DxfViewer {
             void main() {
                 gl_FragColor = vec4(color, 1.0);
             }
-            
             `
         })
     }
@@ -193,10 +215,35 @@ export class DxfViewer {
         const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
         const geometry = new three.BufferGeometry()
         geometry.setAttribute("position", verticesBufferAttr)
+        //XXX line type
         const material = this._GetSimpleColorMaterial(batch.key.color)
         const obj = new three.LineSegments(geometry, material)
         obj.frustumCulled = false
         return obj
+    }
+
+    /** One rendering batch per each indexed chunk. */
+    *_CreateIndexedLinesBatches(scene, batch) {
+        //XXX line type
+        const material = this._GetSimpleColorMaterial(batch.key.color)
+        for (const chunk of batch.chunks) {
+            const verticesArray =
+                new Float32Array(scene.vertices,
+                                 chunk.verticesOffset * Float32Array.BYTES_PER_ELEMENT,
+                                 chunk.verticesCount)
+            const indicesArray =
+                new Uint16Array(scene.indices,
+                                chunk.indicesOffset * Uint16Array.BYTES_PER_ELEMENT,
+                                chunk.indicesCount)
+            const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+            const indicesBufferAttr = new three.BufferAttribute(indicesArray, 1)
+            const geometry = new three.BufferGeometry()
+            geometry.setAttribute("position", verticesBufferAttr)
+            geometry.setIndex(indicesBufferAttr)
+            const obj = new three.LineSegments(geometry, material)
+            obj.frustumCulled = false
+            yield obj
+        }
     }
 }
 
