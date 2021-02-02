@@ -93,6 +93,8 @@ export class DxfViewer {
         this.Render()
 
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
+        /* Indexed by layer name, value is list of layer scene objects. */
+        this.layers = new Map()
     }
 
     GetCanvas() {
@@ -114,11 +116,14 @@ export class DxfViewer {
         const scene = await worker.Load(url, progressCbk)
         await worker.Destroy()
 
+        //XXX
+        console.log(`${scene.batches.length} batches, vertices ${scene.vertices.byteLength} B, indices ${scene.indices.byteLength} B`)
+
         for (const batch of scene.batches) {
             let objs = []
-            /*if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
+            if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
                 objs.push(this._CreateLinesBatch(scene, batch))
-            } else*/ if (batch.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
+            } else if (batch.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
                 for (const obj of this._CreateIndexedLinesBatches(scene, batch)) {
                     objs.push(obj)
                 }
@@ -126,8 +131,14 @@ export class DxfViewer {
                 //XXX console.warn("Unhandled batch geometry type: " + batch.key.geometryType)
                 continue
             }
+            let layerList = this.layers.get(batch.key.layerName)
+            if (!layerList) {
+                layerList = []
+                this.layers.set(batch.key.layerName, layerList)
+            }
             for (const obj of objs) {
                 this.scene.add(obj)
+                layerList.push(obj)
             }
         }
 
@@ -142,6 +153,22 @@ export class DxfViewer {
 
     Render() {
         this.renderer.render(this.scene, this.camera)
+    }
+
+    /** @return {Iterable<String>} List of layer names. */
+    GetLayers() {
+        return this.layers.keys()
+    }
+
+    ShowLayer(name, show) {
+        const layerList = this.layers.get(name)
+        if (!layerList) {
+            return
+        }
+        for (const obj of layerList) {
+            obj.visible = show
+        }
+        this.Render()
     }
 
     Destroy() {

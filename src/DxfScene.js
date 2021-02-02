@@ -4,6 +4,8 @@ import {BatchingKey} from "./BatchingKey"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
+/** Target angle for each segment of tessellated arc. */
+const ARC_TESSELLATION_ANGLE = 10 / 180 * Math.PI
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -28,6 +30,10 @@ export class DxfScene {
                 this.layers.set(layer.name, layer)
             }
         }
+        /* 0 - CCW, 1 - CW */
+        this.angBase = dxf.header["$ANGBASE"] || 0
+        /* Zero angle direction, 0 is +X */
+        this.angDir = dxf.header["$ANGDIR"] || 0
 
         //XXX blocks
 
@@ -37,6 +43,10 @@ export class DxfScene {
                 renderEntities = this._DecomposeLine(entity)
             } if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
                 renderEntities = this._DecomposePolyline(entity)
+            } else if (entity.type === "ARC") {
+                renderEntities = this._DecomposeArc(entity)
+            } else if (entity.type === "CIRCLE") {
+                renderEntities = this._DecomposeCircle(entity)
             } else {
                 // console.log("Unhandled entity type: " + entity.type)
                 continue
@@ -68,7 +78,7 @@ export class DxfScene {
         }
     }
 
-    _GetLineType(entity, vertex) {
+    _GetLineType(entity, vertex = null) {
         //XXX lookup
         return 0
     }
@@ -80,7 +90,6 @@ export class DxfScene {
 
     *_DecomposeLine(entity) {
         /* start/end width, bulge - seems cannot be present, at least with current parser */
-        //XXX linetype
         if (entity.vertices.length !== 2) {
             return
         }
@@ -90,8 +99,7 @@ export class DxfScene {
                          this._GetLineType(entity, entity.vertices[0]))
     }
 
-    /** Generate vertices for bulged line segment. Segments may have start/end width specified.
-     * This should be properly interpolated.
+    /** Generate vertices for bulged line segment.
      *
      * @param vertices Generated vertices pushed here.
      * @param startVtx Starting vertex. Assuming it is already present in the vertices array.
@@ -103,19 +111,95 @@ export class DxfScene {
         vertices.push(endVtx)
     }
 
+    /** Generate vertices for arc segment.
+     *
+     * @param vertices Generated vertices pushed here.
+     * @param center Center vector.
+     * @param radius
+     * @param startAngle {number?} Start angle. Zero if not specified. Arc is drawn in CCW direction
+     *  from start angle towards end angle.
+     * @param endAngle {number?} Optional end angle. Full circle is drawn if not specified.
+     */
+    _GenerateArcVertices(vertices, center, radius, startAngle, endAngle) {
+        if (!center || !radius) {
+            return
+        }
+        /* Normalize angles - make them starting from +X in CCW direction. End angle should be
+         * greater than start angle.
+         */
+        if (startAngle === undefined) {
+            startAngle = 0
+        } else {
+            startAngle += this.angBase
+        }
+        let isClosed = false
+        if (endAngle === undefined || endAngle === null) {
+            endAngle = startAngle + 2 * Math.PI
+            isClosed = true
+        } else {
+            endAngle += this.angBase
+        }
+        if (this.angDir) {
+            const tmp = startAngle
+            startAngle = endAngle
+            endAngle = tmp
+        }
+        while (endAngle <= startAngle) {
+            endAngle += Math.PI * 2
+        }
+
+        const arcAngle = endAngle - startAngle
+        let numSegments = Math.floor(arcAngle / ARC_TESSELLATION_ANGLE)
+        if (numSegments === 0) {
+            numSegments = 1
+        }
+        const step = arcAngle / numSegments
+        for (let i = 0; i <= numSegments; i++) {
+            if (i === numSegments && isClosed) {
+                break
+            }
+            const a = startAngle + i * step
+            const v = {
+                x: center.x + radius * Math.cos(a),
+                y: center.y + radius * Math.sin(a)
+            }
+            vertices.push(v)
+        }
+    }
+
+    *_DecomposeArc(entity) {
+        const color = this._GetEntityColor(entity)
+        const layer = this._GetEntityLayer(entity)
+        const lineType = this._GetLineType(entity)
+        const vertices = []
+        this._GenerateArcVertices(vertices, entity.center, entity.radius, entity.startAngle,
+                                  entity.endAngle)
+        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType,
+                         entity.endAngle === undefined)
+    }
+
+    *_DecomposeCircle(entity) {
+        const color = this._GetEntityColor(entity)
+        const layer = this._GetEntityLayer(entity)
+        const lineType = this._GetLineType(entity)
+        const vertices = []
+        this._GenerateArcVertices(vertices, entity.center, entity.radius)
+        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, true)
+    }
+
     /**
      * Generate entities for shaped polyline (e.g. line resulting in mesh). All segments are shaped
-     * (have start/end width). Bulging is already tessellated.
+     * (have start/end width). Segments may be bulge.
      * @param vertices
      * @param layer
      * @param color
-     * @param linetype
+     * @param lineType
      * @param shape {Boolean} True if closed polyline.
      * @return {Generator<Entity>}
      */
-    *_GenerateShapedPolyline(vertices, layer, color, linetype, shape) {
+    *_GenerateShapedPolyline(vertices, layer, color, lineType, shape) {
         //XXX
-        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, linetype, shape)
+        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, shape)
     }
 
     *_DecomposePolyline(entity) {
@@ -184,7 +268,7 @@ export class DxfScene {
                 vtx = entity.vertices[vIdx]
             }
 
-            if (Boolean(prevVtx.bulge)) {
+            if (Boolean(prevVtx.bulge) && curPlainLine) {
                 if (curVertices === null) {
                     curVertices = entity.vertices.slice(startIdx, vIdx)
                 }
@@ -218,7 +302,7 @@ export class DxfScene {
             throw Error("Even number of vertices expected")
         }
         const key = new BatchingKey(entity.layer, isBlock,
-                                    BatchingKey.GeometryType.LINES, entity.color, entity.linetype)
+                                    BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
             batch.PushVertex(this._TransformVertex(v))
@@ -239,7 +323,7 @@ export class DxfScene {
         const verticesCount = entity.vertices.length
         if (verticesCount <= 3) {
             const key = new BatchingKey(entity.layer, isBlock, BatchingKey.GeometryType.LINES,
-                                        entity.color, entity.linetype)
+                                        entity.color, entity.lineType)
             const batch = this._GetBatch(key)
             let prev = null
             for (const v of entity.vertices) {
@@ -257,7 +341,7 @@ export class DxfScene {
         }
 
         const key = new BatchingKey(entity.layer, isBlock, BatchingKey.GeometryType.INDEXED_LINES,
-                                    entity.color, entity.linetype)
+                                    entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         /* Line may be split if exceeds chunk limit. */
         for (const lineChunk of entity._IterateLineChunks()) {
@@ -539,12 +623,12 @@ class Entity {
     /** @param type {Entity.Type}
      * @param shape {Boolean} true if closed shape.
      */
-    constructor(type, vertices, layer, color, linetype, shape = false) {
+    constructor(type, vertices, layer, color, lineType, shape = false) {
         this.type = type
         this.vertices = vertices
         this.layer = layer
         this.color = color
-        this.linetype = linetype
+        this.lineType = lineType
         this.shape = shape
     }
 

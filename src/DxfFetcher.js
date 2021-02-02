@@ -39,13 +39,11 @@ export class DxfFetcher {
         }
         const text = new TextDecoder("utf-8").decode(binData)
 
-        console.log("Parsing started")//XXX
         if (progressCbk !== null) {
             progressCbk("parse", 0, null)
         }
         const parser = new DxfParser()
         const dxf = parser.parseSync(text)
-        console.log("Parsing done")//XXX
         return dxf
     }
 }
