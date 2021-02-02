@@ -39,6 +39,7 @@ export class DxfScene {
                 renderEntities = this._DecomposePolyline(entity)
             } else {
                 // console.log("Unhandled entity type: " + entity.type)
+                continue
             }
             for (const renderEntity of renderEntities) {
                 this._ProcessEntity(renderEntity)
@@ -74,7 +75,7 @@ export class DxfScene {
 
     /** Check if start/end with are not specified. */
     _IsPlainLine(entity) {
-        return Boolean(entity.startWidth || entity.endWidth)
+        return !Boolean(entity.startWidth || entity.endWidth)
     }
 
     *_DecomposeLine(entity) {
@@ -114,7 +115,7 @@ export class DxfScene {
      */
     *_GenerateShapedPolyline(vertices, layer, color, linetype, shape) {
         //XXX
-        return new Entity(Entity.Type.POLYLINE, vertices, layer, color, linetype, shape)
+        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, linetype, shape)
     }
 
     *_DecomposePolyline(entity) {
