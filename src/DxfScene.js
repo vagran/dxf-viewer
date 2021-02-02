@@ -1,5 +1,5 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer"
-import "bintrees/dist/rbtree"
+import "./RBTree"
 import {BatchingKey} from "./BatchingKey"
 
 /** Use 16-bit indices for indexed geometry. */
@@ -31,9 +31,9 @@ export class DxfScene {
 
         for (let entity of dxf.entities) {
             if (entity.type === "LINE") {
-                this.ProcessLine(entity)
+                this._ProcessLine(entity)
             } if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
-                this.ProcessPolyline(entity)
+                this._ProcessPolyline(entity)
             } else {
                 // console.log("Unhandled entity type: " + entity.type)
             }
@@ -44,7 +44,7 @@ export class DxfScene {
         delete this.layers
     }
 
-    ProcessLine(entity, isBlock = false) {
+    _ProcessLine(entity, isBlock = false) {
         //XXX check entity.linetype
         //XXX start end width
         //XXX bulge
@@ -60,7 +60,7 @@ export class DxfScene {
         }
     }
 
-    ProcessPolyline(entity, isBlock = false) {
+    _ProcessPolyline(entity, isBlock = false) {
         //XXX check entity.linetype
         //XXX start end width
         //XXX bulge
