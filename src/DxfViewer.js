@@ -33,7 +33,9 @@ export class DxfViewer {
         camera.position.y = 0
 
         this.simpleColorMaterial = this._CreateSimpleColorMaterial()
+        this.simpleInstancedColorMaterial = this._CreateSimpleColorMaterial(true)
         this.simplePointMaterial = this._CreateSimplePointMaterial()
+        this.simpleInstancedPointMaterial = this._CreateSimplePointMaterial(true)
 
         //XXX auto resize not implemented
         this.canvasWidth = options.canvasWidth
@@ -96,6 +98,33 @@ export class DxfViewer {
         //     geometry.setAttribute("position", verticesBufferAttr)
         //     geometry.setIndex(indicesBufferAttr)
         //     const material = this._CreateSimpleColorMaterialInstance(0xff0000)
+        //     const obj = new three.LineSegments(geometry, material)
+        //     obj.frustumCulled = false
+        //     scene.add(obj)
+        // }
+
+        //XXX
+        // {
+        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0.5, 1, 1, 0, -1, -1, 0])
+        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
+        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        //     const _transformArray = new Float32Array([
+        //         0, 0, 0, 0, 0, 0,
+        //         1, 0, 0,  0, 1, 0,
+        //         1, 0, 0.5,  0, 1, -0.2,
+        //         0.5, 0, 0,  0, 0.5, 0])
+        //     const transformArray = new Float32Array(_transformArray.buffer, 6 * 4, 18)
+        //     const transformBufferAttrBuf = new three.InstancedInterleavedBuffer(transformArray, 6)
+        //     const transformBufferAttr0 = new three.InterleavedBufferAttribute(
+        //         transformBufferAttrBuf, 3, 0)
+        //     const transformBufferAttr1 = new three.InterleavedBufferAttribute(
+        //         transformBufferAttrBuf, 3, 3)
+        //     const geometry = new three.InstancedBufferGeometry()
+        //     geometry.instanceCount = 3
+        //     geometry.setAttribute("position", verticesBufferAttr)
+        //     geometry.setAttribute("instanceTransform0", transformBufferAttr0)
+        //     geometry.setAttribute("instanceTransform1", transformBufferAttr1)
+        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000, true)
         //     const obj = new three.LineSegments(geometry, material)
         //     obj.frustumCulled = false
         //     scene.add(obj)
@@ -219,124 +248,141 @@ export class DxfViewer {
         cam.updateProjectionMatrix()
     }
 
-    _GetSimpleColorMaterial(color) {
-        const key = new BatchingKey(null, null, null, color, 0)
+    _GetSimpleColorMaterial(color, isInstanced = false) {
+        const key = new BatchingKey(null, isInstanced, null, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
         }
         entry = {
             key,
-            material: this._CreateSimpleColorMaterialInstance(color)
+            material: this._CreateSimpleColorMaterialInstance(color, isInstanced)
         }
         this.materials.insert(entry)
         return entry.material
     }
 
-    _CreateSimpleColorMaterial() {
+    _CreateSimpleColorMaterial(instanced = false) {
+        const shaders = this._GenerateShaders(instanced, false)
         return new three.RawShaderMaterial({
             uniforms: {
                 color: {
                     value: new three.Color(0xff00ff)
                 }
             },
-            vertexShader: `
-            
-            precision highp float;
-            precision highp int;
-            attribute vec2 position;
-            uniform mat4 modelViewMatrix;
-            uniform mat4 projectionMatrix;
-            
-            void main() {
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 0.0, 1.0);
-            }
-            `,
-            fragmentShader: `
-            
-            precision highp float;
-            precision highp int;
-            uniform vec3 color;
-            
-            void main() {
-                gl_FragColor = vec4(color, 1.0);
-            }
-            `,
+            vertexShader: shaders.vertex,
+            fragmentShader: shaders.fragment,
             depthTest: false,
-            depthWrite: false
+            depthWrite: false,
+            glslVersion: three.GLSL3
         })
     }
 
-    /** @param color {Number} Color RGB numeric value. */
-    _CreateSimpleColorMaterialInstance(color) {
+    /** @param color {Number} Color RGB numeric value.
+     * @param isInstanced {Boolean} Get version for instanced geometry.
+     */
+    _CreateSimpleColorMaterialInstance(color, isInstanced = false) {
+        const src = isInstanced ? this.simpleInstancedColorMaterial : this.simpleColorMaterial
         /* Should reuse compiled shaders. */
-        const m = this.simpleColorMaterial.clone()
+        const m = src.clone()
         m.uniforms.color = { value: new three.Color(color) }
         return m
     }
 
-    _GetSimplePointMaterial(color) {
-        const key = new BatchingKey(null, null, BatchingKey.GeometryType.POINTS, color, 0)
+    _GetSimplePointMaterial(color, isInstanced = false) {
+        const key = new BatchingKey(null, isInstanced, BatchingKey.GeometryType.POINTS, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
         }
         entry = {
             key,
-            material: this._CreateSimplePointMaterialInstance(color)
+            material: this._CreateSimplePointMaterialInstance(color, this.options.pointSize,
+                                                              isInstanced)
         }
         this.materials.insert(entry)
         return entry.material
     }
 
-    _CreateSimplePointMaterial() {
+    _CreateSimplePointMaterial(isInstanced = false) {
+        const shaders = this._GenerateShaders(isInstanced, true)
         return new three.RawShaderMaterial({
             uniforms: {
                 color: {
                     value: new three.Color(0xff00ff)
                 },
-                size: {
+                pointSize: {
                     value: 2
                 }
             },
-            vertexShader: `
-            
-            precision highp float;
-            precision highp int;
-            attribute vec2 position;
-            uniform mat4 modelViewMatrix;
-            uniform mat4 projectionMatrix;
-            uniform float size;
-            
-            void main() {
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 0.0, 1.0);
-                gl_PointSize = size;
-            }
-            `,
-            fragmentShader: `
-            
-            precision highp float;
-            precision highp int;
-            uniform vec3 color;
-            
-            void main() {
-                gl_FragColor = vec4(color, 1.0);
-            }
-            `,
+            vertexShader: shaders.vertex,
+            fragmentShader: shaders.fragment,
             depthTest: false,
-            depthWrite: false
+            depthWrite: false,
+            glslVersion: three.GLSL3
         })
     }
 
     /** @param color {Number} Color RGB numeric value.
      * @param size {Number} Rasterized point size in pixels.
+     * @param isInstanced {Boolean} Create material for instanced drawing.
      */
-    _CreateSimplePointMaterialInstance(color, size = 2) {
+    _CreateSimplePointMaterialInstance(color, size = 2, isInstanced = false) {
+        const src = isInstanced ? this.simpleInstancedPointMaterial : this.simplePointMaterial
         /* Should reuse compiled shaders. */
-        const m = this.simplePointMaterial.clone()
+        const m = src.clone()
         m.uniforms.color = { value: new three.Color(color) }
         m.uniforms.size = { value: size }
         return m
+    }
+
+    _GenerateShaders(isInstanced, pointSize) {
+        const instanceAttr = isInstanced ?
+            `
+            /* First row. */
+            in vec3 instanceTransform0;
+            /* Second row. */
+            in vec3 instanceTransform1;
+            ` : ""
+        const instanceTransform = isInstanced ?
+            `  
+            pos.xy = mat2(instanceTransform0[0], instanceTransform1[0],
+                          instanceTransform0[1], instanceTransform1[1]) * pos.xy + 
+                     vec2(instanceTransform0[2], instanceTransform1[2]);
+            ` : ""
+        const pointSizeUniform = pointSize ? "uniform float pointSize;" : ""
+        const pointSizeAssigment = pointSize ? "gl_PointSize = pointSize;" : ""
+
+        return {
+            vertex: `
+           
+            precision highp float;
+            precision highp int;
+            in vec2 position;
+            ${instanceAttr}
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+            ${pointSizeUniform}
+            
+            void main() {
+                vec4 pos = vec4(position, 0.0, 1.0);
+                ${instanceTransform}
+                gl_Position = projectionMatrix * modelViewMatrix * pos;
+                ${pointSizeAssigment}
+            }
+            `,
+            fragment: `
+            
+            precision highp float;
+            precision highp int;
+            uniform vec3 color;
+            out vec4 fragColor;
+            
+            void main() {
+                fragColor = vec4(color, 1.0);
+            }
+            `
+        }
     }
 
     _CreatePointsBatch(scene, batch) {
@@ -446,7 +492,9 @@ DxfViewer.DefaultOptions = {
     /** Simpler version of colorCorrection - just invert pure white or black entities if they are
      * invisible on current background color.
      */
-    blackWhiteInversion: true
+    blackWhiteInversion: true,
+    /** Size in pixels for rasterized points. */
+    pointSize: 2,
 }
 
 DxfViewer.SetupWorker = function () {
