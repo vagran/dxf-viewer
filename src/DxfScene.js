@@ -34,6 +34,8 @@ export class DxfScene {
         this.angBase = dxf.header["$ANGBASE"] || 0
         /* Zero angle direction, 0 is +X */
         this.angDir = dxf.header["$ANGDIR"] || 0
+        this.pdMode = dxf.header["$PDMODE"] || 0
+        this.pdSize = dxf.header["$PDSIZE"] || 0
 
         //XXX blocks
 
@@ -47,8 +49,10 @@ export class DxfScene {
                 renderEntities = this._DecomposeArc(entity)
             } else if (entity.type === "CIRCLE") {
                 renderEntities = this._DecomposeCircle(entity)
+            } else if (entity.type === "POINT") {
+                renderEntities = this._DecomposePoint(entity)
             } else {
-                // console.log("Unhandled entity type: " + entity.type)
+                //XXX console.log("Unhandled entity type: " + entity.type)
                 continue
             }
             for (const renderEntity of renderEntities) {
@@ -67,6 +71,9 @@ export class DxfScene {
      */
     _ProcessEntity(entity, isBlock = false) {
         switch (entity.type) {
+        case Entity.Type.POINTS:
+            this._ProcessPoints(entity, isBlock)
+            break
         case Entity.Type.LINE_SEGMENTS:
             this._ProcessLineSegments(entity, isBlock)
             break
@@ -187,6 +194,64 @@ export class DxfScene {
         yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, true)
     }
 
+    *_DecomposePoint(entity) {
+        if (this.pdMode === PdMode.NONE) {
+            /* Points not displayed. */
+            return
+        }
+        if (this.pdSize <= 0) {
+            /* Currently not supported. */
+            return
+        }
+        const color = this._GetEntityColor(entity)
+        const layer = this._GetEntityLayer(entity)
+        const markType = this.pdMode & PdMode.MARK_MASK
+
+        if (markType === PdMode.DOT) {
+            yield new Entity(Entity.Type.POINTS, [entity.position], layer, color, null, false)
+        }
+
+        if ((this.pdMode & PdMode.SHAPE_MASK) !== 0) {
+            /* Shaped mark should be instanced. */
+            //XXX not implemented
+            return
+        }
+        if (markType === PdMode.DOT) {
+            return
+        }
+
+        const vertices = []
+
+        const _this = this
+        function PushVertex(offsetX, offsetY) {
+            vertices.push({
+                x: entity.position.x + offsetX * _this.pdSize * 0.5,
+                y: entity.position.y + offsetY * _this.pdSize * 0.5
+            })
+        }
+
+        if (markType === PdMode.PLUS) {
+            PushVertex(0, 1.5)
+            PushVertex(0, -1.5)
+            PushVertex(-1.5, 0)
+            PushVertex(1.5, 0)
+        } else if (markType === PdMode.CROSS) {
+            PushVertex(-1, 1)
+            PushVertex(1, -1)
+            PushVertex(1, 1)
+            PushVertex(-1, -1)
+        } else if (markType === PdMode.TICK) {
+            PushVertex(0, 1)
+            PushVertex(0, 0)
+        } else if (markType === PdMode.CIRCLE) {
+            this._GenerateArcVertices(vertices, entity.position, this.pdSize * 0.5)
+        } else {
+            console.warn("Unsupported point display type: " + markType)
+            return
+        }
+        yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
+    }
+
     /**
      * Generate entities for shaped polyline (e.g. line resulting in mesh). All segments are shaped
      * (have start/end width). Segments may be bulge.
@@ -290,6 +355,19 @@ export class DxfScene {
 
                 yield* CommitSegment(vIdx)
             }
+        }
+    }
+
+    /**
+     * @param entity {Entity}
+     * @param isBlock
+     */
+    _ProcessPoints(entity, isBlock = false) {
+        const key = new BatchingKey(entity.layer, isBlock,
+                                    BatchingKey.GeometryType.POINTS, entity.color, 0)
+        const batch = this._GetBatch(key)
+        for (const v of entity.vertices) {
+            batch.PushVertex(this._TransformVertex(v))
         }
     }
 
@@ -720,9 +798,10 @@ class Entity {
 }
 
 Entity.Type = Object.freeze({
+    POINTS: 0,
     /** Each vertices pair defines a segment. */
-    LINE_SEGMENTS: 0,
-    POLYLINE: 1
+    LINE_SEGMENTS: 1,
+    POLYLINE: 2
 })
 
 function* _IterateLineIndices(verticesCount, close) {
@@ -735,3 +814,18 @@ function* _IterateLineIndices(verticesCount, close) {
         yield 0
     }
 }
+
+/** Point display mode, $PDMODE system variable. */
+const PdMode = Object.freeze({
+    DOT: 0,
+    NONE: 1,
+    PLUS: 2,
+    CROSS: 3,
+    TICK: 4,
+    MARK_MASK: 0xf,
+
+    CIRCLE: 0x20,
+    SQUARE: 0x40,
+
+    SHAPE_MASK: 0xf0
+})

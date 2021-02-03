@@ -18,16 +18,22 @@ export class DxfViewer {
         }
         options = this.options
 
+        this.clearColor = this.options.clearColor.getHex()
+
         const scene = this.scene = new three.Scene()
         const renderer = this.renderer = new three.WebGLRenderer({
             alpha: options.canvasAlpha,
             premultipliedAlpha: options.canvasPremultipliedAlpha,
-            antialias: options.antialias
+            antialias: options.antialias,
+            depth: false
         })
         const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
         camera.position.z = 1
         camera.position.x = 0
         camera.position.y = 0
+
+        this.simpleColorMaterial = this._CreateSimpleColorMaterial()
+        this.simplePointMaterial = this._CreateSimplePointMaterial()
 
         //XXX auto resize not implemented
         this.canvasWidth = options.canvasWidth
@@ -59,8 +65,21 @@ export class DxfViewer {
         //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
         //     const geometry = new three.BufferGeometry()
         //     geometry.setAttribute("position", verticesBufferAttr)
-        //     const material = this._CreateSimpleColorMaterial(0xff0000)
+        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000)
         //     const obj = new three.LineSegments(geometry, material)
+        //     obj.frustumCulled = false
+        //     scene.add(obj)
+        // }
+
+        //XXX
+        // {
+        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
+        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
+        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        //     const geometry = new three.BufferGeometry()
+        //     geometry.setAttribute("position", verticesBufferAttr)
+        //     const material = this._CreateSimplePointMaterialInstance(0xff0000, 10)
+        //     const obj = new three.Points(geometry, material)
         //     obj.frustumCulled = false
         //     scene.add(obj)
         // }
@@ -76,7 +95,7 @@ export class DxfViewer {
         //     const geometry = new three.BufferGeometry()
         //     geometry.setAttribute("position", verticesBufferAttr)
         //     geometry.setIndex(indicesBufferAttr)
-        //     const material = this._CreateSimpleColorMaterial(0xff0000)
+        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000)
         //     const obj = new three.LineSegments(geometry, material)
         //     obj.frustumCulled = false
         //     scene.add(obj)
@@ -120,26 +139,7 @@ export class DxfViewer {
         console.log(`${scene.batches.length} batches, vertices ${scene.vertices.byteLength} B, indices ${scene.indices.byteLength} B`)
 
         for (const batch of scene.batches) {
-            let objs = []
-            if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
-                objs.push(this._CreateLinesBatch(scene, batch))
-            } else if (batch.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
-                for (const obj of this._CreateIndexedLinesBatches(scene, batch)) {
-                    objs.push(obj)
-                }
-            } else {
-                //XXX console.warn("Unhandled batch geometry type: " + batch.key.geometryType)
-                continue
-            }
-            let layerList = this.layers.get(batch.key.layerName)
-            if (!layerList) {
-                layerList = []
-                this.layers.set(batch.key.layerName, layerList)
-            }
-            for (const obj of objs) {
-                this.scene.add(obj)
-                layerList.push(obj)
-            }
+            this._LoadBatch(scene, batch)
         }
 
         this._SetView(
@@ -148,6 +148,7 @@ export class DxfViewer {
                 y: scene.bounds.minY + (scene.bounds.maxY - scene.bounds.minY) / 2 - scene.origin.y
             },
             (scene.bounds.maxX - scene.bounds.minX) * 1.2)
+
         this.Render()
     }
 
@@ -175,6 +176,37 @@ export class DxfViewer {
         //XXX
     }
 
+    _LoadBatch(scene, batch) {
+        const objs = []
+
+        if (batch.key.geometryType === BatchingKey.GeometryType.POINTS) {
+            objs.push(this._CreatePointsBatch(scene, batch))
+
+        } else if (batch.key.geometryType === BatchingKey.GeometryType.LINES) {
+            objs.push(this._CreateLinesBatch(scene, batch))
+
+        } else if (batch.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
+            for (const obj of this._CreateIndexedLinesBatches(scene, batch)) {
+                objs.push(obj)
+            }
+
+        } else {
+            console.warn("Unhandled batch geometry type: " + batch.key.geometryType)
+            return
+        }
+
+        let layerList = this.layers.get(batch.key.layerName)
+        if (!layerList) {
+            layerList = []
+            this.layers.set(batch.key.layerName, layerList)
+        }
+
+        for (const obj of objs) {
+            this.scene.add(obj)
+            layerList.push(obj)
+        }
+    }
+
     _SetView(center, width) {
         const aspect = this.canvasWidth / this.canvasHeight
         const height = width / aspect
@@ -195,18 +227,17 @@ export class DxfViewer {
         }
         entry = {
             key,
-            material: this._CreateSimpleColorMaterial(color)
+            material: this._CreateSimpleColorMaterialInstance(color)
         }
         this.materials.insert(entry)
         return entry.material
     }
 
-    /** @param color {Number} Color RGB numeric value. */
-    _CreateSimpleColorMaterial(color) {
+    _CreateSimpleColorMaterial() {
         return new three.RawShaderMaterial({
             uniforms: {
                 color: {
-                    value: new three.Color(color)
+                    value: new three.Color(0xff00ff)
                 }
             },
             vertexShader: `
@@ -230,8 +261,96 @@ export class DxfViewer {
             void main() {
                 gl_FragColor = vec4(color, 1.0);
             }
-            `
+            `,
+            depthTest: false,
+            depthWrite: false
         })
+    }
+
+    /** @param color {Number} Color RGB numeric value. */
+    _CreateSimpleColorMaterialInstance(color) {
+        /* Should reuse compiled shaders. */
+        const m = this.simpleColorMaterial.clone()
+        m.uniforms.color = { value: new three.Color(color) }
+        return m
+    }
+
+    _GetSimplePointMaterial(color) {
+        const key = new BatchingKey(null, null, BatchingKey.GeometryType.POINTS, color, 0)
+        let entry = this.materials.find({key})
+        if (entry !== null) {
+            return entry.material
+        }
+        entry = {
+            key,
+            material: this._CreateSimplePointMaterialInstance(color)
+        }
+        this.materials.insert(entry)
+        return entry.material
+    }
+
+    _CreateSimplePointMaterial() {
+        return new three.RawShaderMaterial({
+            uniforms: {
+                color: {
+                    value: new three.Color(0xff00ff)
+                },
+                size: {
+                    value: 2
+                }
+            },
+            vertexShader: `
+            
+            precision highp float;
+            precision highp int;
+            attribute vec2 position;
+            uniform mat4 modelViewMatrix;
+            uniform mat4 projectionMatrix;
+            uniform float size;
+            
+            void main() {
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 0.0, 1.0);
+                gl_PointSize = size;
+            }
+            `,
+            fragmentShader: `
+            
+            precision highp float;
+            precision highp int;
+            uniform vec3 color;
+            
+            void main() {
+                gl_FragColor = vec4(color, 1.0);
+            }
+            `,
+            depthTest: false,
+            depthWrite: false
+        })
+    }
+
+    /** @param color {Number} Color RGB numeric value.
+     * @param size {Number} Rasterized point size in pixels.
+     */
+    _CreateSimplePointMaterialInstance(color, size = 2) {
+        /* Should reuse compiled shaders. */
+        const m = this.simplePointMaterial.clone()
+        m.uniforms.color = { value: new three.Color(color) }
+        m.uniforms.size = { value: size }
+        return m
+    }
+
+    _CreatePointsBatch(scene, batch) {
+        const verticesArray =
+            new Float32Array(scene.vertices,
+                             batch.verticesOffset * Float32Array.BYTES_PER_ELEMENT,
+                             batch.verticesCount)
+        const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
+        const geometry = new three.BufferGeometry()
+        geometry.setAttribute("position", verticesBufferAttr)
+        const material = this._GetSimplePointMaterial(this._TransformColor(batch.key.color))
+        const obj = new three.Points(geometry, material)
+        obj.frustumCulled = false
+        return obj
     }
 
     _CreateLinesBatch(scene, batch) {
@@ -243,7 +362,7 @@ export class DxfViewer {
         const geometry = new three.BufferGeometry()
         geometry.setAttribute("position", verticesBufferAttr)
         //XXX line type
-        const material = this._GetSimpleColorMaterial(batch.key.color)
+        const material = this._GetSimpleColorMaterial(this._TransformColor(batch.key.color))
         const obj = new three.LineSegments(geometry, material)
         obj.frustumCulled = false
         return obj
@@ -252,7 +371,7 @@ export class DxfViewer {
     /** One rendering batch per each indexed chunk. */
     *_CreateIndexedLinesBatches(scene, batch) {
         //XXX line type
-        const material = this._GetSimpleColorMaterial(batch.key.color)
+        const material = this._GetSimpleColorMaterial(this._TransformColor(batch.key.color))
         for (const chunk of batch.chunks) {
             const verticesArray =
                 new Float32Array(scene.vertices,
@@ -271,6 +390,34 @@ export class DxfViewer {
             obj.frustumCulled = false
             yield obj
         }
+    }
+
+    /** Ensure the color is contrast enough with current background color.
+     * @param color {number} RGB value.
+     * @return {number} RGB value to use for rendering.
+     */
+    _TransformColor(color) {
+        if (!this.options.colorCorrection && !this.options.blackWhiteInversion) {
+            return color
+        }
+        if (!this.options.colorCorrection) {
+            /* Just black and white inversion. */
+            const bkgLum = Luminance(this.clearColor)
+            if (color === 0xffffff && bkgLum >= 0.8) {
+                return 0
+            }
+            if (color === 0 && bkgLum <= 0.2) {
+                return 0xffffff
+            }
+            return color
+        }
+        //XXX not implemented
+        // const MIN_TARGET_RATIO = 1.5
+        // const contrast = ContrastRatio(color, this.clearColor)
+        // const diff = contrast >= 1 ? contrast : 1 / contrast
+        // if (diff < MIN_TARGET_RATIO) {
+        // }
+        return color
     }
 }
 
@@ -291,9 +438,137 @@ DxfViewer.DefaultOptions = {
     /** Assume premultiplied alpha in a framebuffer. */
     canvasPremultipliedAlpha: true,
     /** Use antialiasing. May degrade performance on poor hardware. */
-    antialias: true
+    antialias: true,
+    /** Correct entities colors to ensure that they are always visible with the current background
+     * color.
+     */
+    colorCorrection: false,
+    /** Simpler version of colorCorrection - just invert pure white or black entities if they are
+     * invisible on current background color.
+     */
+    blackWhiteInversion: true
 }
 
 DxfViewer.SetupWorker = function () {
     new DxfWorker(self, true)
+}
+
+/** Transform sRGB color component to linear color space. */
+function LinearColor(c) {
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
+/** Transform linear color component to sRGB color space. */
+function SRgbColor(c) {
+    return c < 0.003 ? c * 12.92 : Math.pow(c, 1 / 2.4) * 1.055 - 0.055
+}
+
+/** Get relative luminance value for a color.
+ * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#relativeluminancedef
+ * @param color {number} RGB color value.
+ * @return {number} Luminance value in range [0; 1].
+ */
+function Luminance(color) {
+    const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
+    const g = LinearColor(((color & 0xff00) >>> 8) / 255)
+    const b = LinearColor((color & 0xff) / 255)
+
+    return r * 0.2126 + g * 0.7152 + b * 0.0722
+}
+
+/**
+ * Get contrast ratio for a color pair.
+ * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#contrast-ratiodef
+ * @param c1
+ * @param c2
+ * @return {number} Contrast ratio between the colors. Greater than one if the first color color is
+ *  brighter than the second one.
+ */
+function ContrastRatio(c1, c2) {
+    return (Luminance(c1) + 0.05) / (Luminance(c2) + 0.05)
+}
+
+function HlsToRgb({h, l, s}) {
+    let r, g, b
+    if (s === 0) {
+        /* Achromatic */
+        r = g = b = l
+    } else {
+        function hue2rgb(p, q, t) {
+            if (t < 0) {
+                t += 1
+            }
+            if (t > 1) {
+                t -= 1
+            }
+            if (t < 1/6) {
+                return p + (q - p) * 6 * t
+            }
+            if (t < 1/2) {
+                return q
+            }
+            if (t < 2/3) {
+                return p + (q - p) * (2/3 - t) * 6
+            }
+            return p
+        }
+
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+        const p = 2 * l - q
+        r = hue2rgb(p, q, h + 1/3)
+        g = hue2rgb(p, q, h)
+        b = hue2rgb(p, q, h - 1/3)
+    }
+
+    return (Math.min(Math.floor(SRgbColor(r) * 256), 255) << 16) |
+           (Math.min(Math.floor(SRgbColor(g) * 256), 255) << 8) |
+            Math.min(Math.floor(SRgbColor(b) * 256), 255)
+}
+
+function RgbToHls(color) {
+    const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
+    const g = LinearColor(((color & 0xff00) >>> 8) / 255)
+    const b = LinearColor((color & 0xff) / 255)
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    let h, s
+    const l = (max + min) / 2
+
+    if (max === min) {
+        /* Achromatic */
+        h = s = 0
+    } else {
+        const d = max - min
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+        switch (max) {
+        case r:
+            h = (g - b) / d + (g < b ? 6 : 0)
+            break;
+        case g:
+            h = (b - r) / d + 2
+            break
+        case b:
+            h = (r - g) / d + 4
+            break
+        }
+        h /= 6
+    }
+
+    return {h, l, s}
+}
+
+function Lighten(color, factor) {
+    const hls = RgbToHls(color)
+    hls.l *= factor
+    if (hls.l > 1) {
+        hls.l = 1
+    }
+    return HlsToRgb(hls)
+}
+
+function Darken(color, factor) {
+    const hls = RgbToHls(color)
+    hls.l /= factor
+    return HlsToRgb(hls)
 }
