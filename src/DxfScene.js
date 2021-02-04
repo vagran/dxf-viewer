@@ -313,28 +313,6 @@ export class DxfScene {
         batch.PushInstanceTransform(transform)
     }
 
-    /** XXX not needed here, needed in renderer
-     * Iterate block definition batches.
-     * @param blockName {string}
-     * @return {Generator<RenderBatch>}
-     */
-    *_GetBlockDefinition(blockName) {
-        const it = this.batches.lowerBound({
-             key: new BatchingKey(null, blockName, null, null, null)
-        })
-        let batch = it.data()
-        while(batch !== null) {
-            if (batch.key.layer !== null ||
-                batch.key.blockName !== blockName ||
-                batch.key.isInstanced) {
-
-                break
-            }
-            yield batch
-            batch = it.next()
-        }
-    }
-
     /**
      * Generate entities for shaped polyline (e.g. line resulting in mesh). All segments are shaped
      * (have start/end width). Segments may be bulge.

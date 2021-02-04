@@ -144,7 +144,7 @@ export class DxfViewer {
 
         /* Indexed by MaterialKey. */
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
-        /* Indexed by layer name, value is list of layer scene objects. */
+        /* Indexed by layer name, value is Layer instance. */
         this.layers = new Map()
         /* Indexed by block name, value is Block instance. */
         this.blocks = new Map()
@@ -174,6 +174,10 @@ export class DxfViewer {
                      vertices ${scene.vertices.byteLength} B,
                      indices ${scene.indices.byteLength} B
                      transforms ${scene.transforms.byteLength} B`)
+
+        for (const layer of scene.layers) {
+            this.layers.set(layer.name, new Layer(layer.name, layer.color))
+        }
 
         /* Load all blocks on the first pass. */
         for (const batch of scene.batches) {
@@ -214,11 +218,11 @@ export class DxfViewer {
     }
 
     ShowLayer(name, show) {
-        const layerList = this.layers.get(name)
-        if (!layerList) {
+        const layer = this.layers.get(name)
+        if (!layer) {
             return
         }
-        for (const obj of layerList) {
+        for (const obj of layer.objects) {
             obj.visible = show
         }
         this.Render()
@@ -236,15 +240,13 @@ export class DxfViewer {
         }
         const objects = new Batch(this, scene, batch).CreateObjects()
 
-        let layerList = this.layers.get(batch.key.layerName)
-        if (!layerList) {
-            layerList = []
-            this.layers.set(batch.key.layerName, layerList)
-        }
+        const layer = this.layers.get(batch.key.layerName)
 
         for (const obj of objects) {
             this.scene.add(obj)
-            layerList.push(obj)
+            if (layer) {
+                layer.PushObject(obj)
+            }
         }
     }
 
@@ -626,6 +628,18 @@ class Batch {
         } else {
             return defColor
         }
+    }
+}
+
+class Layer {
+    constructor(name, color) {
+        this.name = name
+        this.color = color
+        this.objects = []
+    }
+
+    PushObject(obj) {
+        this.objects.push(obj)
     }
 }
 
