@@ -1,6 +1,7 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer"
 import "./RBTree"
 import {BatchingKey} from "./BatchingKey"
+import {Matrix3} from "three"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
@@ -80,6 +81,15 @@ export class DxfScene {
             renderEntities = this._DecomposeCircle(entity, isBlock)
         } else if (entity.type === "POINT") {
             renderEntities = this._DecomposePoint(entity, isBlock)
+        } else if (entity.type === "INSERT") {
+            if (isBlock) {
+                console.warn(
+                    `Nested blocks are currently not supported, ${blockName} includes ${entity.name}`)
+                return
+            }
+            /* Works with rendering batches without intermediate entities. */
+            this._ProcessInsert(entity)
+            return
         } else {
             //XXX console.log("Unhandled entity type: " + entity.type)
             return
@@ -276,6 +286,55 @@ export class DxfScene {
         yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
     }
 
+    /** Updates batches directly. */
+    _ProcessInsert(entity) {
+        const block = this.blocks.get(entity.name)
+        if (block === null) {
+            console.warn("INSERT encountered with unknown block name: " + entity.name)
+            return
+        }
+        const origin = block.position
+        const layer = this._GetEntityLayer(entity, false)
+        const color = this._GetEntityColor(entity, false)
+        const lineType = this._GetLineType(entity, null, false)
+        const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
+                                    color, lineType)
+        const batch = this._GetBatch(key)
+        const position = this._TransformVertex(entity.position)
+        let transform = new Matrix3().setUvTransform(
+            position.x - origin.x,
+            position.y - origin.y,
+            entity.xScale || 1,
+            entity.yScale || 1,
+            entity.rotation || 0,
+            origin.x,
+            origin.y)
+        //XXX grid instancing not supported yet
+        batch.PushInstanceTransform(transform)
+    }
+
+    /** XXX not needed here, needed in renderer
+     * Iterate block definition batches.
+     * @param blockName {string}
+     * @return {Generator<RenderBatch>}
+     */
+    *_GetBlockDefinition(blockName) {
+        const it = this.batches.lowerBound({
+             key: new BatchingKey(null, blockName, null, null, null)
+        })
+        let batch = it.data()
+        while(batch !== null) {
+            if (batch.key.layer !== null ||
+                batch.key.blockName !== blockName ||
+                batch.key.isInstanced) {
+
+                break
+            }
+            yield batch
+            batch = it.next()
+        }
+    }
+
     /**
      * Generate entities for shaped polyline (e.g. line resulting in mesh). All segments are shaped
      * (have start/end width). Segments may be bulge.
@@ -427,8 +486,9 @@ export class DxfScene {
          */
         const verticesCount = entity.vertices.length
         if (verticesCount <= 3) {
-            const key = new BatchingKey(entity.layer, blockName, BatchingKey.GeometryType.LINES,
-                                        entity.color, entity.lineType)
+            const key = new BatchingKey(entity.layer, blockName,
+                                        BatchingKey.GeometryType.LINES, entity.color,
+                                        entity.lineType)
             const batch = this._GetBatch(key)
             let prev = null
             for (const v of entity.vertices) {
@@ -445,7 +505,8 @@ export class DxfScene {
             return
         }
 
-        const key = new BatchingKey(entity.layer, blockName, BatchingKey.GeometryType.INDEXED_LINES,
+        const key = new BatchingKey(entity.layer, blockName,
+                                    BatchingKey.GeometryType.INDEXED_LINES,
                                     entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         /* Line may be split if exceeds chunk limit. */
@@ -469,26 +530,30 @@ export class DxfScene {
      *  which are resolved on block instantiation.
      */
     _GetEntityColor(entity, isBlock = false) {
-        if (entity.hasOwnProperty("color")) {
-            if (isBlock && entity.hasOwnProperty("colorIndex")) {
-                if (entity.colorIndex === 0) {
-                    return ColorCode.BY_BLOCK
-                }
-                if (entity.colorIndex === 256) {
-                    return ColorCode.BY_LAYER
-                }
-            }
-            return entity.color
+        let color = ColorCode.BY_LAYER
+        if (entity.colorIndex === 0) {
+            color = ColorCode.BY_BLOCK
+        } else if (entity.colorIndex === 256) {
+            color = ColorCode.BY_LAYER
+        } else if (entity.hasOwnProperty("color")) {
+            color = entity.color
         }
+
         if (isBlock) {
-            return ColorCode.BY_LAYER
+            return color
         }
-        if (entity.hasOwnProperty("layer")) {
-            const layer = this.layers.get(entity.layer)
-            if (layer) {
-                return layer.color
+        if (color === ColorCode.BY_LAYER || color === ColorCode.BY_BLOCK) {
+            /* BY_BLOCK is not useful when not in block so replace it by layer as well. */
+            if (entity.hasOwnProperty("layer")) {
+                const layer = this.layers.get(entity.layer)
+                if (layer) {
+                    return layer.color
+                }
             }
+        } else {
+            return color
         }
+        /* Fallback to black. */
         return 0
     }
 
@@ -540,14 +605,17 @@ export class DxfScene {
     _BuildScene() {
         let verticesSize = 0
         let indicesSize = 0
+        let transformsSize = 0
         this.batches.each(b => {
             verticesSize += b.GetVerticesBufferSize()
             indicesSize += b.GetIndicesBufferSize()
+            transformsSize += b.GetTransformsSize()
         })
 
         const scene = {
             vertices: new ArrayBuffer(verticesSize),
             indices: new ArrayBuffer(indicesSize),
+            transforms: new ArrayBuffer(transformsSize),
             batches: [],
             layers: [],
             origin: this.origin,
@@ -558,7 +626,9 @@ export class DxfScene {
             vertices: new Float32Array(scene.vertices),
             verticesOffset: 0,
             indices: new Uint16Array(scene.indices),
-            indicesOffset: 0
+            indicesOffset: 0,
+            transforms: new Float32Array(scene.transforms),
+            transformsOffset: 0
         }
 
         this.batches.each(b => {
@@ -580,6 +650,8 @@ class RenderBatch {
         this.key = key
         if (key.IsIndexed()) {
             this.chunks = []
+        } else if (key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            this.transforms = new DynamicBuffer(NativeType.FLOAT32)
         } else {
             this.vertices = new DynamicBuffer(NativeType.FLOAT32)
         }
@@ -589,6 +661,19 @@ class RenderBatch {
         const idx = this.vertices.Push(v.x)
         this.vertices.Push(v.y)
         return idx
+    }
+
+    /**
+     * @param matrix {Matrix3} 3x3 Transform matrix. Assuming 2D affine transform so only top 3x2
+     *  sub-matrix is taken.
+     */
+    PushInstanceTransform(matrix) {
+        /* Storing in row-major order as expected by renderer. */
+        for (let row = 0; row < 2; row++) {
+            for (let col = 0; col < 3; col++) {
+                this.transforms.Push(matrix.elements[col * 3 + row])
+            }
+        }
     }
 
     /** This method actually reserves space for the specified number of indexed vertices in some
@@ -628,6 +713,8 @@ class RenderBatch {
                 size += chunk.vertices.GetSize()
             }
             return size * Float32Array.BYTES_PER_ELEMENT
+        } else if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            return 0
         } else {
             return this.vertices.GetSize() * Float32Array.BYTES_PER_ELEMENT
         }
@@ -646,6 +733,15 @@ class RenderBatch {
         }
     }
 
+    /** @return Instances transforms buffer required size in bytes. */
+    GetTransformsSize() {
+        if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            return this.transforms.GetSize() * Float32Array.BYTES_PER_ELEMENT
+        } else {
+            return 0
+        }
+    }
+
     Serialize(buffers) {
         if (this.key.IsIndexed()) {
             const batch = {
@@ -657,20 +753,28 @@ class RenderBatch {
             }
             return batch
 
+        } else if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            const size = this.transforms.GetSize()
+            const batch = {
+                key: this.key,
+                transformsOffset: buffers.transformsOffset,
+                transformsSize: size
+            }
+            this.transforms.CopyTo(buffers.transforms, buffers.transformsOffset)
+            buffers.transformsOffset += size
+            return batch
+
         } else {
             const size = this.vertices.GetSize()
             const batch = {
                 key: this.key,
                 verticesOffset: buffers.verticesOffset,
-                verticesCount: size
+                verticesSize: size
             }
-            const src = new Float32Array(this.vertices.buffer.buffer, 0, size)
-            buffers.vertices.set(src, buffers.verticesOffset)
+            this.vertices.CopyTo(buffers.vertices, buffers.verticesOffset)
             buffers.verticesOffset += size
             return batch
         }
-
-        //XXX instances
     }
 
     _NewChunk(initialCapacity) {
@@ -696,17 +800,15 @@ class IndexedChunk {
         {
             const size = this.vertices.GetSize()
             chunk.verticesOffset = buffers.verticesOffset
-            chunk.verticesCount = size
-            const src = new Float32Array(this.vertices.buffer.buffer, 0, size)
-            buffers.vertices.set(src, buffers.verticesOffset)
+            chunk.verticesSize = size
+            this.vertices.CopyTo(buffers.vertices, buffers.verticesOffset)
             buffers.verticesOffset += size
         }
         {
             const size = this.indices.GetSize()
             chunk.indicesOffset = buffers.indicesOffset
-            chunk.indicesCount = size
-            const src = new Uint16Array(this.indices.buffer.buffer, 0, size)
-            buffers.indices.set(src, buffers.indicesOffset)
+            chunk.indicesSize = size
+            this.indices.CopyTo(buffers.indices, buffers.indicesOffset)
             buffers.indicesOffset += size
         }
         return chunk
@@ -885,7 +987,7 @@ const PdMode = Object.freeze({
 })
 
 /** Special color values, used for block entities. Regular entities color is resolved instantly. */
-const ColorCode = Object.freeze({
+export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2
 })

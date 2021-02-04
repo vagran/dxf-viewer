@@ -1,11 +1,13 @@
 /** Key for render batches. */
 export class BatchingKey {
     /**
-     * @param layerName {String?} Layer name, null if not bound to a layer.
-     * @param blockName {String?} Block name if applicable.
-     * @param geometryType {number?} One of BatchingKey.GeometryType.
+     * Components order matters for lookup by prefix.
+     * @param layerName {?String} Layer name, null if not bound to a layer (e.g. block definition).
+     * @param blockName {?String} Block name if applicable. If specified and geometryType is not
+     *  BLOCK_INSTANCE, the batch is part of block definition. Otherwise it is block instance.
+     * @param geometryType {?number} One of BatchingKey.GeometryType.
      * @param color {number} Color ARGB value.
-     * @param lineType {number?} Line type ID, null for non-lines. Zero is default type (solid
+     * @param lineType {?number} Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */
     constructor(layerName, blockName, geometryType, color, lineType) {
@@ -50,7 +52,8 @@ BatchingKey.GeometryType = Object.freeze({
     LINES: 1,
     INDEXED_LINES: 2,
     TRIANGLES: 3,
-    INDEXED_TRIANGLES: 4
+    INDEXED_TRIANGLES: 4,
+    BLOCK_INSTANCE: 5
 })
 
 /** Comparator function for arbitrary types. Null is always first. This is used just to make some

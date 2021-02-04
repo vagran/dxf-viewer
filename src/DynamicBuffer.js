@@ -27,6 +27,20 @@ export class DynamicBuffer {
         return pos
     }
 
+    /** Copy content to the specified buffer.
+     * @param dstBuffer Destination buffer, should be typed array of the same type.
+     * @param dstOffset {number} Offset in elements in the destination buffer.
+     * @param srcOffset {number} Offset in elements in this buffer.
+     * @param size {number} Number of elements to copy, -1 (default) to copy till this buffer end.
+     */
+    CopyTo(dstBuffer, dstOffset, srcOffset = 0, size = -1) {
+        if (size === -1) {
+            size = this.size - srcOffset
+        }
+        const src = new (NativeArray(this.type))(this.buffer.buffer, srcOffset, size)
+        dstBuffer.set(src, dstOffset)
+    }
+
     _CheckGrow() {
         if (this.size < this.capacity) {
             return

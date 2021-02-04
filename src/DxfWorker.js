@@ -69,6 +69,7 @@ export class DxfWorker {
             //XXX handle all buffers
             transfers.push(scene.vertices)
             transfers.push(scene.indices)
+            transfers.push(scene.transforms)
             return scene
         }
         case DxfWorker.WorkerMsg.DESTROY:

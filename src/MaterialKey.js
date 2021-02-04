@@ -1,5 +1,5 @@
 /** Key for materials. */
-import {CompareValues} from "./BatchingKey";
+import {BatchingKey, CompareValues} from "./BatchingKey";
 
 export class MaterialKey {
     /**
@@ -37,6 +37,6 @@ export class MaterialKey {
 
     IsIndexed() {
         return this.geometryType === BatchingKey.GeometryType.INDEXED_LINES ||
-            this.geometryType === BatchingKey.GeometryType.INDEXED_TRIANGLES
+               this.geometryType === BatchingKey.GeometryType.INDEXED_TRIANGLES
     }
 }
