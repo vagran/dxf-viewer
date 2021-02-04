@@ -18,8 +18,12 @@ export class DxfScene {
         * loss.
         */
         this.origin = null
+        /* RBTree<BatchingKey, RenderBatch> */
         this.batches = new RBTree((b1, b2) => b1.key.Compare(b2.key))
+        /* Indexed by layer name, value is layer object from parsed DXF. */
         this.layers = new Map()
+        /* Indexed by block name, value is block object from parsed DXF. */
+        this.blocks = new Map()
         this.bounds = null
     }
 
@@ -30,6 +34,13 @@ export class DxfScene {
                 this.layers.set(layer.name, layer)
             }
         }
+
+        if (dxf.blocks) {
+            for (const [, block] of Object.entries(dxf.blocks)) {
+                this.blocks.set(block.name, block)
+            }
+        }
+
         /* 0 - CCW, 1 - CW */
         this.angBase = dxf.header["$ANGBASE"] || 0
         /* Zero angle direction, 0 is +X */
@@ -37,55 +48,68 @@ export class DxfScene {
         this.pdMode = dxf.header["$PDMODE"] || 0
         this.pdSize = dxf.header["$PDSIZE"] || 0
 
-        //XXX blocks
-
-        for (let entity of dxf.entities) {
-            let renderEntities
-            if (entity.type === "LINE") {
-                renderEntities = this._DecomposeLine(entity)
-            } if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
-                renderEntities = this._DecomposePolyline(entity)
-            } else if (entity.type === "ARC") {
-                renderEntities = this._DecomposeArc(entity)
-            } else if (entity.type === "CIRCLE") {
-                renderEntities = this._DecomposeCircle(entity)
-            } else if (entity.type === "POINT") {
-                renderEntities = this._DecomposePoint(entity)
-            } else {
-                //XXX console.log("Unhandled entity type: " + entity.type)
-                continue
-            }
-            for (const renderEntity of renderEntities) {
-                this._ProcessEntity(renderEntity)
+        for (const block of this.blocks.values()) {
+            if (block.hasOwnProperty("entities")) {
+                for (const entity of block.entities) {
+                    this._ProcessDxfEntity(entity, block.name)
+                }
             }
         }
 
+        for (const entity of dxf.entities) {
+            this._ProcessDxfEntity(entity)
+        }
+
         this.scene = this._BuildScene()
+
         delete this.batches
         delete this.layers
+        delete this.blocks
+    }
+
+    _ProcessDxfEntity(entity, blockName = null) {
+        let renderEntities
+        const isBlock = blockName !== null
+        if (entity.type === "LINE") {
+            renderEntities = this._DecomposeLine(entity, isBlock)
+        } if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
+            renderEntities = this._DecomposePolyline(entity, isBlock)
+        } else if (entity.type === "ARC") {
+            renderEntities = this._DecomposeArc(entity, isBlock)
+        } else if (entity.type === "CIRCLE") {
+            renderEntities = this._DecomposeCircle(entity, isBlock)
+        } else if (entity.type === "POINT") {
+            renderEntities = this._DecomposePoint(entity, isBlock)
+        } else {
+            //XXX console.log("Unhandled entity type: " + entity.type)
+            return
+        }
+        for (const renderEntity of renderEntities) {
+            this._ProcessEntity(renderEntity, blockName)
+        }
     }
 
     /**
      * @param entity {Entity}
-     * @param isBlock
+     * @param blockName {?string}
      */
-    _ProcessEntity(entity, isBlock = false) {
+    _ProcessEntity(entity, blockName = null) {
         switch (entity.type) {
         case Entity.Type.POINTS:
-            this._ProcessPoints(entity, isBlock)
+            this._ProcessPoints(entity, blockName)
             break
         case Entity.Type.LINE_SEGMENTS:
-            this._ProcessLineSegments(entity, isBlock)
+            this._ProcessLineSegments(entity, blockName)
             break
         case Entity.Type.POLYLINE:
-            this._ProcessPolyline(entity, isBlock)
+            this._ProcessPolyline(entity, blockName)
             break
         default:
             throw new Error("Unhandled entity type: " + entity.type)
         }
     }
 
-    _GetLineType(entity, vertex = null) {
+    _GetLineType(entity, vertex = null, isBlock = false) {
         //XXX lookup
         return 0
     }
@@ -95,13 +119,13 @@ export class DxfScene {
         return !Boolean(entity.startWidth || entity.endWidth)
     }
 
-    *_DecomposeLine(entity) {
+    *_DecomposeLine(entity, isBlock) {
         /* start/end width, bulge - seems cannot be present, at least with current parser */
         if (entity.vertices.length !== 2) {
             return
         }
-        const layer = this._GetEntityLayer(entity)
-        const color = this._GetEntityColor(entity)
+        const layer = this._GetEntityLayer(entity, isBlock)
+        const color = this._GetEntityColor(entity, isBlock)
         yield new Entity(Entity.Type.LINE_SEGMENTS, entity.vertices, layer, color,
                          this._GetLineType(entity, entity.vertices[0]))
     }
@@ -174,10 +198,10 @@ export class DxfScene {
         }
     }
 
-    *_DecomposeArc(entity) {
-        const color = this._GetEntityColor(entity)
-        const layer = this._GetEntityLayer(entity)
-        const lineType = this._GetLineType(entity)
+    *_DecomposeArc(entity, isBlock) {
+        const color = this._GetEntityColor(entity, isBlock)
+        const layer = this._GetEntityLayer(entity, isBlock)
+        const lineType = this._GetLineType(entity, null, isBlock)
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius, entity.startAngle,
                                   entity.endAngle)
@@ -185,16 +209,16 @@ export class DxfScene {
                          entity.endAngle === undefined)
     }
 
-    *_DecomposeCircle(entity) {
-        const color = this._GetEntityColor(entity)
-        const layer = this._GetEntityLayer(entity)
-        const lineType = this._GetLineType(entity)
+    *_DecomposeCircle(entity, isBlock) {
+        const color = this._GetEntityColor(entity, isBlock)
+        const layer = this._GetEntityLayer(entity, isBlock)
+        const lineType = this._GetLineType(entity, null, isBlock)
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius)
         yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, true)
     }
 
-    *_DecomposePoint(entity) {
+    *_DecomposePoint(entity, isBlock) {
         if (this.pdMode === PdMode.NONE) {
             /* Points not displayed. */
             return
@@ -203,8 +227,8 @@ export class DxfScene {
             /* Currently not supported. */
             return
         }
-        const color = this._GetEntityColor(entity)
-        const layer = this._GetEntityLayer(entity)
+        const color = this._GetEntityColor(entity, isBlock)
+        const layer = this._GetEntityLayer(entity, isBlock)
         const markType = this.pdMode & PdMode.MARK_MASK
 
         if (markType === PdMode.DOT) {
@@ -267,17 +291,17 @@ export class DxfScene {
         yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, shape)
     }
 
-    *_DecomposePolyline(entity) {
+    *_DecomposePolyline(entity, isBlock = false) {
         const verticesCount = entity.vertices.length
         if (verticesCount < 2) {
             return
         }
-        const color = this._GetEntityColor(entity)
-        const layer = this._GetEntityLayer(entity)
+        const color = this._GetEntityColor(entity, isBlock)
+        const layer = this._GetEntityLayer(entity, isBlock)
         const _this = this
         let startIdx = 0
         let curPlainLine = this._IsPlainLine(entity.vertices[0])
-        let curLineType = this._GetLineType(entity, entity.vertices[0])
+        let curLineType = this._GetLineType(entity, entity.vertices[0], isBlock)
         let curVertices = null
 
         function *CommitSegment(endIdx) {
@@ -360,72 +384,75 @@ export class DxfScene {
 
     /**
      * @param entity {Entity}
-     * @param isBlock
+     * @param blockName {String?}
      */
-    _ProcessPoints(entity, isBlock = false) {
-        const key = new BatchingKey(entity.layer, isBlock,
+    _ProcessPoints(entity, blockName = null) {
+        const isBlock = blockName !== null
+        const key = new BatchingKey(entity.layer, blockName,
                                     BatchingKey.GeometryType.POINTS, entity.color, 0)
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v))
+            batch.PushVertex(this._TransformVertex(v, isBlock))
         }
     }
 
     /**
      * @param entity {Entity}
-     * @param isBlock
+     * @param blockName {String?}
      */
-    _ProcessLineSegments(entity, isBlock = false) {
+    _ProcessLineSegments(entity, blockName = null) {
         if (entity.vertices.length % 2 !== 0) {
             throw Error("Even number of vertices expected")
         }
-        const key = new BatchingKey(entity.layer, isBlock,
+        const isBlock = blockName !== null
+        const key = new BatchingKey(entity.layer, blockName,
                                     BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v))
+            batch.PushVertex(this._TransformVertex(v, isBlock))
         }
     }
 
     /**
      * @param entity {Entity}
-     * @param isBlock
+     * @param blockName {String?}
      */
-    _ProcessPolyline(entity, isBlock = false) {
+    _ProcessPolyline(entity, blockName = null) {
         if (entity.vertices.length < 2) {
             return
         }
+        const isBlock = blockName !== null
         /* It is more optimal to render short polylines un-indexed. Also DXF often contains
          * polylines with just two points.
          */
         const verticesCount = entity.vertices.length
         if (verticesCount <= 3) {
-            const key = new BatchingKey(entity.layer, isBlock, BatchingKey.GeometryType.LINES,
+            const key = new BatchingKey(entity.layer, blockName, BatchingKey.GeometryType.LINES,
                                         entity.color, entity.lineType)
             const batch = this._GetBatch(key)
             let prev = null
             for (const v of entity.vertices) {
                 if (prev !== null) {
-                    batch.PushVertex(this._TransformVertex(prev))
-                    batch.PushVertex(this._TransformVertex(v))
+                    batch.PushVertex(this._TransformVertex(prev, isBlock))
+                    batch.PushVertex(this._TransformVertex(v, isBlock))
                 }
                 prev = v
             }
             if (entity.shape && verticesCount > 2) {
-                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1]))
-                batch.PushVertex(this._TransformVertex(entity.vertices[0]))
+                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1], isBlock))
+                batch.PushVertex(this._TransformVertex(entity.vertices[0], isBlock))
             }
             return
         }
 
-        const key = new BatchingKey(entity.layer, isBlock, BatchingKey.GeometryType.INDEXED_LINES,
+        const key = new BatchingKey(entity.layer, blockName, BatchingKey.GeometryType.INDEXED_LINES,
                                     entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         /* Line may be split if exceeds chunk limit. */
         for (const lineChunk of entity._IterateLineChunks()) {
             const chunk = batch.PushChunk(lineChunk.verticesCount)
             for (const v of lineChunk.vertices) {
-                chunk.PushVertex(this._TransformVertex(v))
+                chunk.PushVertex(this._TransformVertex(v, isBlock))
             }
             for (const idx of lineChunk.indices) {
                 chunk.PushIndex(idx)
@@ -434,11 +461,27 @@ export class DxfScene {
         }
     }
 
-    _GetEntityColor(entity) {
-        //XXX check block
+    /** Resolve entity color.
+     *
+     * @param entity
+     * @param isBlock {Boolean}
+     * @return {number} RGB color value. For block entity it also may be one of ColorCode values
+     *  which are resolved on block instantiation.
+     */
+    _GetEntityColor(entity, isBlock = false) {
         if (entity.hasOwnProperty("color")) {
-            //XXX colorIndex 256 - by block
+            if (isBlock && entity.hasOwnProperty("colorIndex")) {
+                if (entity.colorIndex === 0) {
+                    return ColorCode.BY_BLOCK
+                }
+                if (entity.colorIndex === 256) {
+                    return ColorCode.BY_LAYER
+                }
+            }
             return entity.color
+        }
+        if (isBlock) {
+            return ColorCode.BY_LAYER
         }
         if (entity.hasOwnProperty("layer")) {
             const layer = this.layers.get(entity.layer)
@@ -449,7 +492,11 @@ export class DxfScene {
         return 0
     }
 
-    _GetEntityLayer(entity) {
+    /** @return {?string} Layer name, null for block entity. */
+    _GetEntityLayer(entity, isBlock = false) {
+        if (isBlock) {
+            return null
+        }
         if (entity.hasOwnProperty("layer")) {
             return entity.layer
         }
@@ -466,7 +513,10 @@ export class DxfScene {
         return batch
     }
 
-    _TransformVertex(v) {
+    _TransformVertex(v, isBlock = false) {
+        if (isBlock) {
+            return v
+        }
         if (this.bounds === null) {
             this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
         } else {
@@ -699,6 +749,10 @@ class IndexedChunkWriter {
  */
 class Entity {
     /** @param type {Entity.Type}
+     * @param vertices {{x, y}[]}
+     * @param layer {?string}
+     * @param color {number}
+     * @param lineType {number}
      * @param shape {Boolean} true if closed shape.
      */
     constructor(type, vertices, layer, color, lineType, shape = false) {
@@ -828,4 +882,10 @@ const PdMode = Object.freeze({
     SQUARE: 0x40,
 
     SHAPE_MASK: 0xf0
+})
+
+/** Special color values, used for block entities. Regular entities color is resolved instantly. */
+const ColorCode = Object.freeze({
+    BY_LAYER: -1,
+    BY_BLOCK: -2
 })

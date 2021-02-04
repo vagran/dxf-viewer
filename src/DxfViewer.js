@@ -2,6 +2,7 @@ import * as three from "three"
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {BatchingKey} from "./BatchingKey"
 import {DxfWorker} from "./DxfWorker"
+import {MaterialKey} from "./MaterialKey";
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -140,6 +141,7 @@ export class DxfViewer {
 
         this.Render()
 
+        /* Indexed by MaterialKey. */
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
         /* Indexed by layer name, value is list of layer scene objects. */
         this.layers = new Map()
@@ -166,6 +168,9 @@ export class DxfViewer {
 
         //XXX
         console.log(`${scene.batches.length} batches, vertices ${scene.vertices.byteLength} B, indices ${scene.indices.byteLength} B`)
+
+        //XXX load blocks
+        //XXX create vertices buffer attributes
 
         for (const batch of scene.batches) {
             this._LoadBatch(scene, batch)
@@ -206,6 +211,10 @@ export class DxfViewer {
     }
 
     _LoadBatch(scene, batch) {
+        if (batch.key.blockName !== null) {
+            return
+        }
+
         const objs = []
 
         if (batch.key.geometryType === BatchingKey.GeometryType.POINTS) {
@@ -249,7 +258,7 @@ export class DxfViewer {
     }
 
     _GetSimpleColorMaterial(color, isInstanced = false) {
-        const key = new BatchingKey(null, isInstanced, null, color, 0)
+        const key = new MaterialKey(isInstanced, null, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
@@ -290,7 +299,7 @@ export class DxfViewer {
     }
 
     _GetSimplePointMaterial(color, isInstanced = false) {
-        const key = new BatchingKey(null, isInstanced, BatchingKey.GeometryType.POINTS, color, 0)
+        const key = new MaterialKey(isInstanced, BatchingKey.GeometryType.POINTS, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material

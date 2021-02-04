@@ -2,15 +2,15 @@
 export class BatchingKey {
     /**
      * @param layerName {String?} Layer name, null if not bound to a layer.
-     * @param isInstanced {Boolean}
+     * @param blockName {String?} Block name if applicable.
      * @param geometryType {number?} One of BatchingKey.GeometryType.
      * @param color {number} Color ARGB value.
      * @param lineType {number?} Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */
-    constructor(layerName, isInstanced, geometryType, color, lineType) {
+    constructor(layerName, blockName, geometryType, color, lineType) {
         this.layerName = layerName
-        this.isInstanced = isInstanced
+        this.blockName = blockName
         this.geometryType = geometryType
         this.color = color
         this.lineType = lineType
@@ -24,7 +24,7 @@ export class BatchingKey {
         if (c !== 0) {
             return c
         }
-        c = CompareValues(this.isInstanced, other.isInstanced)
+        c = CompareValues(this.blockName, other.blockName)
         if (c !== 0) {
             return c
         }
@@ -56,7 +56,7 @@ BatchingKey.GeometryType = Object.freeze({
 /** Comparator function for arbitrary types. Null is always first. This is used just to make some
  * ordering for keys in tree structures, so no locale-aware string comparison.
  */
-function CompareValues(v1, v2) {
+export function CompareValues(v1, v2) {
     if (v1 === null) {
         if (v2 === null) {
             return 0
