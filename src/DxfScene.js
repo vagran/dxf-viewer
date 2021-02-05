@@ -306,7 +306,7 @@ export class DxfScene {
             position.y - origin.y,
             entity.xScale || 1,
             entity.yScale || 1,
-            entity.rotation || 0,
+            -(entity.rotation || 0) * Math.PI / 180,
             origin.x,
             origin.y)
         //XXX grid instancing not supported yet
