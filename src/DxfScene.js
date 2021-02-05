@@ -102,7 +102,7 @@ export class DxfScene {
 
     /**
      * @param entity {Entity}
-     * @param blockName {?BlockContext}
+     * @param blockCtx {?BlockContext}
      */
     _ProcessEntity(entity, blockCtx = null) {
         switch (entity.type) {
@@ -123,7 +123,7 @@ export class DxfScene {
     /**
      * @param entity
      * @param vertex
-     * @param blockCtx {BlockContext}
+     * @param blockCtx {?BlockContext}
      * @return {number}
      */
     _GetLineType(entity, vertex = null, blockCtx = null) {
@@ -795,8 +795,13 @@ class RenderBatch {
 class BlockContext {
     constructor(block) {
         this.block = block
-        /* Transform to apply for nested blocks definition. */
-        this.transform = null
+        const origin = this.block.position
+        /* Transform to apply for block definition entities. Initially origin is moved to zero
+         * which is required because often blocks are defined in-place in global coordinate
+         * system so having origin with huge coordinates. This may lead to precision loss during
+         * coordinates conversions.
+         */
+        this.transform = new Matrix3().translate(-origin.x, -origin.y)
     }
 
     get name() {
@@ -809,15 +814,14 @@ class BlockContext {
      * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
      */
     GetInsertionTransform(entity) {
-        const origin = this.block.position
         return new Matrix3().setUvTransform(
-            entity.position.x - origin.x,
-            entity.position.y - origin.y,
+            entity.position.x,
+            entity.position.y,
             entity.xScale || 1,
             entity.yScale || 1,
             -(entity.rotation || 0) * Math.PI / 180,
-            origin.x,
-            origin.y)
+            /* Origin is already moved to zero so rotate around zero. */
+            0, 0)
     }
 
     /**
@@ -828,12 +832,9 @@ class BlockContext {
      */
     NestedBlockContext(block, entity) {
         const ctx = new BlockContext(this.block)
-        const nestedTransform = new BlockContext(block).GetInsertionTransform(entity)
-        if (this.transform) {
-            ctx.transform = nestedTransform.premultiply(this.transform)
-        } else {
-            ctx.transform = nestedTransform
-        }
+        const nestedCtx = new BlockContext(block)
+        const nestedTransform = nestedCtx.GetInsertionTransform(entity).multiply(nestedCtx.transform)
+        ctx.transform = this.transform.multiply(nestedTransform)
         return ctx
     }
 }
@@ -1045,12 +1046,3 @@ export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2
 })
-
-/**
- * Get block transform
- * @param entity
- * @constructor
- */
-function GetBlockInsertTransform(entity) {
-
-}
