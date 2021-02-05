@@ -5,8 +5,6 @@ import {Matrix3, Vector2} from "three"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
-/** Target angle for each segment of tessellated arc. */
-const ARC_TESSELLATION_ANGLE = 10 / 180 * Math.PI
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -14,7 +12,13 @@ const ARC_TESSELLATION_ANGLE = 10 / 180 * Math.PI
  */
 export class DxfScene {
 
-    constructor() {
+    constructor(options) {
+        this.options = options
+        this.options = Object.create(DxfScene.DefaultOptions)
+        if (options) {
+            Object.assign(this.options, options)
+        }
+
         /* Scene origin. All input coordinates are made local to this point to minimize precision
         * loss.
         */
@@ -91,8 +95,14 @@ export class DxfScene {
             /* Works with rendering batches without intermediate entities. */
             this._ProcessInsert(entity, blockCtx)
             return
+        case "TEXT":
+            //XXX
+            return
+        case "MTEXT":
+            //XXX
+            return
         default:
-            //XXX console.log("Unhandled entity type: " + entity.type)
+            console.log("Unhandled entity type: " + entity.type)
             return
         }
         for (const renderEntity of renderEntities) {
@@ -155,7 +165,46 @@ export class DxfScene {
      * @param bulge Bulge value (see DXF specification).
      */
     _GenerateBulgeVertices(vertices, startVtx, endVtx, bulge) {
-        //XXX
+        const a = 4 * Math.atan(bulge)
+        const aAbs = Math.abs(a)
+        if (aAbs < this.options.arcTessellationAngle) {
+            vertices.push(endVtx)
+            return
+        }
+        const ha = a / 2
+        const sha = Math.sin(ha)
+        const cha = Math.cos(ha)
+        const d = {x: endVtx.x - startVtx.x, y: endVtx.y - startVtx.y}
+        const dSq = d.x * d.x + d.y * d.y
+        if (dSq < Number.MIN_VALUE * 2) {
+            /* No vertex is pushed since end vertex is duplicate of start vertex. */
+            return
+        }
+        const D = Math.sqrt(dSq)
+        let R = D / 2 / sha
+        d.x /= D
+        d.y /= D
+        const center = {
+            x: (d.x * sha - d.y * cha) * R + startVtx.x,
+            y: (d.x * cha + d.y * sha) * R + startVtx.y
+        }
+
+        let numSegments = Math.floor(aAbs / this.options.arcTessellationAngle)
+        if (numSegments > 1) {
+            const startAngle = Math.atan2(startVtx.y - center.y, startVtx.x - center.x)
+            const step = a / numSegments
+            if (a < 0) {
+                R = -R
+            }
+            for (let i = 1; i < numSegments; i++) {
+                const a = startAngle + i * step
+                const v = {
+                    x: center.x + R * Math.cos(a),
+                    y: center.y + R * Math.sin(a)
+                }
+                vertices.push(v)
+            }
+        }
         vertices.push(endVtx)
     }
 
@@ -164,9 +213,9 @@ export class DxfScene {
      * @param vertices Generated vertices pushed here.
      * @param center Center vector.
      * @param radius
-     * @param startAngle {number?} Start angle. Zero if not specified. Arc is drawn in CCW direction
+     * @param startAngle {?number} Start angle. Zero if not specified. Arc is drawn in CCW direction
      *  from start angle towards end angle.
-     * @param endAngle {number?} Optional end angle. Full circle is drawn if not specified.
+     * @param endAngle {?number} Optional end angle. Full circle is drawn if not specified.
      */
     _GenerateArcVertices(vertices, center, radius, startAngle, endAngle) {
         if (!center || !radius) {
@@ -197,7 +246,7 @@ export class DxfScene {
         }
 
         const arcAngle = endAngle - startAngle
-        let numSegments = Math.floor(arcAngle / ARC_TESSELLATION_ANGLE)
+        let numSegments = Math.floor(arcAngle / this.options.arcTessellationAngle)
         if (numSegments === 0) {
             numSegments = 1
         }
@@ -1046,3 +1095,8 @@ export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2
 })
+
+DxfScene.DefaultOptions = {
+    /** Target angle for each segment of tessellated arc. */
+    arcTessellationAngle: 10 / 180 * Math.PI
+}

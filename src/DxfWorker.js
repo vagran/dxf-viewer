@@ -25,11 +25,12 @@ export class DxfWorker {
 
     /**
      * @param url DXF file URL.
+     * @param options Loading options, see DxfScene.DefaultOptions.
      * @param progressCbk {Function?} (phase, processedSize, totalSize)
      */
-    async Load(url, progressCbk) {
+    async Load(url, options, progressCbk) {
         if (this.worker) {
-            return this._SendRequest(DxfWorker.WorkerMsg.LOAD, { url }, progressCbk)
+            return this._SendRequest(DxfWorker.WorkerMsg.LOAD, { url, options }, progressCbk)
         } else {
             return this._Load(url, progressCbk)
         }
@@ -65,8 +66,8 @@ export class DxfWorker {
         case DxfWorker.WorkerMsg.LOAD: {
             const scene = await this._Load(
                 data.url,
+                data.options,
                 (phase, size, totalSize) => this._SendProgress(seq, phase, size, totalSize))
-            //XXX handle all buffers
             transfers.push(scene.vertices)
             transfers.push(scene.indices)
             transfers.push(scene.transforms)
@@ -123,12 +124,12 @@ export class DxfWorker {
     }
 
     /** @return {Object} DxfScene serialized scene. */
-    async _Load(url, progressCbk) {
+    async _Load(url, options, progressCbk) {
         const dxf = await new DxfFetcher(url).Fetch(progressCbk)
         if (progressCbk) {
             progressCbk("prepare", 0, null)
         }
-        const dxfScene = new DxfScene()
+        const dxfScene = new DxfScene(options)
         dxfScene.Build(dxf)
         return dxfScene.scene
     }

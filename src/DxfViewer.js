@@ -50,88 +50,6 @@ export class DxfViewer {
         domContainer.style.display = "block"
         domContainer.appendChild(renderer.domElement)
 
-        //XXX
-        // {
-        //     const shape = new three.Shape([new three.Vector2(0, 0),
-        //                                    new three.Vector2(1, 0),
-        //                                    new three.Vector2(0, 1)])
-        //
-        //     const geometry = new three.ShapeGeometry(shape)
-        //     const material = new three.MeshBasicMaterial({color: 0x00ff00})
-        //     const mesh = new three.Mesh(geometry, material)
-        //     scene.add(mesh)
-        // }
-
-        //XXX
-        // {
-        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
-        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
-        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
-        //     const geometry = new three.BufferGeometry()
-        //     geometry.setAttribute("position", verticesBufferAttr)
-        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000)
-        //     const obj = new three.LineSegments(geometry, material)
-        //     obj.frustumCulled = false
-        //     scene.add(obj)
-        // }
-
-        //XXX
-        // {
-        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
-        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
-        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
-        //     const geometry = new three.BufferGeometry()
-        //     geometry.setAttribute("position", verticesBufferAttr)
-        //     const material = this._CreateSimplePointMaterialInstance(0xff0000, 10)
-        //     const obj = new three.Points(geometry, material)
-        //     obj.frustumCulled = false
-        //     scene.add(obj)
-        // }
-
-        //XXX
-        // {
-        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0, 1, 1, 0, -1, -1, 0])
-        //     const _indicesArray = new Uint16Array([0, 0, 0, 1, 2, 3])
-        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
-        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
-        //     const indicesArray = new Uint16Array(_indicesArray.buffer, 2 * 2, 4)
-        //     const indicesBufferAttr = new three.BufferAttribute(indicesArray, 1)
-        //     const geometry = new three.BufferGeometry()
-        //     geometry.setAttribute("position", verticesBufferAttr)
-        //     geometry.setIndex(indicesBufferAttr)
-        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000)
-        //     const obj = new three.LineSegments(geometry, material)
-        //     obj.frustumCulled = false
-        //     scene.add(obj)
-        // }
-
-        //XXX
-        // {
-        //     const _verticesArray = new Float32Array([5,5,5,5, 0, 0.5, 1, 1, 0, -1, -1, 0])
-        //     const verticesArray = new Float32Array(_verticesArray.buffer, 4 * 4, 8)
-        //     const verticesBufferAttr = new three.BufferAttribute(verticesArray, 2)
-        //     const _transformArray = new Float32Array([
-        //         0, 0, 0, 0, 0, 0,
-        //         1, 0, 0,  0, 1, 0,
-        //         1, 0, 0.5,  0, 1, -0.2,
-        //         0.5, 0, 0,  0, 0.5, 0])
-        //     const transformArray = new Float32Array(_transformArray.buffer, 6 * 4, 18)
-        //     const transformBufferAttrBuf = new three.InstancedInterleavedBuffer(transformArray, 6)
-        //     const transformBufferAttr0 = new three.InterleavedBufferAttribute(
-        //         transformBufferAttrBuf, 3, 0)
-        //     const transformBufferAttr1 = new three.InterleavedBufferAttribute(
-        //         transformBufferAttrBuf, 3, 3)
-        //     const geometry = new three.InstancedBufferGeometry()
-        //     geometry.instanceCount = 3
-        //     geometry.setAttribute("position", verticesBufferAttr)
-        //     geometry.setAttribute("instanceTransform0", transformBufferAttr0)
-        //     geometry.setAttribute("instanceTransform1", transformBufferAttr1)
-        //     const material = this._CreateSimpleColorMaterialInstance(0xff0000, true)
-        //     const obj = new three.LineSegments(geometry, material)
-        //     obj.frustumCulled = false
-        //     scene.add(obj)
-        // }
-
         const controls = this.controls = new OrbitControls(camera, renderer.domElement)
         controls.enableRotate = false
         controls.mouseButtons = {
@@ -166,7 +84,10 @@ export class DxfViewer {
      */
     async Load(url, progressCbk = null, workerFactory = null) {
         const worker = new DxfWorker(workerFactory ? workerFactory() : null)
-        const scene = await worker.Load(url, progressCbk)
+        const loadOptions = {
+            arcTessellationAngle: this.options.arcTessellationAngle
+        }
+        const scene = await worker.Load(url, loadOptions, progressCbk)
         await worker.Destroy()
 
         for (const layer of scene.layers) {
@@ -466,6 +387,8 @@ DxfViewer.DefaultOptions = {
     blackWhiteInversion: true,
     /** Size in pixels for rasterized points. */
     pointSize: 2,
+    /** Target angle for each segment of tessellated arc. */
+    arcTessellationAngle: 6 / 180 * Math.PI
 }
 
 DxfViewer.SetupWorker = function () {
