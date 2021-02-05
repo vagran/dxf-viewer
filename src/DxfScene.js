@@ -73,7 +73,7 @@ export class DxfScene {
         const isBlock = blockName !== null
         if (entity.type === "LINE") {
             renderEntities = this._DecomposeLine(entity, isBlock)
-        } if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
+        } else if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
             renderEntities = this._DecomposePolyline(entity, isBlock)
         } else if (entity.type === "ARC") {
             renderEntities = this._DecomposeArc(entity, isBlock)
