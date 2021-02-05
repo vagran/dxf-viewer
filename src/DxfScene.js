@@ -1,7 +1,7 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer"
 import "./RBTree"
 import {BatchingKey} from "./BatchingKey"
-import {Matrix3} from "three"
+import {Matrix3, Vector2} from "three"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
@@ -52,7 +52,7 @@ export class DxfScene {
         for (const block of this.blocks.values()) {
             if (block.hasOwnProperty("entities")) {
                 for (const entity of block.entities) {
-                    this._ProcessDxfEntity(entity, block.name)
+                    this._ProcessDxfEntity(entity, new BlockContext(block))
                 }
             }
         }
@@ -68,58 +68,65 @@ export class DxfScene {
         delete this.blocks
     }
 
-    _ProcessDxfEntity(entity, blockName = null) {
+    _ProcessDxfEntity(entity, blockCtx = null) {
         let renderEntities
-        const isBlock = blockName !== null
-        if (entity.type === "LINE") {
-            renderEntities = this._DecomposeLine(entity, isBlock)
-        } else if (entity.type === "POLYLINE" || entity.type === "LWPOLYLINE") {
-            renderEntities = this._DecomposePolyline(entity, isBlock)
-        } else if (entity.type === "ARC") {
-            renderEntities = this._DecomposeArc(entity, isBlock)
-        } else if (entity.type === "CIRCLE") {
-            renderEntities = this._DecomposeCircle(entity, isBlock)
-        } else if (entity.type === "POINT") {
-            renderEntities = this._DecomposePoint(entity, isBlock)
-        } else if (entity.type === "INSERT") {
-            if (isBlock) {
-                console.warn(
-                    `Nested blocks are currently not supported, ${blockName} includes ${entity.name}`)
-                return
-            }
+        switch (entity.type) {
+        case "LINE":
+            renderEntities = this._DecomposeLine(entity, blockCtx)
+            break
+        case "POLYLINE":
+        case "LWPOLYLINE":
+            renderEntities = this._DecomposePolyline(entity, blockCtx)
+            break
+        case "ARC":
+            renderEntities = this._DecomposeArc(entity, blockCtx)
+            break
+        case "CIRCLE":
+            renderEntities = this._DecomposeCircle(entity, blockCtx)
+            break
+        case "POINT":
+            renderEntities = this._DecomposePoint(entity, blockCtx)
+            break
+        case "INSERT":
             /* Works with rendering batches without intermediate entities. */
-            this._ProcessInsert(entity)
+            this._ProcessInsert(entity, blockCtx)
             return
-        } else {
+        default:
             //XXX console.log("Unhandled entity type: " + entity.type)
             return
         }
         for (const renderEntity of renderEntities) {
-            this._ProcessEntity(renderEntity, blockName)
+            this._ProcessEntity(renderEntity, blockCtx)
         }
     }
 
     /**
      * @param entity {Entity}
-     * @param blockName {?string}
+     * @param blockName {?BlockContext}
      */
-    _ProcessEntity(entity, blockName = null) {
+    _ProcessEntity(entity, blockCtx = null) {
         switch (entity.type) {
         case Entity.Type.POINTS:
-            this._ProcessPoints(entity, blockName)
+            this._ProcessPoints(entity, blockCtx)
             break
         case Entity.Type.LINE_SEGMENTS:
-            this._ProcessLineSegments(entity, blockName)
+            this._ProcessLineSegments(entity, blockCtx)
             break
         case Entity.Type.POLYLINE:
-            this._ProcessPolyline(entity, blockName)
+            this._ProcessPolyline(entity, blockCtx)
             break
         default:
             throw new Error("Unhandled entity type: " + entity.type)
         }
     }
 
-    _GetLineType(entity, vertex = null, isBlock = false) {
+    /**
+     * @param entity
+     * @param vertex
+     * @param blockCtx {BlockContext}
+     * @return {number}
+     */
+    _GetLineType(entity, vertex = null, blockCtx = null) {
         //XXX lookup
         return 0
     }
@@ -129,13 +136,13 @@ export class DxfScene {
         return !Boolean(entity.startWidth || entity.endWidth)
     }
 
-    *_DecomposeLine(entity, isBlock) {
+    *_DecomposeLine(entity, blockCtx) {
         /* start/end width, bulge - seems cannot be present, at least with current parser */
         if (entity.vertices.length !== 2) {
             return
         }
-        const layer = this._GetEntityLayer(entity, isBlock)
-        const color = this._GetEntityColor(entity, isBlock)
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
         yield new Entity(Entity.Type.LINE_SEGMENTS, entity.vertices, layer, color,
                          this._GetLineType(entity, entity.vertices[0]))
     }
@@ -208,10 +215,10 @@ export class DxfScene {
         }
     }
 
-    *_DecomposeArc(entity, isBlock) {
-        const color = this._GetEntityColor(entity, isBlock)
-        const layer = this._GetEntityLayer(entity, isBlock)
-        const lineType = this._GetLineType(entity, null, isBlock)
+    *_DecomposeArc(entity, blockCtx) {
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius, entity.startAngle,
                                   entity.endAngle)
@@ -219,16 +226,16 @@ export class DxfScene {
                          entity.endAngle === undefined)
     }
 
-    *_DecomposeCircle(entity, isBlock) {
-        const color = this._GetEntityColor(entity, isBlock)
-        const layer = this._GetEntityLayer(entity, isBlock)
-        const lineType = this._GetLineType(entity, null, isBlock)
+    *_DecomposeCircle(entity, blockCtx) {
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius)
         yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, true)
     }
 
-    *_DecomposePoint(entity, isBlock) {
+    *_DecomposePoint(entity, blockCtx) {
         if (this.pdMode === PdMode.NONE) {
             /* Points not displayed. */
             return
@@ -237,8 +244,8 @@ export class DxfScene {
             /* Currently not supported. */
             return
         }
-        const color = this._GetEntityColor(entity, isBlock)
-        const layer = this._GetEntityLayer(entity, isBlock)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
         const markType = this.pdMode & PdMode.MARK_MASK
 
         if (markType === PdMode.DOT) {
@@ -286,29 +293,45 @@ export class DxfScene {
         yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
     }
 
-    /** Updates batches directly. */
-    _ProcessInsert(entity) {
+    /**
+     * Updates batches directly.
+     * @param entity
+     * @param blockCtx {?BlockContext} Nested block insert when non-null.
+     */
+    _ProcessInsert(entity, blockCtx = null) {
+        if (blockCtx) {
+            if (blockCtx.name === entity.name) {
+                console.warn("Recursive block reference: " + blockCtx.name)
+                return
+            }
+            /* Flatten nested blocks definition. */
+            const block = this.blocks.get(entity.name)
+            if (!block) {
+                console.warn("Unresolved nested block reference: " + entity.name)
+            }
+            const nestedCtx = blockCtx.NestedBlockContext(block, entity)
+            for (const entity of block.entities) {
+                this._ProcessDxfEntity(entity, nestedCtx)
+            }
+            return
+        }
+
         const block = this.blocks.get(entity.name)
         if (block === null) {
-            console.warn("INSERT encountered with unknown block name: " + entity.name)
+            console.warn("Unresolved block reference in INSERT: " + entity.name)
             return
         }
         const origin = block.position
-        const layer = this._GetEntityLayer(entity, false)
-        const color = this._GetEntityColor(entity, false)
-        const lineType = this._GetLineType(entity, null, false)
+        const layer = this._GetEntityLayer(entity, null)
+        const color = this._GetEntityColor(entity, null)
+        const lineType = this._GetLineType(entity, null, null)
         const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
                                     color, lineType)
         const batch = this._GetBatch(key)
-        const position = this._TransformVertex(entity.position)
-        let transform = new Matrix3().setUvTransform(
-            position.x - origin.x,
-            position.y - origin.y,
-            entity.xScale || 1,
-            entity.yScale || 1,
-            -(entity.rotation || 0) * Math.PI / 180,
-            origin.x,
-            origin.y)
+        /* Just to update bounding box and origin. */
+        this._TransformVertex(entity.position)
+        const transform = new BlockContext(block).GetInsertionTransform(entity)
+            .translate(-this.origin.x, -this.origin.y)
         //XXX grid instancing not supported yet
         batch.PushInstanceTransform(transform)
     }
@@ -328,17 +351,17 @@ export class DxfScene {
         yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, shape)
     }
 
-    *_DecomposePolyline(entity, isBlock = false) {
+    *_DecomposePolyline(entity, blockCtx = null) {
         const verticesCount = entity.vertices.length
         if (verticesCount < 2) {
             return
         }
-        const color = this._GetEntityColor(entity, isBlock)
-        const layer = this._GetEntityLayer(entity, isBlock)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
         const _this = this
         let startIdx = 0
         let curPlainLine = this._IsPlainLine(entity.vertices[0])
-        let curLineType = this._GetLineType(entity, entity.vertices[0], isBlock)
+        let curLineType = this._GetLineType(entity, entity.vertices[0], blockCtx)
         let curVertices = null
 
         function *CommitSegment(endIdx) {
@@ -421,69 +444,66 @@ export class DxfScene {
 
     /**
      * @param entity {Entity}
-     * @param blockName {String?}
+     * @param blockCtx {?BlockContext}
      */
-    _ProcessPoints(entity, blockName = null) {
-        const isBlock = blockName !== null
-        const key = new BatchingKey(entity.layer, blockName,
+    _ProcessPoints(entity, blockCtx = null) {
+        const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.POINTS, entity.color, 0)
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v, isBlock))
+            batch.PushVertex(this._TransformVertex(v, blockCtx))
         }
     }
 
     /**
      * @param entity {Entity}
-     * @param blockName {String?}
+     * @param blockCtx {?BlockContext}
      */
-    _ProcessLineSegments(entity, blockName = null) {
+    _ProcessLineSegments(entity, blockCtx = null) {
         if (entity.vertices.length % 2 !== 0) {
             throw Error("Even number of vertices expected")
         }
-        const isBlock = blockName !== null
-        const key = new BatchingKey(entity.layer, blockName,
+        const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v, isBlock))
+            batch.PushVertex(this._TransformVertex(v, blockCtx))
         }
     }
 
     /**
      * @param entity {Entity}
-     * @param blockName {String?}
+     * @param blockCtx {?BlockContext}
      */
-    _ProcessPolyline(entity, blockName = null) {
+    _ProcessPolyline(entity, blockCtx = null) {
         if (entity.vertices.length < 2) {
             return
         }
-        const isBlock = blockName !== null
         /* It is more optimal to render short polylines un-indexed. Also DXF often contains
          * polylines with just two points.
          */
         const verticesCount = entity.vertices.length
         if (verticesCount <= 3) {
-            const key = new BatchingKey(entity.layer, blockName,
+            const key = new BatchingKey(entity.layer, blockCtx?.name,
                                         BatchingKey.GeometryType.LINES, entity.color,
                                         entity.lineType)
             const batch = this._GetBatch(key)
             let prev = null
             for (const v of entity.vertices) {
                 if (prev !== null) {
-                    batch.PushVertex(this._TransformVertex(prev, isBlock))
-                    batch.PushVertex(this._TransformVertex(v, isBlock))
+                    batch.PushVertex(this._TransformVertex(prev, blockCtx))
+                    batch.PushVertex(this._TransformVertex(v, blockCtx))
                 }
                 prev = v
             }
             if (entity.shape && verticesCount > 2) {
-                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1], isBlock))
-                batch.PushVertex(this._TransformVertex(entity.vertices[0], isBlock))
+                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1], blockCtx))
+                batch.PushVertex(this._TransformVertex(entity.vertices[0], blockCtx))
             }
             return
         }
 
-        const key = new BatchingKey(entity.layer, blockName,
+        const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.INDEXED_LINES,
                                     entity.color, entity.lineType)
         const batch = this._GetBatch(key)
@@ -491,7 +511,7 @@ export class DxfScene {
         for (const lineChunk of entity._IterateLineChunks()) {
             const chunk = batch.PushChunk(lineChunk.verticesCount)
             for (const v of lineChunk.vertices) {
-                chunk.PushVertex(this._TransformVertex(v, isBlock))
+                chunk.PushVertex(this._TransformVertex(v, blockCtx))
             }
             for (const idx of lineChunk.indices) {
                 chunk.PushIndex(idx)
@@ -503,11 +523,11 @@ export class DxfScene {
     /** Resolve entity color.
      *
      * @param entity
-     * @param isBlock {Boolean}
+     * @param blockCtx {?BlockContext}
      * @return {number} RGB color value. For block entity it also may be one of ColorCode values
      *  which are resolved on block instantiation.
      */
-    _GetEntityColor(entity, isBlock = false) {
+    _GetEntityColor(entity, blockCtx = null) {
         let color = ColorCode.BY_LAYER
         if (entity.colorIndex === 0) {
             color = ColorCode.BY_BLOCK
@@ -517,7 +537,7 @@ export class DxfScene {
             color = entity.color
         }
 
-        if (isBlock) {
+        if (blockCtx) {
             return color
         }
         if (color === ColorCode.BY_LAYER || color === ColorCode.BY_BLOCK) {
@@ -536,8 +556,8 @@ export class DxfScene {
     }
 
     /** @return {?string} Layer name, null for block entity. */
-    _GetEntityLayer(entity, isBlock = false) {
-        if (isBlock) {
+    _GetEntityLayer(entity, blockCtx = null) {
+        if (blockCtx) {
             return null
         }
         if (entity.hasOwnProperty("layer")) {
@@ -556,8 +576,18 @@ export class DxfScene {
         return batch
     }
 
-    _TransformVertex(v, isBlock = false) {
-        if (isBlock) {
+    /**
+     * Apply all necessary final transforms to a vertex before just before storing it in a rendering
+     * batch.
+     * @param v {{x: number, y: number}}
+     * @param blockCtx {BlockContext}
+     * @return {{x: number, y: number}}
+     */
+    _TransformVertex(v, blockCtx = null) {
+        if (blockCtx) {
+            if (blockCtx.transform) {
+                return new Vector2(v.x, v.y).applyMatrix3(blockCtx.transform)
+            }
             return v
         }
         if (this.bounds === null) {
@@ -762,6 +792,52 @@ class RenderBatch {
     }
 }
 
+class BlockContext {
+    constructor(block) {
+        this.block = block
+        /* Transform to apply for nested blocks definition. */
+        this.transform = null
+    }
+
+    get name() {
+        return this.block.name
+    }
+
+    /**
+     * Get transform for block instance.
+     * @param entity Raw DXF INSERT entity.
+     * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
+     */
+    GetInsertionTransform(entity) {
+        const origin = this.block.position
+        return new Matrix3().setUvTransform(
+            entity.position.x - origin.x,
+            entity.position.y - origin.y,
+            entity.xScale || 1,
+            entity.yScale || 1,
+            -(entity.rotation || 0) * Math.PI / 180,
+            origin.x,
+            origin.y)
+    }
+
+    /**
+     * Create context for nested block.
+     * @param block Nested block (raw DXF entity).
+     * @param entity Raw DXF INSERT entity.
+     * @return {BlockContext} Context to use for nested block entities.
+     */
+    NestedBlockContext(block, entity) {
+        const ctx = new BlockContext(this.block)
+        const nestedTransform = new BlockContext(block).GetInsertionTransform(entity)
+        if (this.transform) {
+            ctx.transform = nestedTransform.premultiply(this.transform)
+        } else {
+            ctx.transform = nestedTransform
+        }
+        return ctx
+    }
+}
+
 class IndexedChunk {
     constructor(initialCapacity) {
         if (initialCapacity < 16) {
@@ -832,7 +908,7 @@ class Entity {
      * @param vertices {{x, y}[]}
      * @param layer {?string}
      * @param color {number}
-     * @param lineType {number}
+     * @param lineType {?number}
      * @param shape {Boolean} true if closed shape.
      */
     constructor(type, vertices, layer, color, lineType, shape = false) {
@@ -969,3 +1045,12 @@ export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2
 })
+
+/**
+ * Get block transform
+ * @param entity
+ * @constructor
+ */
+function GetBlockInsertTransform(entity) {
+
+}

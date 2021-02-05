@@ -11,9 +11,9 @@ export class MaterialKey {
      */
     constructor(isInstanced, geometryType, color, lineType) {
         this.isInstanced = isInstanced
-        this.geometryType = geometryType
+        this.geometryType = geometryType ?? null
         this.color = color
-        this.lineType = lineType
+        this.lineType = lineType ?? null
     }
 
     /** Comparator function. Fields lexical order corresponds to the constructor arguments order.

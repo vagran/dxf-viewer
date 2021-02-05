@@ -169,12 +169,6 @@ export class DxfViewer {
         const scene = await worker.Load(url, progressCbk)
         await worker.Destroy()
 
-        console.log(`DXF scene:
-                     ${scene.batches.length} batches,
-                     vertices ${scene.vertices.byteLength} B,
-                     indices ${scene.indices.byteLength} B
-                     transforms ${scene.transforms.byteLength} B`)
-
         for (const layer of scene.layers) {
             this.layers.set(layer.name, new Layer(layer.name, layer.color))
         }
@@ -193,17 +187,21 @@ export class DxfViewer {
             }
         }
 
+        console.log(`DXF scene:
+                     ${scene.batches.length} batches,
+                     ${this.layers.size} layers,
+                     ${this.blocks.size} blocks,
+                     vertices ${scene.vertices.byteLength} B,
+                     indices ${scene.indices.byteLength} B
+                     transforms ${scene.transforms.byteLength} B`)
+
         /* Instantiate all entities. */
         for (const batch of scene.batches) {
             this._LoadBatch(scene, batch)
         }
 
-        this._SetView(
-            {
-                x: scene.bounds.minX + (scene.bounds.maxX - scene.bounds.minX) / 2 - scene.origin.x,
-                y: scene.bounds.minY + (scene.bounds.maxY - scene.bounds.minY) / 2 - scene.origin.y
-            },
-            (scene.bounds.maxX - scene.bounds.minX) * 1.2)
+        this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
+                     scene.bounds.minY - scene.origin.y, scene.bounds.maxY - scene.origin.y)
 
         this.Render()
     }
@@ -232,6 +230,30 @@ export class DxfViewer {
         //XXX
     }
 
+    SetView(center, width) {
+        const aspect = this.canvasWidth / this.canvasHeight
+        const height = width / aspect
+        const cam = this.camera
+        cam.left = center.x - width / 2
+        cam.right = center.x + width / 2
+        cam.top = center.y + height / 2
+        cam.bottom = center.y - height / 2
+        cam.zoom = 1
+        cam.updateProjectionMatrix()
+    }
+
+    /** Set view to fit the specified bounds. */
+    FitView(minX, maxX, minY, maxY, padding = 0.1) {
+        const aspect = this.canvasWidth / this.canvasHeight
+        let width = maxX - minX
+        const height = maxY - minY
+        const center = {x: minX + width / 2, y: minY + height / 2}
+        if (height * aspect > width) {
+            width = height * aspect
+        }
+        this.SetView(center, width * (1 + padding))
+    }
+
     _LoadBatch(scene, batch) {
         if (batch.key.blockName !== null &&
             batch.key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE) {
@@ -248,18 +270,6 @@ export class DxfViewer {
                 layer.PushObject(obj)
             }
         }
-    }
-
-    _SetView(center, width) {
-        const aspect = this.canvasWidth / this.canvasHeight
-        const height = width / aspect
-        const cam = this.camera
-        cam.left = center.x - width / 2
-        cam.right = center.x + width / 2
-        cam.top = center.y + height / 2
-        cam.bottom = center.y - height / 2
-        cam.zoom = 1
-        cam.updateProjectionMatrix()
     }
 
     _GetSimpleColorMaterial(color, isInstanced = false) {

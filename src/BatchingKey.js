@@ -11,11 +11,11 @@ export class BatchingKey {
      *  line).
      */
     constructor(layerName, blockName, geometryType, color, lineType) {
-        this.layerName = layerName
-        this.blockName = blockName
-        this.geometryType = geometryType
+        this.layerName = layerName ?? null
+        this.blockName = blockName ?? null
+        this.geometryType = geometryType ?? null
         this.color = color
-        this.lineType = lineType
+        this.lineType = lineType ?? null
     }
 
     /** Comparator function. Fields lexical order corresponds to the constructor arguments order.
