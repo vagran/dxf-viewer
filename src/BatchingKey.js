@@ -53,7 +53,9 @@ BatchingKey.GeometryType = Object.freeze({
     INDEXED_LINES: 2,
     TRIANGLES: 3,
     INDEXED_TRIANGLES: 4,
-    BLOCK_INSTANCE: 5
+    BLOCK_INSTANCE: 5,
+    /** Shaped point instances. */
+    POINT_INSTANCE: 6
 })
 
 /** Comparator function for arbitrary types. Null is always first. This is used just to make some

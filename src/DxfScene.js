@@ -5,6 +5,9 @@ import {Matrix3, Vector2} from "three"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
+/** Arc angle for tessellation point circle shape. */
+const POINT_CIRCLE_TESSELLATION_ANGLE = 15 * Math.PI / 180
+const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -30,6 +33,7 @@ export class DxfScene {
         /* Indexed by block name, value is block object from parsed DXF. */
         this.blocks = new Map()
         this.bounds = null
+        this.pointShapeBlock = null
     }
 
     /** Build the scene from the provided parsed DXF. */
@@ -211,20 +215,26 @@ export class DxfScene {
     /** Generate vertices for arc segment.
      *
      * @param vertices Generated vertices pushed here.
-     * @param center Center vector.
-     * @param radius
+     * @param center {{x, y}} Center vector.
+     * @param radius {number}
      * @param startAngle {?number} Start angle. Zero if not specified. Arc is drawn in CCW direction
      *  from start angle towards end angle.
      * @param endAngle {?number} Optional end angle. Full circle is drawn if not specified.
+     * @param tessellationAngle {?number} Arc tessellation angle, default value is taken from scene
+     *  options.
      */
-    _GenerateArcVertices(vertices, center, radius, startAngle, endAngle) {
+    _GenerateArcVertices(vertices, center, radius, startAngle = null, endAngle = null,
+                         tessellationAngle = null) {
         if (!center || !radius) {
             return
+        }
+        if (!tessellationAngle) {
+            tessellationAngle = this.options.arcTessellationAngle
         }
         /* Normalize angles - make them starting from +X in CCW direction. End angle should be
          * greater than start angle.
          */
-        if (startAngle === undefined) {
+        if (startAngle === undefined || startAngle === null) {
             startAngle = 0
         } else {
             startAngle += this.angBase
@@ -246,7 +256,7 @@ export class DxfScene {
         }
 
         const arcAngle = endAngle - startAngle
-        let numSegments = Math.floor(arcAngle / this.options.arcTessellationAngle)
+        let numSegments = Math.floor(arcAngle / tessellationAngle)
         if (numSegments === 0) {
             numSegments = 1
         }
@@ -296,50 +306,105 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const markType = this.pdMode & PdMode.MARK_MASK
+        const isShaped = (this.pdMode & PdMode.SHAPE_MASK) !== 0
+
+        if (isShaped) {
+            /* Shaped mark should be instanced. */
+            const key = new BatchingKey(layer, POINT_SHAPE_BLOCK_NAME,
+                                        BatchingKey.GeometryType.POINT_INSTANCE, color, 0)
+            const batch = this._GetBatch(key)
+            batch.PushVertex(this._TransformVertex(entity.position))
+            this._CreatePointShapeBlock()
+            return
+        }
 
         if (markType === PdMode.DOT) {
             yield new Entity(Entity.Type.POINTS, [entity.position], layer, color, null, false)
-        }
-
-        if ((this.pdMode & PdMode.SHAPE_MASK) !== 0) {
-            /* Shaped mark should be instanced. */
-            //XXX not implemented
-            return
-        }
-        if (markType === PdMode.DOT) {
             return
         }
 
         const vertices = []
+        this._CreatePointMarker(vertices, markType, entity.position)
+        yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
+    }
 
+    /** Create line segments for point marker.
+     * @param vertices
+     * @param markType
+     * @param position {?{x,y}} point center position, default is zero.
+     */
+    _CreatePointMarker(vertices, markType, position = null) {
         const _this = this
         function PushVertex(offsetX, offsetY) {
             vertices.push({
-                x: entity.position.x + offsetX * _this.pdSize * 0.5,
-                y: entity.position.y + offsetY * _this.pdSize * 0.5
+                x: (position?.x ?? 0) + offsetX * _this.pdSize * 0.5,
+                y: (position?.y ?? 0) + offsetY * _this.pdSize * 0.5
             })
         }
 
-        if (markType === PdMode.PLUS) {
+        switch(markType) {
+        case PdMode.PLUS:
             PushVertex(0, 1.5)
             PushVertex(0, -1.5)
             PushVertex(-1.5, 0)
             PushVertex(1.5, 0)
-        } else if (markType === PdMode.CROSS) {
+            break
+        case PdMode.CROSS:
             PushVertex(-1, 1)
             PushVertex(1, -1)
             PushVertex(1, 1)
             PushVertex(-1, -1)
-        } else if (markType === PdMode.TICK) {
+            break
+        case PdMode.TICK:
             PushVertex(0, 1)
             PushVertex(0, 0)
-        } else if (markType === PdMode.CIRCLE) {
-            this._GenerateArcVertices(vertices, entity.position, this.pdSize * 0.5)
-        } else {
+            break
+        default:
             console.warn("Unsupported point display type: " + markType)
+        }
+    }
+
+    /** Create point shape block if not yet done. */
+    _CreatePointShapeBlock() {
+        if (this.pointShapeBlock) {
             return
         }
-        yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
+        /* This mimics DXF block entity. */
+        this.pointShapeBlock = {
+            name: POINT_SHAPE_BLOCK_NAME,
+            position: { x: 0, y: 0}
+        }
+        const blockCtx = new BlockContext(this.pointShapeBlock)
+
+        const markType = this.pdMode & PdMode.MARK_MASK
+        if (markType !== PdMode.DOT && markType !== PdMode.NONE) {
+            const vertices = []
+            this._CreatePointMarker(vertices, markType)
+            const entity = new Entity(Entity.Type.LINE_SEGMENTS, vertices, null,
+                                      ColorCode.BY_BLOCK, 0)
+            this._ProcessEntity(entity, blockCtx)
+        }
+
+        if (this.pdMode & PdMode.SQUARE) {
+            const r = this.pdSize * 0.5
+            const vertices = [
+                {x: -r, y: r},
+                {x: r, y: r},
+                {x: r, y: -r},
+                {x: -r, y: -r}
+            ]
+            const entity = new Entity(Entity.Type.POLYLINE, vertices, null,
+                                      ColorCode.BY_BLOCK, 0, true)
+            this._ProcessEntity(entity, blockCtx)
+        }
+        if (this.pdMode & PdMode.CIRCLE) {
+            const vertices = []
+            this._GenerateArcVertices(vertices, {x: 0, y: 0}, this.pdSize * 0.5, null, null,
+                                      POINT_CIRCLE_TESSELLATION_ANGLE)
+            const entity = new Entity(Entity.Type.POLYLINE, vertices, null,
+                                      ColorCode.BY_BLOCK, 0, true)
+            this._ProcessEntity(entity, blockCtx)
+        }
     }
 
     /**
@@ -698,6 +763,9 @@ export class DxfScene {
                 color: layer.color
             })
         }
+
+        scene.pointShapeHasDot = (this.pdMode & PdMode.MARK_MASK) === PdMode.DOT
+
         return scene
     }
 }

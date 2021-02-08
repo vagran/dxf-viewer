@@ -3,14 +3,14 @@ import {BatchingKey, CompareValues} from "./BatchingKey";
 
 export class MaterialKey {
     /**
-     * @param isInstanced {Boolean}
+     * @param instanceType {Number} One of InstanceType values.
      * @param geometryType {?number} One of BatchingKey.GeometryType.
      * @param color {number} Color ARGB value.
      * @param lineType {?number} Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */
-    constructor(isInstanced, geometryType, color, lineType) {
-        this.isInstanced = isInstanced
+    constructor(instanceType, geometryType, color, lineType) {
+        this.instanceType = instanceType
         this.geometryType = geometryType ?? null
         this.color = color
         this.lineType = lineType ?? null
@@ -20,7 +20,7 @@ export class MaterialKey {
      * Null values are always first.
      */
     Compare(other) {
-        let c = CompareValues(this.isInstanced, other.isInstanced)
+        let c = CompareValues(this.instanceType, other.instanceType)
         if (c !== 0) {
             return c
         }
@@ -33,10 +33,5 @@ export class MaterialKey {
             return c
         }
         return CompareValues(this.lineType, other.lineType)
-    }
-
-    IsIndexed() {
-        return this.geometryType === BatchingKey.GeometryType.INDEXED_LINES ||
-               this.geometryType === BatchingKey.GeometryType.INDEXED_TRIANGLES
     }
 }

@@ -34,10 +34,12 @@ export class DxfViewer {
         camera.position.x = 0
         camera.position.y = 0
 
-        this.simpleColorMaterial = this._CreateSimpleColorMaterial()
-        this.simpleInstancedColorMaterial = this._CreateSimpleColorMaterial(true)
-        this.simplePointMaterial = this._CreateSimplePointMaterial()
-        this.simpleInstancedPointMaterial = this._CreateSimplePointMaterial(true)
+        this.simpleColorMaterial = []
+        this.simplePointMaterial = []
+        for (let i = 0; i < InstanceType.MAX; i++) {
+            this.simpleColorMaterial[i] = this._CreateSimpleColorMaterial(i)
+            this.simplePointMaterial[i] = this._CreateSimplePointMaterial(i)
+        }
 
         //XXX auto resize not implemented
         this.canvasWidth = options.canvasWidth
@@ -97,7 +99,8 @@ export class DxfViewer {
         /* Load all blocks on the first pass. */
         for (const batch of scene.batches) {
             if (batch.key.blockName !== null &&
-                batch.key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE) {
+                batch.key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE &&
+                batch.key.geometryType !== BatchingKey.GeometryType.POINT_INSTANCE) {
 
                 let block = this.blocks.get(batch.key.blockName)
                 if (!block) {
@@ -177,7 +180,8 @@ export class DxfViewer {
 
     _LoadBatch(scene, batch) {
         if (batch.key.blockName !== null &&
-            batch.key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            batch.key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE &&
+            batch.key.geometryType !== BatchingKey.GeometryType.POINT_INSTANCE) {
             /* Block definition. */
             return
         }
@@ -193,22 +197,22 @@ export class DxfViewer {
         }
     }
 
-    _GetSimpleColorMaterial(color, isInstanced = false) {
-        const key = new MaterialKey(isInstanced, null, color, 0)
+    _GetSimpleColorMaterial(color, instanceType = InstanceType.NONE) {
+        const key = new MaterialKey(instanceType, null, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
         }
         entry = {
             key,
-            material: this._CreateSimpleColorMaterialInstance(color, isInstanced)
+            material: this._CreateSimpleColorMaterialInstance(color, instanceType)
         }
         this.materials.insert(entry)
         return entry.material
     }
 
-    _CreateSimpleColorMaterial(instanced = false) {
-        const shaders = this._GenerateShaders(instanced, false)
+    _CreateSimpleColorMaterial(instanceType = InstanceType.NONE) {
+        const shaders = this._GenerateShaders(instanceType, false)
         return new three.RawShaderMaterial({
             uniforms: {
                 color: {
@@ -223,19 +227,19 @@ export class DxfViewer {
         })
     }
 
-    /** @param color {Number} Color RGB numeric value.
-     * @param isInstanced {Boolean} Get version for instanced geometry.
+    /** @param color {number} Color RGB numeric value.
+     * @param instanceType {number}
      */
-    _CreateSimpleColorMaterialInstance(color, isInstanced = false) {
-        const src = isInstanced ? this.simpleInstancedColorMaterial : this.simpleColorMaterial
+    _CreateSimpleColorMaterialInstance(color, instanceType = InstanceType.NONE) {
+        const src = this.simpleColorMaterial[instanceType]
         /* Should reuse compiled shaders. */
         const m = src.clone()
         m.uniforms.color = { value: new three.Color(color) }
         return m
     }
 
-    _GetSimplePointMaterial(color, isInstanced = false) {
-        const key = new MaterialKey(isInstanced, BatchingKey.GeometryType.POINTS, color, 0)
+    _GetSimplePointMaterial(color, instanceType = InstanceType.NONE) {
+        const key = new MaterialKey(instanceType, BatchingKey.GeometryType.POINTS, color, 0)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
@@ -243,14 +247,14 @@ export class DxfViewer {
         entry = {
             key,
             material: this._CreateSimplePointMaterialInstance(color, this.options.pointSize,
-                                                              isInstanced)
+                                                              instanceType)
         }
         this.materials.insert(entry)
         return entry.material
     }
 
-    _CreateSimplePointMaterial(isInstanced = false) {
-        const shaders = this._GenerateShaders(isInstanced, true)
+    _CreateSimplePointMaterial(instanceType = InstanceType.NONE) {
+        const shaders = this._GenerateShaders(instanceType, true)
         return new three.RawShaderMaterial({
             uniforms: {
                 color: {
@@ -268,12 +272,12 @@ export class DxfViewer {
         })
     }
 
-    /** @param color {Number} Color RGB numeric value.
-     * @param size {Number} Rasterized point size in pixels.
-     * @param isInstanced {Boolean} Create material for instanced drawing.
+    /** @param color {number} Color RGB numeric value.
+     * @param size {number} Rasterized point size in pixels.
+     * @param instanceType {number}
      */
-    _CreateSimplePointMaterialInstance(color, size = 2, isInstanced = false) {
-        const src = isInstanced ? this.simpleInstancedPointMaterial : this.simplePointMaterial
+    _CreateSimplePointMaterialInstance(color, size = 2, instanceType = InstanceType.NONE) {
+        const src = this.simplePointMaterial[instanceType]
         /* Should reuse compiled shaders. */
         const m = src.clone()
         m.uniforms.color = { value: new three.Color(color) }
@@ -281,20 +285,30 @@ export class DxfViewer {
         return m
     }
 
-    _GenerateShaders(isInstanced, pointSize) {
-        const instanceAttr = isInstanced ?
+    _GenerateShaders(instanceType, pointSize) {
+        const fullInstanceAttr = instanceType === InstanceType.FULL ?
             `
             /* First row. */
             in vec3 instanceTransform0;
             /* Second row. */
             in vec3 instanceTransform1;
             ` : ""
-        const instanceTransform = isInstanced ?
+        const fullInstanceTransform = instanceType === InstanceType.FULL ?
             `  
             pos.xy = mat2(instanceTransform0[0], instanceTransform1[0],
                           instanceTransform0[1], instanceTransform1[1]) * pos.xy + 
                      vec2(instanceTransform0[2], instanceTransform1[2]);
             ` : ""
+
+        const pointInstanceAttr = instanceType === InstanceType.POINT ?
+            `
+            in vec2 instanceTransform;
+            ` : ""
+        const pointInstanceTransform = instanceType === InstanceType.POINT ?
+            `  
+            pos.xy += instanceTransform;
+            ` : ""
+
         const pointSizeUniform = pointSize ? "uniform float pointSize;" : ""
         const pointSizeAssigment = pointSize ? "gl_PointSize = pointSize;" : ""
 
@@ -304,14 +318,16 @@ export class DxfViewer {
             precision highp float;
             precision highp int;
             in vec2 position;
-            ${instanceAttr}
+            ${fullInstanceAttr}
+            ${pointInstanceAttr}
             uniform mat4 modelViewMatrix;
             uniform mat4 projectionMatrix;
             ${pointSizeUniform}
             
             void main() {
                 vec4 pos = vec4(position, 0.0, 1.0);
-                ${instanceTransform}
+                ${fullInstanceTransform}
+                ${pointInstanceTransform}
                 gl_Position = projectionMatrix * modelViewMatrix * pos;
                 ${pointSizeAssigment}
             }
@@ -395,6 +411,18 @@ DxfViewer.SetupWorker = function () {
     new DxfWorker(self, true)
 }
 
+const InstanceType = Object.freeze({
+    /** Not instanced. */
+    NONE: 0,
+    /** Full affine transform per instance. */
+    FULL: 1,
+    /** Point instances, 2D-translation vector per instance. */
+    POINT: 2,
+
+    /** Number of types. */
+    MAX: 3
+})
+
 class Batch {
     /**
      * @param viewer {DxfViewer}
@@ -410,7 +438,13 @@ class Batch {
                 new Float32Array(scene.vertices,
                                  batch.verticesOffset * Float32Array.BYTES_PER_ELEMENT,
                                  batch.verticesSize)
-            this.vertices = new three.BufferAttribute(verticesArray, 2)
+            if (this.key.geometryType !== BatchingKey.GeometryType.POINT_INSTANCE ||
+                scene.pointShapeHasDot) {
+                this.vertices = new three.BufferAttribute(verticesArray, 2)
+            }
+            if (this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
+                this.transforms = new three.InstancedBufferAttribute(verticesArray, 2)
+            }
         }
 
         if (batch.hasOwnProperty("chunks")) {
@@ -445,12 +479,26 @@ class Batch {
             this.transforms1 = new three.InterleavedBufferAttribute(buf, 3, 3)
         }
 
-        if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
-            this.layerColor = 0
+        if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE ||
+            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
+
             const layer = this.viewer.layers.get(this.key.layerName)
             if (layer) {
                 this.layerColor = layer.color
+            } else {
+                this.layerColor = 0
             }
+        }
+    }
+
+    GetInstanceType() {
+        switch (this.key.geometryType) {
+        case BatchingKey.GeometryType.BLOCK_INSTANCE:
+            return InstanceType.FULL
+        case BatchingKey.GeometryType.POINT_INSTANCE:
+            return InstanceType.POINT
+        default:
+            return InstanceType.NONE
         }
     }
 
@@ -458,22 +506,24 @@ class Batch {
      * @param instanceBatch {?Batch} Batch with instance transform. Null for non-instanced object.
      */
     *CreateObjects(instanceBatch = null) {
-        if (this.key.geometryType === BatchingKey.GeometryType.POINTS) {
+        switch(this.key.geometryType) {
+        case BatchingKey.GeometryType.POINTS:
             yield this._CreatePointsObject(instanceBatch)
-
-        } else if (this.key.geometryType === BatchingKey.GeometryType.LINES) {
+            break
+        case BatchingKey.GeometryType.LINES:
             yield this._CreateLinesObject(instanceBatch)
-
-        } else if (this.key.geometryType === BatchingKey.GeometryType.INDEXED_LINES) {
+            break
+        case BatchingKey.GeometryType.INDEXED_LINES:
             yield* this._CreateIndexedLinesObjects(instanceBatch)
-
-        } else if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
+            break
+        case BatchingKey.GeometryType.BLOCK_INSTANCE:
+        case BatchingKey.GeometryType.POINT_INSTANCE:
             if (instanceBatch !== null) {
                 throw new Error("Unexpected instance batch specified for instance batch")
             }
             yield* this._CreateBlockInstanceObjects()
-
-        } else {
+            break
+        default:
             console.warn("Unhandled batch geometry type: " + this.key.geometryType)
         }
     }
@@ -487,7 +537,7 @@ class Batch {
             instanceBatch._GetInstanceColor(this.key.color) : this.key.color
         const material = this.viewer._GetSimplePointMaterial(
             this.viewer._TransformColor(color),
-            instanceBatch !== null)
+            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
         const obj = new three.Points(geometry, material)
         obj.frustumCulled = false
         return obj
@@ -503,7 +553,7 @@ class Batch {
         //XXX line type
         const material = this.viewer._GetSimpleColorMaterial(
             this.viewer._TransformColor(color),
-            instanceBatch !== null)
+            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
         const obj = new three.LineSegments(geometry, material)
         obj.frustumCulled = false
         return obj
@@ -514,7 +564,7 @@ class Batch {
             instanceBatch._GetInstanceColor(this.key.color) : this.key.color
         const material = this.viewer._GetSimpleColorMaterial(
             this.viewer._TransformColor(color),
-            instanceBatch !== null)
+            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
         for (const chunk of this.chunks) {
             const geometry = instanceBatch ?
                 new three.InstancedBufferGeometry() : new three.BufferGeometry()
@@ -535,8 +585,12 @@ class Batch {
         if (!geometry.isInstancedBufferGeometry) {
             throw new Error("InstancedBufferGeometry expected")
         }
-        geometry.setAttribute("instanceTransform0", this.transforms0)
-        geometry.setAttribute("instanceTransform1", this.transforms1)
+        if (this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
+            geometry.setAttribute("instanceTransform", this.transforms)
+        } else {
+            geometry.setAttribute("instanceTransform0", this.transforms0)
+            geometry.setAttribute("instanceTransform1", this.transforms1)
+        }
     }
 
     *_CreateBlockInstanceObjects() {
@@ -546,6 +600,10 @@ class Batch {
         }
         for (const batch of block.batches) {
             yield* batch.CreateObjects(this)
+        }
+        if (this.hasOwnProperty("vertices")) {
+            /* Dots for point shapes. */
+            yield this._CreatePointsObject(null)
         }
     }
 
