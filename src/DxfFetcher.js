@@ -18,32 +18,25 @@ export class DxfFetcher {
         let receivedSize = 0
         //XXX streaming parsing is not supported in dxf-parser for now (its parseStream() method
         // just accumulates chunks in a string buffer before parsing. Fix it later.
-        let chunks = []
+        let buffer = ""
+        let decoder = new TextDecoder("utf-8")
         while(true) {
             const {done, value} = await reader.read()
             if (done) {
+                buffer += decoder.decode(new ArrayBuffer(0), {stream: false})
                 break
             }
-            chunks.push(value)
+            buffer += decoder.decode(value, {stream: true})
             receivedSize += value.length
             if (progressCbk !== null) {
                 progressCbk("fetch", receivedSize, totalSize)
             }
         }
 
-        const binData = new Uint8Array(receivedSize)
-        let position = 0
-        for(let chunk of chunks) {
-            binData.set(chunk, position)
-            position += chunk.length
-        }
-        const text = new TextDecoder("utf-8").decode(binData)
-
         if (progressCbk !== null) {
             progressCbk("parse", 0, null)
         }
         const parser = new DxfParser()
-        const dxf = parser.parseSync(text)
-        return dxf
+        return parser.parseSync(buffer)
     }
 }
