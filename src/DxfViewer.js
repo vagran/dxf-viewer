@@ -3,7 +3,7 @@ import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {BatchingKey} from "./BatchingKey"
 import {DxfWorker} from "./DxfWorker"
 import {MaterialKey} from "./MaterialKey"
-import {ColorCode} from "./DxfScene"
+import {ColorCode, DxfScene} from "./DxfScene"
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -75,21 +75,25 @@ export class DxfViewer {
     }
 
     /** Load DXF into the viewer. Old content is discarded, state is reset.
-     * @param url DXF file URL.
-     * @param progressCbk {Function?} (phase, processedSize, totalSize)
+     * @param url {string} DXF file URL.
+     * @param fonts {?string[]} List of font URLs. Files should have typeface.js format. Fonts are
+     *  used in the specified order, each one is checked until necessary glyph is found. Text is not
+     *  rendered if fonts are not specified.
+     * @param progressCbk {?Function} (phase, processedSize, totalSize)
      *  Possible phase values:
+     *  * "font"
      *  * "fetch"
      *  * "parse"
      *  * "prepare"
-     * @param workerFactory {Function?} Factory for worker creation. The worker script should
+     * @param workerFactory {?Function} Factory for worker creation. The worker script should
      *  invoke DxfViewer.SetupWorker() function.
      */
-    async Load(url, progressCbk = null, workerFactory = null) {
+    async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
+
+        //XXX discard current scene
+
         const worker = new DxfWorker(workerFactory ? workerFactory() : null)
-        const loadOptions = {
-            arcTessellationAngle: this.options.arcTessellationAngle
-        }
-        const scene = await worker.Load(url, loadOptions, progressCbk)
+        const scene = await worker.Load(url, fonts, this.options, progressCbk)
         await worker.Destroy()
 
         for (const layer of scene.layers) {
@@ -404,7 +408,9 @@ DxfViewer.DefaultOptions = {
     /** Size in pixels for rasterized points. */
     pointSize: 2,
     /** Target angle for each segment of tessellated arc. */
-    arcTessellationAngle: 6 / 180 * Math.PI
+    arcTessellationAngle: 6 / 180 * Math.PI,
+    /** Scene generation options. */
+    sceneOptions: DxfScene.DefaultOptions,
 }
 
 DxfViewer.SetupWorker = function () {
@@ -506,80 +512,70 @@ class Batch {
      * @param instanceBatch {?Batch} Batch with instance transform. Null for non-instanced object.
      */
     *CreateObjects(instanceBatch = null) {
-        switch(this.key.geometryType) {
-        case BatchingKey.GeometryType.POINTS:
-            yield this._CreatePointsObject(instanceBatch)
-            break
-        case BatchingKey.GeometryType.LINES:
-            yield this._CreateLinesObject(instanceBatch)
-            break
-        case BatchingKey.GeometryType.INDEXED_LINES:
-            yield* this._CreateIndexedLinesObjects(instanceBatch)
-            break
-        case BatchingKey.GeometryType.BLOCK_INSTANCE:
-        case BatchingKey.GeometryType.POINT_INSTANCE:
+        if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE ||
+            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
+
             if (instanceBatch !== null) {
                 throw new Error("Unexpected instance batch specified for instance batch")
             }
             yield* this._CreateBlockInstanceObjects()
+            return
+        }
+        yield* this._CreateObjects(instanceBatch)
+    }
+
+    *_CreateObjects(instanceBatch) {
+        const color = instanceBatch ?
+            instanceBatch._GetInstanceColor(this.key.color) : this.key.color
+
+        //XXX line type
+        const materialFactory = this.key.geometryType === BatchingKey.GeometryType.POINTS ?
+            this.viewer._GetSimplePointMaterial : this.viewer._GetSimpleColorMaterial
+
+        const material = materialFactory.call(this.viewer, this.viewer._TransformColor(color),
+                                              instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
+
+        let objConstructor
+        switch (this.key.geometryType) {
+        case BatchingKey.GeometryType.POINTS:
+            objConstructor = three.Points
+            break
+        case BatchingKey.GeometryType.LINES:
+        case BatchingKey.GeometryType.INDEXED_LINES:
+            objConstructor = three.LineSegments
+            break
+        case BatchingKey.GeometryType.TRIANGLES:
+        case BatchingKey.GeometryType.INDEXED_TRIANGLES:
+            objConstructor = three.Mesh
             break
         default:
-            console.warn("Unhandled batch geometry type: " + this.key.geometryType)
+            throw new Error("Unexpected geometry type:" + this.key.geometryType)
         }
-    }
 
-    _CreatePointsObject(instanceBatch) {
-        const geometry = instanceBatch ?
-            new three.InstancedBufferGeometry() : new three.BufferGeometry()
-        geometry.setAttribute("position", this.vertices)
-        instanceBatch?._SetInstanceTransformAttribute(geometry)
-        let color = instanceBatch ?
-            instanceBatch._GetInstanceColor(this.key.color) : this.key.color
-        const material = this.viewer._GetSimplePointMaterial(
-            this.viewer._TransformColor(color),
-            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
-        const obj = new three.Points(geometry, material)
-        obj.frustumCulled = false
-        return obj
-    }
-
-    _CreateLinesObject(instanceBatch) {
-        const geometry = instanceBatch ?
-            new three.InstancedBufferGeometry() : new three.BufferGeometry()
-        geometry.setAttribute("position", this.vertices)
-        instanceBatch?._SetInstanceTransformAttribute(geometry)
-        let color = instanceBatch ?
-            instanceBatch._GetInstanceColor(this.key.color) : this.key.color
-        //XXX line type
-        const material = this.viewer._GetSimpleColorMaterial(
-            this.viewer._TransformColor(color),
-            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
-        const obj = new three.LineSegments(geometry, material)
-        obj.frustumCulled = false
-        return obj
-    }
-
-    *_CreateIndexedLinesObjects(instanceBatch) {
-        let color = instanceBatch ?
-            instanceBatch._GetInstanceColor(this.key.color) : this.key.color
-        const material = this.viewer._GetSimpleColorMaterial(
-            this.viewer._TransformColor(color),
-            instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
-        for (const chunk of this.chunks) {
+        function CreateObject(vertices, indices) {
             const geometry = instanceBatch ?
                 new three.InstancedBufferGeometry() : new three.BufferGeometry()
-            geometry.setAttribute("position", chunk.vertices)
+            geometry.setAttribute("position", vertices)
             instanceBatch?._SetInstanceTransformAttribute(geometry)
-            geometry.setIndex(chunk.indices)
-            const obj = new three.LineSegments(geometry, material)
+            if (indices) {
+                geometry.setIndex(indices)
+            }
+            const obj = new objConstructor(geometry, material)
             obj.frustumCulled = false
-            yield obj
+            return obj
+        }
+
+        if (this.chunks) {
+            for (const chunk of this.chunks) {
+                yield CreateObject(chunk.vertices, chunk.indices)
+            }
+        } else {
+            yield CreateObject(this.vertices)
         }
     }
 
     /**
      * @param geometry {InstancedBufferGeometry}
-     * @private
      */
     _SetInstanceTransformAttribute(geometry) {
         if (!geometry.isInstancedBufferGeometry) {

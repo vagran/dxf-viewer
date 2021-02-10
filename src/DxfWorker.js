@@ -25,14 +25,17 @@ export class DxfWorker {
 
     /**
      * @param url DXF file URL.
-     * @param options Loading options, see DxfScene.DefaultOptions.
+     * @param fonts {?string[]} Fonts URLs.
+     * @param options Viewer options. See DxfViewer.DefaultOptions.
      * @param progressCbk {Function?} (phase, processedSize, totalSize)
      */
-    async Load(url, options, progressCbk) {
+    async Load(url, fonts, options, progressCbk) {
         if (this.worker) {
-            return this._SendRequest(DxfWorker.WorkerMsg.LOAD, { url, options }, progressCbk)
+            return this._SendRequest(DxfWorker.WorkerMsg.LOAD,
+                                     { url, fonts, options: this._CloneOptions(options) },
+                                     progressCbk)
         } else {
-            return this._Load(url, progressCbk)
+            return this._Load(url, fonts, options, progressCbk)
         }
     }
 
@@ -66,6 +69,7 @@ export class DxfWorker {
         case DxfWorker.WorkerMsg.LOAD: {
             const scene = await this._Load(
                 data.url,
+                data.fonts,
                 data.options,
                 (phase, size, totalSize) => this._SendProgress(seq, phase, size, totalSize))
             transfers.push(scene.vertices)
@@ -124,14 +128,48 @@ export class DxfWorker {
     }
 
     /** @return {Object} DxfScene serialized scene. */
-    async _Load(url, options, progressCbk) {
+    async _Load(url, fonts, options, progressCbk) {
+        let loadedFonts
+        if (fonts) {
+            loadedFonts = await this._LoadFonts(fonts, progressCbk)
+        } else {
+            loadedFonts = []
+        }
         const dxf = await new DxfFetcher(url).Fetch(progressCbk)
         if (progressCbk) {
             progressCbk("prepare", 0, null)
         }
         const dxfScene = new DxfScene(options)
-        dxfScene.Build(dxf)
+        dxfScene.Build(dxf, loadedFonts)
         return dxfScene.scene
+    }
+
+    async _LoadFonts(urls, progressCbk) {
+        if (progressCbk) {
+            progressCbk("font", 0, null)
+        }
+        const fonts = []
+        for (const url of urls) {
+            const response = await fetch(url)
+            fonts.push(await response.json())
+        }
+        return fonts
+    }
+
+    _CloneOptions(options) {
+        /* Default options values are taken from prototype so need to implement deep clone here. */
+        if (Array.isArray(options)) {
+            return options.map(o => this._CloneOptions(o))
+        } else if (typeof options === "object" && options !== null) {
+            const result = {}
+            for (const propName in options) {
+                // noinspection JSUnfilteredForInLoop
+                result[propName] = this._CloneOptions(options[propName])
+            }
+            return result
+        } else {
+            return options
+        }
     }
 }
 

@@ -2,10 +2,11 @@ import {DynamicBuffer, NativeType} from "./DynamicBuffer"
 import "./RBTree"
 import {BatchingKey} from "./BatchingKey"
 import {Matrix3, Vector2} from "three"
+import {TextRenderer} from "./TextRenderer"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
-/** Arc angle for tessellation point circle shape. */
+/** Arc angle for tessellating point circle shape. */
 const POINT_CIRCLE_TESSELLATION_ANGLE = 15 * Math.PI / 180
 const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 
@@ -16,10 +17,9 @@ const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 export class DxfScene {
 
     constructor(options) {
-        this.options = options
         this.options = Object.create(DxfScene.DefaultOptions)
         if (options) {
-            Object.assign(this.options, options)
+            Object.assign(this.options, options.sceneOptions)
         }
 
         /* Scene origin. All input coordinates are made local to this point to minimize precision
@@ -36,8 +36,14 @@ export class DxfScene {
         this.pointShapeBlock = null
     }
 
-    /** Build the scene from the provided parsed DXF. */
-    Build(dxf) {
+    /** Build the scene from the provided parsed DXF.
+     * @param dxf {{}} Parsed DXF file.
+     * @param fonts {Font[]} List of fonts to use.
+     */
+    Build(dxf, fonts) {
+
+        this.textRenderer = new TextRenderer(fonts, this.options.textOptions)
+
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 this.layers.set(layer.name, layer)
@@ -74,6 +80,7 @@ export class DxfScene {
         delete this.batches
         delete this.layers
         delete this.blocks
+        delete this.textRenderer
     }
 
     _ProcessDxfEntity(entity, blockCtx = null) {
@@ -100,11 +107,8 @@ export class DxfScene {
             this._ProcessInsert(entity, blockCtx)
             return
         case "TEXT":
-            //XXX
-            return
-        case "MTEXT":
-            //XXX
-            return
+            renderEntities = this._DecomposeText(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -128,6 +132,9 @@ export class DxfScene {
             break
         case Entity.Type.POLYLINE:
             this._ProcessPolyline(entity, blockCtx)
+            break
+        case Entity.Type.TRIANGLES:
+            this._ProcessTriangles(entity, blockCtx)
             break
         default:
             throw new Error("Unhandled entity type: " + entity.type)
@@ -157,8 +164,12 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
-        yield new Entity(Entity.Type.LINE_SEGMENTS, entity.vertices, layer, color,
-                         this._GetLineType(entity, entity.vertices[0]))
+        yield new Entity({
+                             type: Entity.Type.LINE_SEGMENTS,
+                             vertices: entity.vertices,
+                             layer, color,
+                             lineType: this._GetLineType(entity, entity.vertices[0])
+                         })
     }
 
     /** Generate vertices for bulged line segment.
@@ -281,8 +292,11 @@ export class DxfScene {
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius, entity.startAngle,
                                   entity.endAngle)
-        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType,
-                         entity.endAngle === undefined)
+        yield new Entity({
+                             type: Entity.Type.POLYLINE,
+                             vertices, layer, color, lineType,
+                             shape: entity.endAngle === undefined
+                         })
     }
 
     *_DecomposeCircle(entity, blockCtx) {
@@ -291,7 +305,11 @@ export class DxfScene {
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
         this._GenerateArcVertices(vertices, entity.center, entity.radius)
-        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, true)
+        yield new Entity({
+                             type: Entity.Type.POLYLINE,
+                             vertices, layer, color, lineType,
+                             shape: true
+                         })
     }
 
     *_DecomposePoint(entity, blockCtx) {
@@ -319,13 +337,22 @@ export class DxfScene {
         }
 
         if (markType === PdMode.DOT) {
-            yield new Entity(Entity.Type.POINTS, [entity.position], layer, color, null, false)
+            yield new Entity({
+                                 type: Entity.Type.POINTS,
+                                 vertices: [entity.position],
+                                 layer, color,
+                                 lineType: null
+                             })
             return
         }
 
         const vertices = []
         this._CreatePointMarker(vertices, markType, entity.position)
-        yield new Entity(Entity.Type.LINE_SEGMENTS, vertices, layer, color, null, false)
+        yield new Entity({
+                             type: Entity.Type.LINE_SEGMENTS,
+                             vertices, layer, color,
+                             lineType: null
+                         })
     }
 
     /** Create line segments for point marker.
@@ -380,8 +407,11 @@ export class DxfScene {
         if (markType !== PdMode.DOT && markType !== PdMode.NONE) {
             const vertices = []
             this._CreatePointMarker(vertices, markType)
-            const entity = new Entity(Entity.Type.LINE_SEGMENTS, vertices, null,
-                                      ColorCode.BY_BLOCK, 0)
+            const entity = new Entity({
+                                          type: Entity.Type.LINE_SEGMENTS,
+                                          vertices,
+                                          color: ColorCode.BY_BLOCK
+                                      })
             this._ProcessEntity(entity, blockCtx)
         }
 
@@ -393,18 +423,38 @@ export class DxfScene {
                 {x: r, y: -r},
                 {x: -r, y: -r}
             ]
-            const entity = new Entity(Entity.Type.POLYLINE, vertices, null,
-                                      ColorCode.BY_BLOCK, 0, true)
+            const entity = new Entity({
+                                          type: Entity.Type.POLYLINE, vertices,
+                                          color: ColorCode.BY_BLOCK,
+                                          shape: true
+                                      })
             this._ProcessEntity(entity, blockCtx)
         }
         if (this.pdMode & PdMode.CIRCLE) {
             const vertices = []
             this._GenerateArcVertices(vertices, {x: 0, y: 0}, this.pdSize * 0.5, null, null,
                                       POINT_CIRCLE_TESSELLATION_ANGLE)
-            const entity = new Entity(Entity.Type.POLYLINE, vertices, null,
-                                      ColorCode.BY_BLOCK, 0, true)
+            const entity = new Entity({
+                                          type: Entity.Type.POLYLINE, vertices,
+                                          color: ColorCode.BY_BLOCK,
+                                          shape: true
+                                      })
             this._ProcessEntity(entity, blockCtx)
         }
+    }
+
+    *_DecomposeText(entity, blockCtx) {
+        if (!this.textRenderer.canRender) {
+            return
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        yield* this.textRenderer.Render({
+            text: entity.text,
+            size: entity.textHeight,
+            position: entity.startPoint,
+            color, layer
+        })
     }
 
     /**
@@ -462,7 +512,14 @@ export class DxfScene {
      */
     *_GenerateShapedPolyline(vertices, layer, color, lineType, shape) {
         //XXX
-        yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, lineType, shape)
+        yield new Entity({
+                             type: Entity.Type.POLYLINE,
+                             vertices,
+                             layer,
+                             color,
+                             lineType,
+                             shape
+                         })
     }
 
     *_DecomposePolyline(entity, blockCtx = null) {
@@ -505,7 +562,12 @@ export class DxfScene {
             }
 
             if (curPlainLine) {
-                yield new Entity(Entity.Type.POLYLINE, vertices, layer, color, curLineType, isClosed)
+                yield new Entity({
+                                     type: Entity.Type.POLYLINE,
+                                     vertices, layer, color,
+                                     lineType: curLineType,
+                                     shape: isClosed
+                                 })
             } else {
                 yield* _this._GenerateShapedPolyline(vertices, layer, color, curLineType, isClosed)
             }
@@ -632,6 +694,34 @@ export class DxfScene {
             }
             chunk.Finish()
         }
+    }
+
+    /**
+     * @param entity {Entity}
+     * @param blockCtx {?BlockContext}
+     */
+    _ProcessTriangles(entity, blockCtx = null) {
+        if (entity.vertices.length < 3) {
+            return
+        }
+        if (entity.indices.length % 3 !== 0) {
+            console.error("Unexpected size of indices array: " + entity.indices.length)
+            return
+        }
+        const key = new BatchingKey(entity.layer, blockCtx?.name,
+                                    BatchingKey.GeometryType.INDEXED_TRIANGLES,
+                                    entity.color, 0)
+        const batch = this._GetBatch(key)
+        //XXX splitting into chunks is not yet implemented. Currently used only for text glyphs so
+        // should fit into one chunk
+        const chunk = batch.PushChunk(entity.vertices.length)
+        for (const v of entity.vertices) {
+            chunk.PushVertex(this._TransformVertex(v, blockCtx))
+        }
+        for (const idx of entity.indices) {
+            chunk.PushIndex(idx)
+        }
+        chunk.Finish()
     }
 
     /** Resolve entity color.
@@ -921,6 +1011,7 @@ class BlockContext {
         this.transform = new Matrix3().translate(-origin.x, -origin.y)
     }
 
+    /** @return {string} Block name */
     get name() {
         return this.block.name
     }
@@ -1021,17 +1112,19 @@ class IndexedChunkWriter {
 /** Internal entity representation. DXF features are decomposed into these simpler entities. Whole
  * entity always shares single material.
  */
-class Entity {
+export class Entity {
     /** @param type {Entity.Type}
      * @param vertices {{x, y}[]}
+     * @param indices {?number[]} Indices for indexed geometry.
      * @param layer {?string}
      * @param color {number}
      * @param lineType {?number}
      * @param shape {Boolean} true if closed shape.
      */
-    constructor(type, vertices, layer, color, lineType, shape = false) {
+    constructor({type, vertices, indices = null, layer = null, color, lineType = 0, shape = false}) {
         this.type = type
         this.vertices = vertices
+        this.indices = indices
         this.layer = layer
         this.color = color
         this.lineType = lineType
@@ -1129,7 +1222,8 @@ Entity.Type = Object.freeze({
     POINTS: 0,
     /** Each vertices pair defines a segment. */
     LINE_SEGMENTS: 1,
-    POLYLINE: 2
+    POLYLINE: 2,
+    TRIANGLES: 3
 })
 
 function* _IterateLineIndices(verticesCount, close) {
@@ -1166,5 +1260,7 @@ export const ColorCode = Object.freeze({
 
 DxfScene.DefaultOptions = {
     /** Target angle for each segment of tessellated arc. */
-    arcTessellationAngle: 10 / 180 * Math.PI
+    arcTessellationAngle: 10 / 180 * Math.PI,
+    /** Text rendering options. */
+    textOptions: TextRenderer.DefaultOptions
 }
