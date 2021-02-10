@@ -1,5 +1,4 @@
-import "dxf-parser"
-import DxfParser from "dxf-parser";
+import DxfParser from "./parser/DxfParser"
 
 /** This class implements proper loading of DXF files. It ensures the event loop is not blocked and
  * a page remains responsive even for huge files. The result is "dxf-parser" output.
@@ -43,7 +42,6 @@ export class DxfFetcher {
             progressCbk("parse", 0, null)
         }
         const parser = new DxfParser()
-        const dxf = parser.parseSync(text)
-        return dxf
+        return parser.parseSync(text)
     }
 }
