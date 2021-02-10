@@ -39,9 +39,11 @@ export class DxfWorker {
         }
     }
 
-    async Destroy() {
+    async Destroy(noWait = false) {
         if (this.worker) {
-            await this._SendRequest(DxfWorker.WorkerMsg.DESTROY)
+            if (!noWait) {
+                await this._SendRequest(DxfWorker.WorkerMsg.DESTROY)
+            }
             /* close() in the worker is not enough, instance is still visible in dev tools. */
             this.worker.terminate()
         }

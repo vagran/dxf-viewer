@@ -62,12 +62,15 @@ export class DxfViewer {
 
         this.Render()
 
-        /* Indexed by MaterialKey. */
+        /* Indexed by MaterialKey, value is {key, material}. */
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
         /* Indexed by layer name, value is Layer instance. */
         this.layers = new Map()
         /* Indexed by block name, value is Block instance. */
         this.blocks = new Map()
+
+        /** Set during data loading. */
+        this.worker = null
     }
 
     GetCanvas() {
@@ -90,11 +93,12 @@ export class DxfViewer {
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
 
-        //XXX discard current scene
+        this.Clear()
 
-        const worker = new DxfWorker(workerFactory ? workerFactory() : null)
-        const scene = await worker.Load(url, fonts, this.options, progressCbk)
-        await worker.Destroy()
+        this.worker = new DxfWorker(workerFactory ? workerFactory() : null)
+        const scene = await this.worker.Load(url, fonts, this.options, progressCbk)
+        await this.worker.Destroy()
+        this.worker = null
 
         for (const layer of scene.layers) {
             this.layers.set(layer.name, new Layer(layer.name, layer.color))
@@ -154,8 +158,37 @@ export class DxfViewer {
         this.Render()
     }
 
+    /** Reset the viewer state. */
+    Clear() {
+        if (this.worker) {
+            this.worker.Destroy(true)
+            this.worker = null
+        }
+        this.scene.clear()
+        for (const layer of this.layers.values()) {
+            layer.Dispose()
+        }
+        this.layers.clear()
+        this.blocks.clear()
+        this.materials.each(e => e.material.dispose())
+        this.materials.clear()
+        this.SetView({x: 0, y: 0}, 2)
+        this.Render()
+    }
+
+    /** Free all resources. The viewer object should not be used after this method was called. */
     Destroy() {
-        //XXX
+        this.Clear()
+        for (const m of this.simplePointMaterial) {
+            m.dispose()
+        }
+        for (const m of this.simpleColorMaterial) {
+            m.dispose()
+        }
+        this.simplePointMaterial = null
+        this.simpleColorMaterial = null
+        this.renderer.dispose()
+        this.renderer = null
     }
 
     SetView(center, width) {
@@ -627,6 +660,13 @@ class Layer {
 
     PushObject(obj) {
         this.objects.push(obj)
+    }
+
+    Dispose() {
+        for (const obj of this.objects) {
+            obj.geometry.dispose()
+        }
+        this.objects = null
     }
 }
 
