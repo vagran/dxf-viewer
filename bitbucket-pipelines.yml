@@ -1,4 +1,4 @@
-image: alpine:latest
+image: ubuntu:20.04
 
 pipelines:
   default:
