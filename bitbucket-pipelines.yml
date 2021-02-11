@@ -12,6 +12,7 @@ pipelines:
           - cd build
           - npm pack ..
           - mv *.tgz ugcs-web-dxf-viewer.$BUILD_VERSION.tgz
+          - cd ..
           - pipe: atlassian/aws-s3-deploy:0.4.5
             variables:
               AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
