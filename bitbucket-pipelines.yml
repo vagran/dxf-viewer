@@ -1,0 +1,26 @@
+image: alpine:latest
+
+pipelines:
+  default:
+    - step:
+        name: Build
+
+        script:
+          - export BUILD_VERSION="$APP_VERSION.$(git rev-parse --short=8 HEAD)"
+          - "echo Version: $BUILD_VERSION"
+          - mkdir build
+          - tar -czvf build/ugcs-web-dxf-viewer.$BUILD_VERSION.tgz
+            --transform 's,^,dxf-viewer/,'
+            --exclude build --exclude .idea --exclude .git --exclude node_modules
+            --exclude bitbucket-pipelines.yml --exclude *.iml .
+          - pipe: atlassian/aws-s3-deploy:0.4.5
+            variables:
+              AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+              AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+              AWS_DEFAULT_REGION: "eu-west-1"
+              S3_BUCKET: "ugcs-build-artifacts/ugcs-web-dxf-viewer"
+              LOCAL_PATH: "build"
+              ACL: "public-read"
+
+        artifacts:
+          - build/*.tgz

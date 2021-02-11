@@ -1,11 +1,17 @@
 {
   "name": "dxf-viewer",
   "version": "1.0.0",
-  "description": "",
+  "description": "JavaScript DXF file viewer",
   "main": "src/index.js",
-  "keywords": [],
-  "author": "",
+  "author": "Artyom Lebedev<arlebedev@ugcs.com>",
   "license": "MIT",
+  "keywords": [
+    "dxf",
+    "viewer",
+    "javascript",
+    "webgl",
+    "html5"
+  ],
   "dependencies": {
     "dxf-parser": "^1.0.0-alpha.2",
     "three": "^0.125.1"

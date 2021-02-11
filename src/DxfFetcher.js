@@ -1,9 +1,7 @@
 import "dxf-parser"
-import DxfParser from "dxf-parser";
+import DxfParser from "dxf-parser"
 
-/** This class implements proper loading of DXF files. It ensures the event loop is not blocked and
- * a page remains responsive even for huge files. The result is "dxf-parser" output.
- */
+/** Fetches and parses DXF file. */
 export class DxfFetcher {
     constructor(url) {
         this.url = url
