@@ -9,7 +9,8 @@ import {ColorCode, DxfScene} from "./DxfScene"
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
 export class DxfViewer {
 
-    /** @param domContainer Container element to create the canvas in. Usually empty div.
+    /** @param domContainer Container element to create the canvas in. Usually empty div. Should not
+     *  have padding if auto-resize feature is used.
      * @param options Some options can be overridden if specified. See DxfViewer.DefaultOptions.
      */
     constructor(domContainer, options = null) {
@@ -41,18 +42,30 @@ export class DxfViewer {
             this.simplePointMaterial[i] = this._CreateSimplePointMaterial(i)
         }
 
-        //XXX auto resize not implemented
-        this.canvasWidth = options.canvasWidth
-        this.canvasHeight = options.canvasHeight
-        renderer.setSize(this.canvasWidth, this.canvasHeight)
         renderer.setClearColor(options.clearColor, options.clearAlpha)
+
+        if (options.autoResize) {
+            this.canvasWidth = domContainer.clientWidth
+            this.canvasHeight = domContainer.clientHeight
+            domContainer.style.position = "relative"
+        } else {
+            this.canvasWidth = options.canvasWidth
+            this.canvasHeight = options.canvasHeight
+            this.resizeObserver = null
+        }
+        renderer.setSize(this.canvasWidth, this.canvasHeight)
 
         this.canvas = renderer.domElement
         this.canvas.getContext("webgl", { premultipliedAlpha: false })
         domContainer.style.display = "block"
-        domContainer.appendChild(renderer.domElement)
+        if (options.autoResize) {
+            this.canvas.style.position = "absolute"
+            this.resizeObserver = new ResizeObserver(entries => this._OnResize(entries[0]))
+            this.resizeObserver.observe(domContainer)
+        }
+        domContainer.appendChild(this.canvas)
 
-        const controls = this.controls = new OrbitControls(camera, renderer.domElement)
+        const controls = this.controls = new OrbitControls(camera, this.canvas)
         controls.enableRotate = false
         controls.mouseButtons = {
             LEFT: three.MOUSE.PAN
@@ -75,6 +88,28 @@ export class DxfViewer {
 
     GetCanvas() {
         return this.canvas
+    }
+
+    SetSize(width, height) {
+        const hScale = width / this.canvasWidth
+        const vScale = height / this.canvasHeight
+
+        const cam = this.camera
+        const centerX = (cam.left + cam.right) / 2
+        const centerY = (cam.bottom + cam.top) / 2
+        const camWidth = cam.right - cam.left
+        const camHeight = cam.top - cam.bottom
+        cam.left = centerX - hScale * camWidth / 2
+        cam.right = centerX + hScale * camWidth / 2
+        cam.bottom = centerY - vScale * camHeight / 2
+        cam.top = centerY + vScale * camHeight / 2
+        cam.updateProjectionMatrix()
+
+        this.canvasWidth = width
+        this.canvasHeight = height
+        this.renderer.setSize(width, height)
+        this.controls.update()
+        this.Render()
     }
 
     /** Load DXF into the viewer. Old content is discarded, state is reset.
@@ -178,6 +213,9 @@ export class DxfViewer {
 
     /** Free all resources. The viewer object should not be used after this method was called. */
     Destroy() {
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect()
+        }
         this.Clear()
         for (const m of this.simplePointMaterial) {
             m.dispose()
@@ -213,6 +251,10 @@ export class DxfViewer {
             width = height * aspect
         }
         this.SetView(center, width * (1 + padding))
+    }
+
+    _OnResize(entry) {
+        this.SetSize(entry.contentRect.width, entry.contentRect.height)
     }
 
     _LoadBatch(scene, batch) {
@@ -416,8 +458,8 @@ DxfViewer.DefaultOptions = {
     canvasWidth: 400,
     canvasHeight: 300,
     /** Automatically resize canvas when the container is resized. This options
-     *  utilizes ResizeObserver API which still not fully standardized. The specified canvas size is
-     *  ignored if the option enabled.
+     *  utilizes ResizeObserver API which is still not fully standardized. The specified canvas size
+     *  is ignored if the option is enabled.
      */
     autoResize: false,
     /** Frame buffer clear color. */
