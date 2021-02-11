@@ -1,4 +1,4 @@
-image: node-alpine-git
+image: timbru31/node-alpine-git
 
 pipelines:
   default:
