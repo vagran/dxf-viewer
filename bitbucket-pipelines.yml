@@ -1,4 +1,4 @@
-image: ubuntu:20.04
+image: ugcsartyom/ugcs-cpp-sdk-build-env
 
 pipelines:
   default:
