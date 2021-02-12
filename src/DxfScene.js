@@ -30,7 +30,7 @@ export class DxfScene {
         this.batches = new RBTree((b1, b2) => b1.key.Compare(b2.key))
         /* Indexed by layer name, value is layer object from parsed DXF. */
         this.layers = new Map()
-        /* Indexed by block name, value is block object from parsed DXF. */
+        /* Indexed by block name, value is Block. */
         this.blocks = new Map()
         this.bounds = null
         this.pointShapeBlock = null
@@ -44,6 +44,13 @@ export class DxfScene {
 
         this.textRenderer = new TextRenderer(fonts, this.options.textOptions)
 
+        /* 0 - CCW, 1 - CW */
+        this.angBase = dxf.header["$ANGBASE"] || 0
+        /* Zero angle direction, 0 is +X */
+        this.angDir = dxf.header["$ANGDIR"] || 0
+        this.pdMode = dxf.header["$PDMODE"] || 0
+        this.pdSize = dxf.header["$PDSIZE"] || 0
+
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 this.layers.set(layer.name, layer)
@@ -52,21 +59,23 @@ export class DxfScene {
 
         if (dxf.blocks) {
             for (const [, block] of Object.entries(dxf.blocks)) {
-                this.blocks.set(block.name, block)
+                this.blocks.set(block.name, new Block(block))
             }
         }
 
-        /* 0 - CCW, 1 - CW */
-        this.angBase = dxf.header["$ANGBASE"] || 0
-        /* Zero angle direction, 0 is +X */
-        this.angDir = dxf.header["$ANGDIR"] || 0
-        this.pdMode = dxf.header["$PDMODE"] || 0
-        this.pdSize = dxf.header["$PDSIZE"] || 0
+        /* Scan all entities to analyze block usage statistics. */
+        for (const entity of dxf.entities) {
+            if (entity.type === "INSERT") {
+                const block = this.blocks.get(entity.name)
+                block?.RegisterInsert(entity)
+            }
+        }
 
         for (const block of this.blocks.values()) {
-            if (block.hasOwnProperty("entities")) {
-                for (const entity of block.entities) {
-                    this._ProcessDxfEntity(entity, new BlockContext(block))
+            if (block.data.hasOwnProperty("entities")) {
+                const blockCtx = block.DefinitionContext()
+                for (const entity of block.data.entities) {
+                    this._ProcessDxfEntity(entity, blockCtx)
                 }
             }
         }
@@ -397,11 +406,11 @@ export class DxfScene {
             return
         }
         /* This mimics DXF block entity. */
-        this.pointShapeBlock = {
+        this.pointShapeBlock = new Block({
             name: POINT_SHAPE_BLOCK_NAME,
             position: { x: 0, y: 0}
-        }
-        const blockCtx = new BlockContext(this.pointShapeBlock)
+        })
+        const blockCtx = this.pointShapeBlock.DefinitionContext()
 
         const markType = this.pdMode & PdMode.MARK_MASK
         if (markType !== PdMode.DOT && markType !== PdMode.NONE) {
@@ -474,7 +483,7 @@ export class DxfScene {
                 console.warn("Unresolved nested block reference: " + entity.name)
             }
             const nestedCtx = blockCtx.NestedBlockContext(block, entity)
-            for (const entity of block.entities) {
+            for (const entity of block.data.entities) {
                 this._ProcessDxfEntity(entity, nestedCtx)
             }
             return
@@ -485,17 +494,19 @@ export class DxfScene {
             console.warn("Unresolved block reference in INSERT: " + entity.name)
             return
         }
-        const origin = block.position
+        if (!block.HasGeometry()) {
+            return
+        }
         const layer = this._GetEntityLayer(entity, null)
         const color = this._GetEntityColor(entity, null)
         const lineType = this._GetLineType(entity, null, null)
         const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
                                     color, lineType)
         const batch = this._GetBatch(key)
-        /* Just to update bounding box and origin. */
-        this._TransformVertex(entity.position)
-        const transform = new BlockContext(block).GetInsertionTransform(entity)
-            .translate(-this.origin.x, -this.origin.y)
+        const transform = block.InstantiationContext().GetInsertionTransform(entity)
+        /* Update bounding box and origin with transformed block origin. */
+        this._UpdateBounds(new Vector2().applyMatrix3(transform))
+        transform.translate(-this.origin.x, -this.origin.y)
         //XXX grid instancing not supported yet
         batch.PushInstanceTransform(transform)
     }
@@ -777,6 +788,16 @@ export class DxfScene {
         }
         batch = new RenderBatch(key)
         this.batches.insert(batch)
+        if (key.blockName !== null &&
+            key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE &&
+            key.geometryType !== BatchingKey.GeometryType.POINT_INSTANCE) {
+
+            /* Block definition batch. */
+            const block = this.blocks.get(key.blockName)
+            if (block) {
+                block.batches.push(batch)
+            }
+        }
         return batch
     }
 
@@ -789,11 +810,15 @@ export class DxfScene {
      */
     _TransformVertex(v, blockCtx = null) {
         if (blockCtx) {
-            if (blockCtx.transform) {
-                return new Vector2(v.x, v.y).applyMatrix3(blockCtx.transform)
-            }
-            return v
+            /* Block definition in block coordinates. So it should not touch bounds and origin. */
+            return blockCtx.TransformVertex(v)
         }
+        this._UpdateBounds(v)
+        return { x: v.x - this.origin.x, y: v.y - this.origin.y }
+    }
+
+    /** @param v {{x,y}} Vertex to extend bounding box with and set origin. */
+    _UpdateBounds(v) {
         if (this.bounds === null) {
             this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
         } else {
@@ -811,7 +836,6 @@ export class DxfScene {
         if (this.origin === null) {
             this.origin = { x: v.x, y: v.y }
         }
-        return { x: v.x - this.origin.x, y: v.y - this.origin.y }
     }
 
     _BuildScene() {
@@ -999,21 +1023,75 @@ class RenderBatch {
     }
 }
 
-class BlockContext {
-    constructor(block) {
-        this.block = block
-        const origin = this.block.position
-        /* Transform to apply for block definition entities. Initially origin is moved to zero
-         * which is required because often blocks are defined in-place in global coordinate
-         * system so having origin with huge coordinates. This may lead to precision loss during
-         * coordinates conversions.
+class Block {
+    /** @param data {{}} Raw DXF entity. */
+    constructor(data) {
+        this.data = data
+        /* Number of times referenced from top-level entities (INSERT). */
+        this.useCount = 0
+        /* Number of times referenced by other block. */
+        this.nestedUseCount = 0
+        /* Offset {x, y} to apply for all vertices. Used to move origin near vertices location to
+         * minimize precision loss.
          */
-        this.transform = new Matrix3().translate(-origin.x, -origin.y)
+        this.offset = null
+        /* Definition batches. Used for root blocks flattening. */
+        this.batches = []
+    }
+
+    /** @return {Boolean} True if has something to draw. */
+    HasGeometry() {
+        /* Offset is set on first geometry vertex encountered. */
+        return this.offset !== null
+    }
+
+    RegisterInsert(entity) {
+        this.useCount++
+    }
+
+    RegisterNestedUse(usedByBlock) {
+        this.nestedUseCount++
+    }
+
+    /** @return {BlockContext} Context for block definition. */
+    DefinitionContext() {
+        return new BlockContext(this, BlockContext.Type.DEFINITION)
+    }
+
+    //XXX
+    InstantiationContext() {
+        //XXX
+        return new BlockContext(this, BlockContext.Type.INSTANTIATION)
+    }
+}
+
+//XXX flattening context, block/layer color, layer name, insert transform
+class BlockContext {
+    constructor(block, type) {
+        this.block = block
+        this.type = type
+        this.origin = this.block.data.position
+        /* Transform to apply for block definition entities not including block offset. */
+        this.transform = new Matrix3()
     }
 
     /** @return {string} Block name */
     get name() {
-        return this.block.name
+        return this.block.data.name
+    }
+
+    /**
+     * @param v {{x,y}}
+     * @return {{x,y}}
+     */
+    TransformVertex(v) {
+        const result = new Vector2(v.x, v.y).applyMatrix3(this.transform)
+        if (this.block.offset === null) {
+            this.block.offset = result
+            return new Vector2()
+        }
+        result.sub(this.block.offset)
+        return result
     }
 
     /**
@@ -1022,30 +1100,42 @@ class BlockContext {
      * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
      */
     GetInsertionTransform(entity) {
-        return new Matrix3().setUvTransform(
-            entity.position.x,
-            entity.position.y,
+        const mInsert = new Matrix3().setUvTransform(
+            entity.position.x - this.origin.x,
+            entity.position.y - this.origin.y,
             entity.xScale || 1,
             entity.yScale || 1,
             -(entity.rotation || 0) * Math.PI / 180,
-            /* Origin is already moved to zero so rotate around zero. */
-            0, 0)
+            this.origin.x, this.origin.y)
+
+        if (this.type !== BlockContext.Type.INSTANTIATION) {
+            return mInsert
+        }
+        const mOffset = new Matrix3().translate(this.block.offset.x, this.block.offset.y)
+        return mInsert.multiply(mOffset)
     }
 
     /**
      * Create context for nested block.
-     * @param block Nested block (raw DXF entity).
+     * @param block {Block} Nested block.
      * @param entity Raw DXF INSERT entity.
      * @return {BlockContext} Context to use for nested block entities.
      */
     NestedBlockContext(block, entity) {
-        const ctx = new BlockContext(this.block)
-        const nestedCtx = new BlockContext(block)
-        const nestedTransform = nestedCtx.GetInsertionTransform(entity).multiply(nestedCtx.transform)
-        ctx.transform = this.transform.multiply(nestedTransform)
+        block.RegisterNestedUse(this.block)
+        const nestedCtx = new BlockContext(block, BlockContext.Type.NESTED_DEFINITION)
+        const nestedTransform = nestedCtx.GetInsertionTransform(entity)
+        const ctx = new BlockContext(this.block, BlockContext.Type.NESTED_DEFINITION)
+        ctx.transform = new Matrix3().multiplyMatrices(this.transform, nestedTransform)
         return ctx
     }
 }
+
+BlockContext.Type = Object.freeze({
+    DEFINITION: 0,
+    NESTED_DEFINITION: 1,
+    INSTANTIATION: 2
+})
 
 class IndexedChunk {
     constructor(initialCapacity) {
