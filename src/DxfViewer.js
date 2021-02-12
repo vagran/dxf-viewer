@@ -250,6 +250,9 @@ export class DxfViewer {
         if (height * aspect > width) {
             width = height * aspect
         }
+        if (width <= Number.MIN_VALUE * 2) {
+            width = 1
+        }
         this.SetView(center, width * (1 + padding))
     }
 

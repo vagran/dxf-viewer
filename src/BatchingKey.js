@@ -45,6 +45,11 @@ export class BatchingKey {
         return this.geometryType === BatchingKey.GeometryType.INDEXED_LINES ||
                this.geometryType === BatchingKey.GeometryType.INDEXED_TRIANGLES
     }
+
+    IsInstanced() {
+        return this.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE ||
+               this.geometryType === BatchingKey.GeometryType.POINT_INSTANCE
+    }
 }
 
 BatchingKey.GeometryType = Object.freeze({

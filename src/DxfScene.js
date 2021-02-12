@@ -9,6 +9,8 @@ const INDEXED_CHUNK_SIZE = 0x10000
 /** Arc angle for tessellating point circle shape. */
 const POINT_CIRCLE_TESSELLATION_ANGLE = 15 * Math.PI / 180
 const POINT_SHAPE_BLOCK_NAME = "__point_shape"
+/** Flatten a block if its total vertices count in all instances is less than this value. */
+const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -34,6 +36,7 @@ export class DxfScene {
         this.blocks = new Map()
         this.bounds = null
         this.pointShapeBlock = null
+        this.numBlocksFlattened = 0
     }
 
     /** Build the scene from the provided parsed DXF.
@@ -78,7 +81,11 @@ export class DxfScene {
                     this._ProcessDxfEntity(entity, blockCtx)
                 }
             }
+            if (block.SetFlatten()) {
+                this.numBlocksFlattened++
+            }
         }
+        console.log(`${this.numBlocksFlattened} blocks flattened`)
 
         for (const entity of dxf.entities) {
             this._ProcessDxfEntity(entity)
@@ -497,18 +504,42 @@ export class DxfScene {
         if (!block.HasGeometry()) {
             return
         }
+
         const layer = this._GetEntityLayer(entity, null)
         const color = this._GetEntityColor(entity, null)
         const lineType = this._GetLineType(entity, null, null)
-        const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
-                                    color, lineType)
-        const batch = this._GetBatch(key)
         const transform = block.InstantiationContext().GetInsertionTransform(entity)
         /* Update bounding box and origin with transformed block origin. */
         this._UpdateBounds(new Vector2().applyMatrix3(transform))
         transform.translate(-this.origin.x, -this.origin.y)
         //XXX grid instancing not supported yet
-        batch.PushInstanceTransform(transform)
+        if (block.flatten) {
+            for (const batch of block.batches) {
+                this._FlattenBatch(batch, layer, color, lineType, transform)
+            }
+        } else {
+            const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
+                                        color, lineType)
+            const batch = this._GetBatch(key)
+            batch.PushInstanceTransform(transform)
+        }
+    }
+
+    /** Flatten block definition batch. It is merged into suitable instant rendering batch. */
+    _FlattenBatch(blockBatch, layerName, blockColor, blockLineType, transform) {
+        const layer = this.layers.get(layerName)
+        let color, lineType = 0
+        if (blockBatch.key.color === ColorCode.BY_BLOCK) {
+            color = blockColor
+        } else if (blockBatch.key.color === ColorCode.BY_LAYER) {
+            color = layer?.color ?? 0
+        } else {
+            color = blockBatch.key.color
+        }
+        //XXX line type
+        const key = new BatchingKey(layerName, null, blockBatch.key.geometryType, color, lineType)
+        const batch = this._GetBatch(key)
+        batch.Merge(blockBatch, transform)
     }
 
     /**
@@ -781,6 +812,7 @@ export class DxfScene {
         return "0"
     }
 
+    /** @return {RenderBatch} */
     _GetBatch(key) {
         let batch = this.batches.find({key})
         if (batch !== null) {
@@ -819,9 +851,6 @@ export class DxfScene {
 
     /** @param v {{x,y}} Vertex to extend bounding box with and set origin. */
     _UpdateBounds(v) {
-        // if (v.x < 200000 || v.x > 210000) {
-        //     console.log(v)//XXX
-        // }
         if (this.bounds === null) {
             this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
         } else {
@@ -947,6 +976,50 @@ class RenderBatch {
         return new IndexedChunkWriter(curChunk, verticesCount)
     }
 
+    /** Merge other batch into this one. They should have the same geometry type. Instanced batches
+     * are disallowed.
+     *
+     * @param batch {RenderBatch}
+     * @param transform {?Matrix3} Optional transform to apply for merged vertices.
+     */
+    Merge(batch, transform = null) {
+        if (this.key.geometryType !== batch.key.geometryType) {
+            throw new Error("Rendering batch merging geometry type mismatch: " +
+                            `${this.key.geometryType} !== ${batch.key.geometryType}`)
+        }
+        if (this.key.IsInstanced()) {
+            throw new Error("Attempted to merge instanced batch")
+        }
+        if (this.key.IsIndexed()) {
+            /* Merge chunks. */
+            for (const chunk of batch.chunks) {
+                const verticesSize = chunk.vertices.size
+                const chunkWriter = this.PushChunk(verticesSize / 2)
+                for (let i = 0; i < verticesSize; i += 2) {
+                    const v = new Vector2(chunk.vertices.Get(i), chunk.vertices.Get(i + 1))
+                    if (transform) {
+                        v.applyMatrix3(transform)
+                    }
+                    chunkWriter.PushVertex(v)
+                }
+                const numIndices = chunk.indices.size
+                for (let i = 0; i < numIndices; i ++) {
+                    chunkWriter.PushIndex(chunk.indices.Get(i))
+                }
+                chunkWriter.Finish()
+            }
+        } else {
+            const n = batch.vertices.size
+            for (let i = 0; i < n; i += 2) {
+                const v = new Vector2(batch.vertices.Get(i), batch.vertices.Get(i + 1))
+                if (transform) {
+                    v.applyMatrix3(transform)
+                }
+                this.PushVertex(v)
+            }
+        }
+    }
+
     /** @return Vertices buffer required size in bytes. */
     GetVerticesBufferSize() {
         if (this.key.IsIndexed()) {
@@ -1034,12 +1107,28 @@ class Block {
         this.useCount = 0
         /* Number of times referenced by other block. */
         this.nestedUseCount = 0
+        /* Total number of vertices in this block. Used for flattening decision. */
+        this.verticesCount = 0
         /* Offset {x, y} to apply for all vertices. Used to move origin near vertices location to
          * minimize precision loss.
          */
         this.offset = null
         /* Definition batches. Used for root blocks flattening. */
         this.batches = []
+        this.flatten = false
+    }
+
+    /** Set block flattening flag based on usage statistics.
+     * @return {Boolean} New flatten flag state.
+     */
+    SetFlatten() {
+        /* Flatten if a block is used once (pure optimization if shares its layer with other
+         * geometry) or if total instanced vertices number is less than a threshold (trade some
+         * space for draw calls number).
+         */
+        this.flatten = this.useCount === 1 ||
+                       this.useCount * this.verticesCount <= BLOCK_FLATTENING_VERTICES_THRESHOLD
+        return this.flatten
     }
 
     /** @return {Boolean} True if has something to draw. */
@@ -1061,14 +1150,11 @@ class Block {
         return new BlockContext(this, BlockContext.Type.DEFINITION)
     }
 
-    //XXX
     InstantiationContext() {
-        //XXX
         return new BlockContext(this, BlockContext.Type.INSTANTIATION)
     }
 }
 
-//XXX flattening context, block/layer color, layer name, insert transform
 class BlockContext {
     constructor(block, type) {
         this.block = block
@@ -1089,6 +1175,12 @@ class BlockContext {
      */
     TransformVertex(v) {
         const result = new Vector2(v.x, v.y).applyMatrix3(this.transform)
+        if (this.type !== BlockContext.Type.DEFINITION &&
+            this.type !== BlockContext.Type.NESTED_DEFINITION) {
+
+            throw new Error("Unexpected transform type")
+        }
+        this.block.verticesCount++
         if (this.block.offset === null) {
             this.block.offset = result
             return new Vector2()

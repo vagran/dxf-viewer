@@ -27,6 +27,13 @@ export class DynamicBuffer {
         return pos
     }
 
+    Get(index) {
+        if (index >= this.size) {
+            throw new Error(`Index out of range: ${index}/${this.size}`)
+        }
+        return this.buffer[index]
+    }
+
     /** Copy content to the specified buffer.
      * @param dstBuffer Destination buffer, should be typed array of the same type.
      * @param dstOffset {number} Offset in elements in the destination buffer.
