@@ -819,6 +819,9 @@ export class DxfScene {
 
     /** @param v {{x,y}} Vertex to extend bounding box with and set origin. */
     _UpdateBounds(v) {
+        // if (v.x < 200000 || v.x > 210000) {
+        //     console.log(v)//XXX
+        // }
         if (this.bounds === null) {
             this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
         } else {
@@ -1100,14 +1103,10 @@ class BlockContext {
      * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
      */
     GetInsertionTransform(entity) {
-        const mInsert = new Matrix3().setUvTransform(
-            entity.position.x - this.origin.x,
-            entity.position.y - this.origin.y,
-            entity.xScale || 1,
-            entity.yScale || 1,
-            -(entity.rotation || 0) * Math.PI / 180,
-            this.origin.x, this.origin.y)
-
+        const mInsert = new Matrix3().translate(-this.origin.x, -this.origin.y)
+        mInsert.scale(entity.xScale || 1, entity.yScale || 1)
+        mInsert.rotate(-(entity.rotation || 0) * Math.PI / 180)
+        mInsert.translate(entity.position.x, entity.position.y)
         if (this.type !== BlockContext.Type.INSTANTIATION) {
             return mInsert
         }
