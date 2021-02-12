@@ -181,12 +181,14 @@ class CharShape {
                 const indices = ShapeUtils.triangulateShape(shapePoints.shape, shapePoints.holes)
 
                 const _this = this
+                const baseIdx = this.vertices.length
+
                 function AddVertices(vertices) {
                     for (const v of vertices) {
                         _this.vertices.push(v)
                     }
                 }
-                const baseIdx = 0
+
                 AddVertices(shapePoints.shape)
                 for (const hole of shapePoints.holes) {
                     AddVertices(hole)

@@ -1122,6 +1122,9 @@ class Block {
      * @return {Boolean} New flatten flag state.
      */
     SetFlatten() {
+        if (!this.HasGeometry()) {
+            return false
+        }
         /* Flatten if a block is used once (pure optimization if shares its layer with other
          * geometry) or if total instanced vertices number is less than a threshold (trade some
          * space for draw calls number).
