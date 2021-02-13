@@ -13,7 +13,7 @@
     "html5"
   ],
   "dependencies": {
-    "dxf-parser": "^1.0.0-alpha.2",
-    "three": "^0.125.1"
+    "three": "^0.125.1",
+    "loglevel": "^1.7.1"
   }
 }
