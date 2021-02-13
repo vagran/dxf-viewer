@@ -253,9 +253,11 @@ export class DxfScene {
      * @param tessellationAngle {?number} Arc tessellation angle, default value is taken from scene
      *  options.
      * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
+     * @param transform {?Matrix3} Optional transform matrix for the arc. Applied before the arc is
+     *  positioned to the specified center.
      */
-    _GenerateArcVertices(vertices, center, radius, startAngle = null, endAngle = null,
-                         tessellationAngle = null, yRadius = null) {
+    _GenerateArcVertices({vertices, center, radius, startAngle = null, endAngle = null,
+                          tessellationAngle = null, yRadius = null, transform = null}) {
         if (!center || !radius) {
             return
         }
@@ -300,10 +302,11 @@ export class DxfScene {
                 break
             }
             const a = startAngle + i * step
-            const v = {
-                x: center.x + radius * Math.cos(a),
-                y: center.y + yRadius * Math.sin(a)
+            const v = new Vector2(radius * Math.cos(a), yRadius * Math.sin(a))
+            if (transform) {
+                v.applyMatrix3(transform)
             }
+            v.add(center)
             vertices.push(v)
         }
     }
@@ -313,8 +316,9 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
-        this._GenerateArcVertices(vertices, entity.center, entity.radius, entity.startAngle,
-                                  entity.endAngle)
+        this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
+                                   startAngle: entity.startAngle, endAngle: entity.endAngle,
+                                   transform: this._GetEntityExtrusionTransform(entity)})
         yield new Entity({
                              type: Entity.Type.POLYLINE,
                              vertices, layer, color, lineType,
@@ -327,7 +331,8 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
-        this._GenerateArcVertices(vertices, entity.center, entity.radius)
+        this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
+                                   transform: this._GetEntityExtrusionTransform(entity)})
         yield new Entity({
                              type: Entity.Type.POLYLINE,
                              vertices, layer, color, lineType,
@@ -344,8 +349,10 @@ export class DxfScene {
                                  entity.majorAxisEndPoint.y * entity.majorAxisEndPoint.y)
         const yR = xR * entity.axisRatio
         const rotation = Math.atan2(entity.majorAxisEndPoint.y, entity.majorAxisEndPoint.x)
-        this._GenerateArcVertices(vertices, entity.center, xR, entity.startAngle, entity.endAngle,
-                                  null, yR)
+        this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
+                                   startAngle: entity.startAngle, endAngle: entity.endAngle,
+                                   yRadius: yR,
+                                   transform: this._GetEntityExtrusionTransform(entity)})
         if (rotation !== 0) {
             //XXX should account angDir?
             const cos = Math.cos(rotation)
@@ -486,8 +493,9 @@ export class DxfScene {
         }
         if (this.pdMode & PdMode.CIRCLE) {
             const vertices = []
-            this._GenerateArcVertices(vertices, {x: 0, y: 0}, this.pdSize * 0.5, null, null,
-                                      POINT_CIRCLE_TESSELLATION_ANGLE)
+            this._GenerateArcVertices({vertices, center: {x: 0, y: 0},
+                                       radius: this.pdSize * 0.5,
+                                       tessellationAngle: POINT_CIRCLE_TESSELLATION_ANGLE})
             const entity = new Entity({
                                           type: Entity.Type.POLYLINE, vertices,
                                           color: ColorCode.BY_BLOCK,
@@ -546,6 +554,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, null)
         const color = this._GetEntityColor(entity, null)
         const lineType = this._GetLineType(entity, null, null)
+        //XXX apply extrusion direction
         const transform = block.InstantiationContext().GetInsertionTransform(entity)
         /* Update bounding box and origin with transformed block origin. */
         this._UpdateBounds(new Vector2().applyMatrix3(transform))
@@ -848,6 +857,22 @@ export class DxfScene {
             return entity.layer
         }
         return "0"
+    }
+
+    /** Check extrusionDirection property of the entity and return corresponding transform matrix.
+     *
+     * @return {?Matrix3} Null if not transform required.
+     */
+    _GetEntityExtrusionTransform(entity) {
+        //XXX For now just mirror Y axis if extrusion Z is negative. Should be investigated for
+        // proper calculation.
+        if (!entity.hasOwnProperty("extrusionDirection")) {
+            return null
+        }
+        if (entity.extrusionDirection.z > 0) {
+            return null
+        }
+        return new Matrix3().scale(1, -1)
     }
 
     /** @return {RenderBatch} */
