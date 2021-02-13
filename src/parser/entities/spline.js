@@ -57,7 +57,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
                 entity.numberOfFitPoints = curr.value;
                 break;
             case 210:
-                entity.normalVector = helpers.parsePoint(scanner);
+                entity.extrusionDirection = helpers.parsePoint(scanner);
                 break;
             default:
                 helpers.checkCommonEntityProperties(entity, curr);

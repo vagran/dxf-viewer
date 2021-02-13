@@ -30,6 +30,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
                     entity.angleLength = endAngle - entity.startAngle;
                 entity.endAngle = endAngle;
                 break;
+            case 210:
+                entity.extrusionDirection = helpers.parsePoint(scanner);
+                break;
             default: // ignored attribute
                 helpers.checkCommonEntityProperties(entity, curr);
                 break;

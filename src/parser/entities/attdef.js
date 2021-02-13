@@ -74,13 +74,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             case 100:
                 break;
             case 210:
-                entity.extrusionDirectionX = curr.value;
-                break;
-            case 220:
-                entity.extrusionDirectionY = curr.value;
-                break;
-            case 230:
-                entity.extrusionDirectionZ = curr.value;
+                entity.extrusionDirection = helpers.parsePoint(scanner);
                 break;
             default:
                 helpers.checkCommonEntityProperties(entity, curr);
