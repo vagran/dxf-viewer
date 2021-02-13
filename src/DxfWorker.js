@@ -151,9 +151,13 @@ export class DxfWorker {
             progressCbk("font", 0, null)
         }
         const fonts = []
+        const responses = []
         for (const url of urls) {
-            const response = await fetch(url)
-            fonts.push(await response.json())
+            responses.push(fetch(url).then(response => response.json()))
+        }
+        await Promise.allSettled(responses)
+        for (const response of responses) {
+            fonts.push(await response)
         }
         return fonts
     }
