@@ -115,6 +115,9 @@ export class DxfScene {
         case "CIRCLE":
             renderEntities = this._DecomposeCircle(entity, blockCtx)
             break
+        case "ELLIPSE":
+            renderEntities = this._DecomposeEllipse(entity, blockCtx)
+            break
         case "POINT":
             renderEntities = this._DecomposePoint(entity, blockCtx)
             break
@@ -249,14 +252,18 @@ export class DxfScene {
      * @param endAngle {?number} Optional end angle. Full circle is drawn if not specified.
      * @param tessellationAngle {?number} Arc tessellation angle, default value is taken from scene
      *  options.
+     * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
      */
     _GenerateArcVertices(vertices, center, radius, startAngle = null, endAngle = null,
-                         tessellationAngle = null) {
+                         tessellationAngle = null, yRadius = null) {
         if (!center || !radius) {
             return
         }
         if (!tessellationAngle) {
             tessellationAngle = this.options.arcTessellationAngle
+        }
+        if (yRadius === null) {
+            yRadius = radius
         }
         /* Normalize angles - make them starting from +X in CCW direction. End angle should be
          * greater than start angle.
@@ -295,7 +302,7 @@ export class DxfScene {
             const a = startAngle + i * step
             const v = {
                 x: center.x + radius * Math.cos(a),
-                y: center.y + radius * Math.sin(a)
+                y: center.y + yRadius * Math.sin(a)
             }
             vertices.push(v)
         }
@@ -325,6 +332,37 @@ export class DxfScene {
                              type: Entity.Type.POLYLINE,
                              vertices, layer, color, lineType,
                              shape: true
+                         })
+    }
+
+    *_DecomposeEllipse(entity, blockCtx) {
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const lineType = this._GetLineType(entity, null, blockCtx)
+        const vertices = []
+        const xR = Math.sqrt(entity.majorAxisEndPoint.x * entity.majorAxisEndPoint.x +
+                                 entity.majorAxisEndPoint.y * entity.majorAxisEndPoint.y)
+        const yR = xR * entity.axisRatio
+        const rotation = Math.atan2(entity.majorAxisEndPoint.y, entity.majorAxisEndPoint.x)
+        this._GenerateArcVertices(vertices, entity.center, xR, entity.startAngle, entity.endAngle,
+                                  null, yR)
+        if (rotation !== 0) {
+            //XXX should account angDir?
+            const cos = Math.cos(rotation)
+            const sin = Math.sin(rotation)
+            for (const v of vertices) {
+                const tx = v.x - entity.center.x
+                const ty = v.y - entity.center.y
+                /* Rotate the vertex around the ellipse center point. */
+                v.x = tx * cos - ty * sin + entity.center.x
+                v.y = tx * sin + ty * cos + entity.center.y
+            }
+        }
+        //XXX extrusion direction mirror
+        yield new Entity({
+                             type: Entity.Type.POLYLINE,
+                             vertices, layer, color, lineType,
+                             shape: entity.endAngle === undefined
                          })
     }
 
