@@ -11,6 +11,8 @@ const POINT_CIRCLE_TESSELLATION_ANGLE = 15 * Math.PI / 180
 const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 /** Flatten a block if its total vertices count in all instances is less than this value. */
 const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
+/** Number of subdivisions per spline point. */
+const SPLINE_SUBDIVISION = 4
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -120,6 +122,9 @@ export class DxfScene {
             break
         case "POINT":
             renderEntities = this._DecomposePoint(entity, blockCtx)
+            break
+        case "SPLINE":
+            renderEntities = this._DecomposeSpline(entity, blockCtx)
             break
         case "INSERT":
             /* Works with rendering batches without intermediate entities. */
@@ -705,6 +710,120 @@ export class DxfScene {
                 yield* CommitSegment(vIdx)
             }
         }
+    }
+
+    *_DecomposeSpline(entity, blockCtx = null) {
+        const color = this._GetEntityColor(entity, blockCtx)
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const lineType = this._GetLineType(entity, null, blockCtx)
+        const controlPoints = entity.controlPoints.map(p => [p.x, p.y])
+        const vertices = []
+        const subdivisions = controlPoints.length * SPLINE_SUBDIVISION
+        const step = 1 / subdivisions
+        for (let i = 0; i <= subdivisions; i++) {
+            const pt = this._InterpolateSpline(i * step, entity.degreeOfSplineCurve, controlPoints,
+                                               entity.knotValues)
+            vertices.push({x: pt[0], y: pt[1]})
+        }
+        //XXX extrusionDirection (normalVector) transform?
+        yield new Entity({type: Entity.Type.POLYLINE, vertices, layer, color, lineType})
+    }
+
+    /** Get a point on a B-spline.
+     * https://github.com/thibauts/b-spline
+     * @param t {number} Point position on spline, [0..1].
+     * @param degree {number} B-spline degree.
+     * @param points {number[][]} Control points. Each point should have the same dimension which
+     *  defines dimension of the result.
+     * @param knots {?number[]} Knot vector. Should have size `points.length + degree + 1`. Default
+     *  is uniform spline.
+     * @param weights {?number} Optional weights vector.
+     * @return {number[]} Resulting point on the specified position.
+     */
+    _InterpolateSpline(t, degree, points, knots = null, weights = null) {
+        let i, j, s, l             // function-scoped iteration variables
+        const n = points.length    // points count
+        const d = points[0].length // point dimensionality
+
+        if (degree < 1) {
+            throw new Error("Degree must be at least 1 (linear)")
+        }
+        if (degree > (n - 1)) {
+            throw new Error("Degree must be less than or equal to point count - 1")
+        }
+
+        if (!weights) {
+            // build weight vector of length [n]
+            weights = []
+            for(i = 0; i < n; i++) {
+                weights[i] = 1
+            }
+        }
+
+        if (!knots) {
+            // build knot vector of length [n + degree + 1]
+            knots = []
+            for(i = 0; i < n + degree + 1; i++) {
+                knots[i] = i
+            }
+        } else {
+            if (knots.length !== n + degree + 1) {
+                throw new Error("Bad knot vector length")
+            }
+        }
+
+        const domain = [
+            degree,
+            knots.length-1 - degree
+        ]
+
+        // remap t to the domain where the spline is defined
+        const low  = knots[domain[0]]
+        const high = knots[domain[1]]
+        t = t * (high - low) + low
+
+        if (t < low) {
+            t = low
+        } else if (t > high) {
+            t = high
+        }
+
+        // find s (the spline segment) for the [t] value provided
+        for (s = domain[0]; s < domain[1]; s++) {
+            if (t >= knots[s] && t <= knots[s + 1]) {
+                break
+            }
+        }
+
+        // convert points to homogeneous coordinates
+        const v = []
+        for (i = 0; i < n; i++) {
+            v[i] = []
+            for (j = 0; j < d; j++) {
+                v[i][j] = points[i][j] * weights[i]
+            }
+            v[i][d] = weights[i]
+        }
+
+        // l (level) goes from 1 to the curve degree + 1
+        let alpha
+        for (l = 1; l <= degree + 1; l++) {
+            // build level l of the pyramid
+            for(i = s; i > s - degree - 1 + l; i--) {
+                alpha = (t - knots[i]) / (knots[i + degree + 1 - l] - knots[i])
+                // interpolate each component
+                for(j = 0; j < d + 1; j++) {
+                    v[i][j] = (1 - alpha) * v[i - 1][j] + alpha * v[i][j]
+                }
+            }
+        }
+
+        // convert back to cartesian and return
+        const result = []
+        for(i = 0; i < d; i++) {
+            result[i] = v[s][i] / v[s][d]
+        }
+        return result
     }
 
     /**
