@@ -14,6 +14,7 @@
   ],
   "dependencies": {
     "three": "^0.125.1",
-    "loglevel": "^1.7.1"
+    "loglevel": "^1.7.1",
+    "opentype.js": "^1.3.3"
   }
 }

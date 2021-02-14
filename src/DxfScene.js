@@ -43,7 +43,7 @@ export class DxfScene {
 
     /** Build the scene from the provided parsed DXF.
      * @param dxf {{}} Parsed DXF file.
-     * @param fonts {Font[]} List of fonts to use.
+     * @param fonts {Font[]} List of fonts (opentype.js) to use.
      */
     Build(dxf, fonts) {
 

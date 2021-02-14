@@ -1,5 +1,6 @@
 import {DxfFetcher} from "./DxfFetcher"
 import {DxfScene} from "./DxfScene"
+import opentype from "opentype.js"
 
 /** Wraps web-worker instance and provides unified interface to its services, including the when
  * web-worker is not used and all heavy operations are performed in main thread.
@@ -153,11 +154,11 @@ export class DxfWorker {
         const fonts = []
         const responses = []
         for (const url of urls) {
-            responses.push(fetch(url).then(response => response.json()))
+            responses.push(fetch(url).then(response => response.arrayBuffer()))
         }
         await Promise.allSettled(responses)
         for (const response of responses) {
-            fonts.push(await response)
+            fonts.push(opentype.parse(await response))
         }
         return fonts
     }

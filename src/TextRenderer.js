@@ -13,12 +13,12 @@ import {ShapeUtils} from "three/src/extras/ShapeUtils"
 export class TextRenderer {
 
     /**
-     * @param fonts {{}[]} List of fonts to use, each one is typeface.js object. Fonts are
+     * @param fonts {?{}[]} List of fonts to use, each one is opentype.js object. Fonts are
      *  used in the specified order, each one is checked until necessary glyph is found.
-     * @param options
+     * @param options {?{}} See TextRenderer.DefaultOptions.
      */
     constructor(fonts, options = null) {
-        this.fonts = fonts
+        this.fonts = fonts?.map(data => new Font(data)) ?? null
         this.options = Object.create(DxfScene.DefaultOptions)
         if (options) {
             Object.assign(this.options, options)
@@ -52,6 +52,9 @@ export class TextRenderer {
     *Render({text, position, color, layer = null, size}) {
         for (const char of Array.from(text)) {
             const shape = this._GetCharShape(char)
+            if (!shape) {
+                continue
+            }
             if (shape.vertices) {
                 yield new Entity({
                     type: Entity.Type.TRIANGLES,
@@ -79,71 +82,16 @@ export class TextRenderer {
     }
 
     _CreateCharShape(char) {
-        let glyph = null
-        let selectedFont = null
         for (const font of this.fonts) {
-            glyph = font.glyphs[char]
-            if (glyph) {
-                selectedFont = font
-                break
+            const path = font.GetCharPath(char)
+            if (path) {
+                return new CharShape(path, this.options)
             }
         }
-        if (!glyph) {
-            return this.stubShape
-        }
-        return new CharShape(this._CreateGlyphPath(selectedFont, glyph), this.options)
-    }
-
-    /** Cannot reuse this method from Three.js Font class, as this API is not exported. So need to
-     * make a copy here.
-     * @return {{advance: number, path: ?ShapePath}} Path is scaled to size 1.
-     */
-    _CreateGlyphPath(font, glyph) {
-        let path = null
-        let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2
-        const scale = 1 / font.resolution
-        if (glyph.o) {
-            const outline = glyph.o.split(' ')
-            path = new ShapePath()
-            for (let i = 0, l = outline.length; i < l; ) {
-                const action = outline[ i ++ ]
-                switch ( action ) {
-
-                case 'm': // moveTo
-                    x = outline[i++] * scale
-                    y = outline[i++] * scale
-                    path.moveTo(x, y)
-                    break
-
-                case 'l': // lineTo
-                    x = outline[i++] * scale
-                    y = outline[i++] * scale
-                    path.lineTo(x, y)
-                    break
-
-                case 'q': // quadraticCurveTo
-                    cpx = outline[i++] * scale
-                    cpy = outline[i++] * scale
-                    cpx1 = outline[i++] * scale
-                    cpy1 = outline[i++] * scale
-                    path.quadraticCurveTo(cpx1, cpy1, cpx, cpy)
-                    break
-
-                case 'b': // bezierCurveTo
-                    cpx = outline[i++] * scale
-                    cpy = outline[i++] * scale
-                    cpx1 = outline[i++] * scale
-                    cpy1 = outline[i++] * scale
-                    cpx2 = outline[i++] * scale
-                    cpy2 = outline[i++] * scale
-                    path.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, cpx, cpy)
-                    break
-                }
-            }
-        }
-        return {advance: glyph.ha * scale, path: path}
+        return this.stubShape
     }
 }
+
 
 TextRenderer.DefaultOptions = {
     /** Number of segments for each curve in a glyph. Currently Three.js does not have more
@@ -212,5 +160,61 @@ class CharShape {
      */
     GetVertices(position, size) {
         return this.vertices.map(v => v.clone().multiplyScalar(size).add(position))
+    }
+}
+
+class Font {
+    constructor(data) {
+        this.data = data
+        this.charMap = new Map()
+        for (const glyph of Object.values(data.glyphs.glyphs)) {
+            if (glyph.unicode === undefined) {
+                continue
+            }
+            this.charMap.set(String.fromCharCode(glyph.unicode), glyph)
+        }
+    }
+
+    /**
+     *
+     * @param char {number} Character code point.
+     * @return {?{advance: number, path: ?ShapePath}} Path is scaled to size 1. Null if no glyphs
+     *  for the specified characters.
+     */
+    GetCharPath(char) {
+        const glyph = this.charMap.get(char)
+        if (!glyph) {
+            return null
+        }
+        let path = null
+        let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2
+        //XXX not really clear what is the resulting unit, check, review and comment it later
+        // (100px?)
+        const scale = 100 / ((this.data.unitsPerEm || 2048) * 72)
+        path = new ShapePath()
+        for (const cmd of glyph.path.commands) {
+            switch (cmd.type) {
+
+            case 'M':
+                path.moveTo(cmd.x * scale, cmd.y * scale)
+                break
+
+            case 'L':
+                path.lineTo(cmd.x * scale, cmd.y * scale)
+                break
+
+            case 'Q':
+                path.quadraticCurveTo(cmd.x1 * scale, cmd.y1 * scale,
+                                      cmd.x * scale, cmd.y * scale)
+                break
+
+            case 'C':
+                path.bezierCurveTo(cmd.x1 * scale, cmd.y1 * scale,
+                                   cmd.x2 * scale, cmd.y2 * scale,
+                                   cmd.x * scale, cmd.y * scale)
+                break
+            }
+        }
+        return {advance: glyph.advanceWidth * scale, path}
     }
 }
