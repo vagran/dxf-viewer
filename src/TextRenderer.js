@@ -13,27 +13,77 @@ import {ShapeUtils} from "three/src/extras/ShapeUtils"
 export class TextRenderer {
 
     /**
-     * @param fonts {?{}[]} List of fonts to use, each one is opentype.js object. Fonts are
-     *  used in the specified order, each one is checked until necessary glyph is found.
+     * @param fontFetchers {?Function[]} List of font fetchers. Fetcher should return promise with
+     *  loaded font object (opentype.js). They are invoked only when necessary. Each glyph is being
+     *  searched sequentially in each provided font.
      * @param options {?{}} See TextRenderer.DefaultOptions.
      */
-    constructor(fonts, options = null) {
-        this.fonts = fonts?.map(data => new Font(data)) ?? null
+    constructor(fontFetchers, options = null) {
+        this.fontFetchers = fontFetchers
+        this.fonts = []
+
         this.options = Object.create(DxfScene.DefaultOptions)
         if (options) {
             Object.assign(this.options, options)
         }
         /* Indexed by character, value is CharShape. */
         this.shapes = new Map()
+        this.stubShapeLoaded = false
         /* Shape to display if no glyph found in the specified fonts. May be null if fallback
          * character can not be rendered as well.
          */
-        for (const char of Array.from(this.options.fallbackChar)) {
-            this.stubShape = this._CreateCharShape(char) ?? null
-            if (this.stubShape) {
-                break
+        this.stubShape = null
+    }
+
+    /** Fetch necessary fonts to render the provided text. Should be called for each string which
+     * will be rendered later.
+     * @param text {string}
+     * @return {Boolean} True if all characters can be rendered, false if none of the provided fonts
+     *  contains glyphs for some of the specified text characters.
+     */
+    async FetchFonts(text) {
+        if (!this.stubShapeLoaded) {
+            this.stubShapeLoaded = true
+            for (const char of Array.from(this.options.fallbackChar)) {
+                if (await this.FetchFonts(char)) {
+                    this.stubShape = this._CreateCharShape(char)
+                    break
+                }
             }
         }
+        let charMissing = false
+        for (const char of Array.from(text)) {
+            if (char.charCodeAt(0) < 0x20) {
+                /* Control character. */
+                continue
+            }
+            let found = false
+            for (const font of this.fonts) {
+                if (font.HasChar(char)) {
+                    found = true
+                    break
+                }
+            }
+            if (found) {
+                continue
+            }
+            if (!this.fontFetchers) {
+                return false
+            }
+            while (this.fontFetchers.length > 0) {
+                const fetcher = this.fontFetchers.shift()
+                const font = await this._FetchFont(fetcher)
+                this.fonts.push(font)
+                if (font.HasChar(char)) {
+                    found = true
+                    break
+                }
+            }
+            if (!found) {
+                charMissing = true
+            }
+        }
+        return !charMissing
     }
 
     get canRender() {
@@ -89,6 +139,10 @@ export class TextRenderer {
             }
         }
         return this.stubShape
+    }
+
+    async _FetchFont(fontFetcher) {
+        return new Font(await fontFetcher())
     }
 }
 
@@ -176,8 +230,16 @@ class Font {
     }
 
     /**
+     * @param char {string} Character code point as string.
+     * @return {Boolean} True if the font has glyphs for the specified character.
+     */
+    HasChar(char) {
+        return this.charMap.has(char)
+    }
+
+    /**
      *
-     * @param char {number} Character code point.
+     * @param char {string} Character code point as string.
      * @return {?{advance: number, path: ?ShapePath}} Path is scaled to size 1. Null if no glyphs
      *  for the specified characters.
      */

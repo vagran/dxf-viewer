@@ -132,35 +132,41 @@ export class DxfWorker {
 
     /** @return {Object} DxfScene serialized scene. */
     async _Load(url, fonts, options, progressCbk) {
-        let loadedFonts
+        let fontFetchers
         if (fonts) {
-            loadedFonts = await this._LoadFonts(fonts, progressCbk)
+            fontFetchers = this._CreateFontFetchers(fonts, progressCbk)
         } else {
-            loadedFonts = []
+            fontFetchers = []
         }
         const dxf = await new DxfFetcher(url).Fetch(progressCbk)
         if (progressCbk) {
             progressCbk("prepare", 0, null)
         }
         const dxfScene = new DxfScene(options)
-        dxfScene.Build(dxf, loadedFonts)
+        await dxfScene.Build(dxf, fontFetchers)
         return dxfScene.scene
     }
 
-    async _LoadFonts(urls, progressCbk) {
-        if (progressCbk) {
-            progressCbk("font", 0, null)
+    _CreateFontFetchers(urls, progressCbk) {
+
+        function CreateFetcher(url) {
+            return async function() {
+                if (progressCbk) {
+                    progressCbk("font", 0, null)
+                }
+                const data = await fetch(url).then(response => response.arrayBuffer())
+                if (progressCbk) {
+                    progressCbk("prepare", 0, null)
+                }
+                return opentype.parse(data)
+            }
         }
-        const fonts = []
-        const responses = []
+
+        const fetchers = []
         for (const url of urls) {
-            responses.push(fetch(url).then(response => response.arrayBuffer()))
+            fetchers.push(CreateFetcher(url))
         }
-        await Promise.allSettled(responses)
-        for (const response of responses) {
-            fonts.push(opentype.parse(await response))
-        }
-        return fonts
+        return fetchers
     }
 
     _CloneOptions(options) {

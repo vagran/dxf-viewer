@@ -43,12 +43,11 @@ export class DxfScene {
 
     /** Build the scene from the provided parsed DXF.
      * @param dxf {{}} Parsed DXF file.
-     * @param fonts {Font[]} List of fonts (opentype.js) to use.
+     * @param fontFetchers {?Function[]} List of font fetchers. Fetcher should return promise with
+     *  loaded font object (opentype.js). They are invoked only when necessary. Each glyph is being
+     *  searched sequentially in each provided font.
      */
-    Build(dxf, fonts) {
-
-        this.textRenderer = new TextRenderer(fonts, this.options.textOptions)
-
+    async Build(dxf, fontFetchers) {
         /* 0 - CCW, 1 - CW */
         this.angBase = dxf.header["$ANGBASE"] || 0
         /* Zero angle direction, 0 is +X */
@@ -67,6 +66,10 @@ export class DxfScene {
                 this.blocks.set(block.name, new Block(block))
             }
         }
+
+        this.textRenderer = new TextRenderer(fontFetchers, this.options.textOptions)
+        this.hasMissingChars = false
+        await this._FetchFonts(dxf)
 
         /* Scan all entities to analyze block usage statistics. */
         for (const entity of dxf.entities) {
@@ -99,6 +102,35 @@ export class DxfScene {
         delete this.layers
         delete this.blocks
         delete this.textRenderer
+    }
+
+    async _FetchFonts(dxf) {
+        for (const entity of dxf.entities) {
+            if (entity.type === "TEXT" || entity.type === "MTEXT") {
+                if (!await this.textRenderer.FetchFonts(entity.text)) {
+                    /* Failing to resolve some character means that all fonts have been loaded and
+                     * checked. No mean to check the rest strings. However until it is encountered,
+                     * all strings should be checked, even if all fonts already loaded. This needed
+                     * to properly set hasMissingChars which allows displaying some warning in a
+                     * viewer.
+                     */
+                    this.hasMissingChars = true
+                    return
+                }
+            }
+        }
+        for (const block of this.blocks.values()) {
+            if (block.data.hasOwnProperty("entities")) {
+                for (const entity of block.data.entities) {
+                    if (entity.type === "TEXT" || entity.type === "MTEXT") {
+                        if (!await this.textRenderer.FetchFonts(entity.text)) {
+                            this.hasMissingChars = true
+                            return
+                        }
+                    }
+                }
+            }
+        }
     }
 
     _ProcessDxfEntity(entity, blockCtx = null) {
@@ -1069,7 +1101,8 @@ export class DxfScene {
             batches: [],
             layers: [],
             origin: this.origin,
-            bounds: this.bounds
+            bounds: this.bounds,
+            hasMissingChars: this.hasMissingChars
         }
 
         const buffers = {
