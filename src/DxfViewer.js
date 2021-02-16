@@ -23,13 +23,16 @@ export class DxfViewer {
 
         this.clearColor = this.options.clearColor.getHex()
 
-        const scene = this.scene = new three.Scene()
+        this.scene = new three.Scene()
+
         const renderer = this.renderer = new three.WebGLRenderer({
             alpha: options.canvasAlpha,
             premultipliedAlpha: options.canvasPremultipliedAlpha,
             antialias: options.antialias,
             depth: false
         })
+        renderer.setPixelRatio(window.devicePixelRatio)
+
         const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
         camera.position.z = 1
         camera.position.x = 0
@@ -71,7 +74,13 @@ export class DxfViewer {
             LEFT: three.MOUSE.PAN
         }
         controls.zoomSpeed = 3
-        controls.addEventListener("change", this.Render.bind(this))
+        controls.addEventListener("change", () => {
+            this._Emit("viewChanged")
+            this.Render()
+        })
+
+        this.canvas.addEventListener("pointerdown", this._OnPointerEvent.bind(this))
+        this.canvas.addEventListener("pointerup", this._OnPointerEvent.bind(this))
 
         this.Render()
 
@@ -109,6 +118,8 @@ export class DxfViewer {
         this.canvasHeight = height
         this.renderer.setSize(width, height)
         this.controls.update()
+        this._Emit("resized", {width, height})
+        this._Emit("viewChanged")
         this.Render()
     }
 
@@ -134,6 +145,10 @@ export class DxfViewer {
         const scene = await this.worker.Load(url, fonts, this.options, progressCbk)
         await this.worker.Destroy()
         this.worker = null
+
+        this.origin = scene.origin
+        this.bounds = scene.bounds
+        this.hasMissingChars = scene.hasMissingChars
 
         for (const layer of scene.layers) {
             this.layers.set(layer.name, new Layer(layer.name, layer.color))
@@ -166,6 +181,8 @@ export class DxfViewer {
         for (const batch of scene.batches) {
             this._LoadBatch(scene, batch)
         }
+
+        this._Emit("loaded")
 
         this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
                      scene.bounds.minY - scene.origin.y, scene.bounds.maxY - scene.origin.y)
@@ -208,6 +225,7 @@ export class DxfViewer {
         this.materials.each(e => e.material.dispose())
         this.materials.clear()
         this.SetView({x: 0, y: 0}, 2)
+        this._Emit("cleared")
         this.Render()
     }
 
@@ -217,6 +235,7 @@ export class DxfViewer {
             this.resizeObserver.disconnect()
         }
         this.Clear()
+        this._Emit("destroyed")
         for (const m of this.simplePointMaterial) {
             m.dispose()
         }
@@ -239,6 +258,7 @@ export class DxfViewer {
         cam.bottom = center.y - height / 2
         cam.zoom = 1
         cam.updateProjectionMatrix()
+        this._Emit("viewChanged")
     }
 
     /** Set view to fit the specified bounds. */
@@ -254,6 +274,73 @@ export class DxfViewer {
             width = 1
         }
         this.SetView(center, width * (1 + padding))
+    }
+
+    /** @return {Scene} three.js scene for the viewer. Can be used to add custom entities on the
+     *      scene. Remember to apply scene origin available via GetOrigin() method.
+     */
+    GetScene() {
+        return this.scene
+    }
+
+    /** @return {Camera} three.js camera for the viewer. */
+    GetCamera() {
+        return this.camera
+    }
+
+    /** @return {Vector2} Scene origin in global drawing coordinates. */
+    GetOrigin() {
+        return this.origin
+    }
+
+    /** Subscribe to the specified event. The following events are defined:
+     *  * "loaded" - new scene loaded.
+     *  * "cleared" - current scene cleared.
+     *  * "destroyed" - viewer instance destroyed.
+     *  * "resized" - viewport size changed. Details: {width, height}
+     *  * "pointerdown" - Details: {domEvent, position:{x,y}}, position is in scene coordinates.
+     *  * "pointerup"
+     *  * "viewChanged"
+     *
+     * @param eventName {string}
+     * @param eventHandler {function} Accepts event object.
+     */
+    Subscribe(eventName, eventHandler) {
+        this.canvas.addEventListener(EVENT_NAME_PREFIX + eventName, eventHandler)
+    }
+
+    /** Unsubscribe from previously subscribed event. The arguments should match previous
+     * Subscribe() call.
+     *
+     * @param eventName {string}
+     * @param eventHandler {function}
+     */
+    Unsubscribe(eventName, eventHandler) {
+        this.canvas.removeEventListener(EVENT_NAME_PREFIX + eventName, eventHandler)
+    }
+
+    // /////////////////////////////////////////////////////////////////////////////////////////////
+
+    _Emit(eventName, data = null) {
+        this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, { detail: data }))
+    }
+
+    _OnPointerEvent(e) {
+        const canvasRect = e.target.getBoundingClientRect()
+        const canvasCoord = {x: e.clientX - canvasRect.left, y: e.clientY - canvasRect.top}
+        this._Emit(e.type, {
+            domEvent: e,
+            canvasCoord,
+            position: this._CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
+        })
+    }
+
+    /** @return {{x,y}} Scene coordinate corresponding to the specified canvas pixel coordinates. */
+    _CanvasToSceneCoord(x, y) {
+        const v = new three.Vector3(x * 2 / this.canvasWidth - 1,
+                                    -y * 2 / this.canvasHeight + 1,
+                                    1).unproject(this.camera)
+        return {x: v.x, y: v.y}
     }
 
     _OnResize(entry) {
@@ -640,6 +727,7 @@ class Batch {
             }
             const obj = new objConstructor(geometry, material)
             obj.frustumCulled = false
+            obj.matrixAutoUpdate = false
             return obj
         }
 
@@ -725,6 +813,9 @@ class Block {
         this.batches.push(batch)
     }
 }
+
+/** Custom viewer event names are prefixed with this string. */
+const EVENT_NAME_PREFIX = "__dxf_"
 
 /** Transform sRGB color component to linear color space. */
 function LinearColor(c) {
