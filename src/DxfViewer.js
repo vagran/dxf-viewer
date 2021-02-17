@@ -25,12 +25,19 @@ export class DxfViewer {
 
         this.scene = new three.Scene()
 
-        const renderer = this.renderer = new three.WebGLRenderer({
-            alpha: options.canvasAlpha,
-            premultipliedAlpha: options.canvasPremultipliedAlpha,
-            antialias: options.antialias,
-            depth: false
-        })
+        try {
+            this.renderer = new three.WebGLRenderer({
+                alpha: options.canvasAlpha,
+                premultipliedAlpha: options.canvasPremultipliedAlpha,
+                antialias: options.antialias,
+                depth: false
+            })
+        } catch (e) {
+            console.log("Failed to create renderer: " + e)
+            this.renderer = null
+            return
+        }
+        const renderer = this.renderer
         renderer.setPixelRatio(window.devicePixelRatio)
 
         const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
@@ -95,11 +102,20 @@ export class DxfViewer {
         this.worker = null
     }
 
+    /** @return {boolean} True if renderer exists. May be false in case when WebGL context is lost
+     * (e.g. after wake up from sleep). In such case page should be reloaded.
+     */
+    HasRenderer() {
+        return Boolean(this.renderer)
+    }
+
     GetCanvas() {
         return this.canvas
     }
 
     SetSize(width, height) {
+        this._EnsureRenderer()
+
         const hScale = width / this.canvasWidth
         const vScale = height / this.canvasHeight
 
@@ -138,6 +154,7 @@ export class DxfViewer {
      *  invoke DxfViewer.SetupWorker() function.
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
+        this._EnsureRenderer()
 
         this.Clear()
 
@@ -191,6 +208,7 @@ export class DxfViewer {
     }
 
     Render() {
+        this._EnsureRenderer()
         this.renderer.render(this.scene, this.camera)
     }
 
@@ -200,6 +218,7 @@ export class DxfViewer {
     }
 
     ShowLayer(name, show) {
+        this._EnsureRenderer()
         const layer = this.layers.get(name)
         if (!layer) {
             return
@@ -212,6 +231,7 @@ export class DxfViewer {
 
     /** Reset the viewer state. */
     Clear() {
+        this._EnsureRenderer()
         if (this.worker) {
             this.worker.Destroy(true)
             this.worker = null
@@ -231,6 +251,9 @@ export class DxfViewer {
 
     /** Free all resources. The viewer object should not be used after this method was called. */
     Destroy() {
+        if (!this.HasRenderer()) {
+            return
+        }
         if (this.resizeObserver) {
             this.resizeObserver.disconnect()
         }
@@ -306,6 +329,7 @@ export class DxfViewer {
      * @param eventHandler {function} Accepts event object.
      */
     Subscribe(eventName, eventHandler) {
+        this._EnsureRenderer()
         this.canvas.addEventListener(EVENT_NAME_PREFIX + eventName, eventHandler)
     }
 
@@ -316,10 +340,17 @@ export class DxfViewer {
      * @param eventHandler {function}
      */
     Unsubscribe(eventName, eventHandler) {
+        this._EnsureRenderer()
         this.canvas.removeEventListener(EVENT_NAME_PREFIX + eventName, eventHandler)
     }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////
+
+    _EnsureRenderer() {
+        if (!this.HasRenderer()) {
+            throw new Error("WebGL renderer not available")
+        }
+    }
 
     _Emit(eventName, data = null) {
         this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, { detail: data }))
