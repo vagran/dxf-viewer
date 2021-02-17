@@ -348,7 +348,8 @@ export class DxfViewer {
 
     _EnsureRenderer() {
         if (!this.HasRenderer()) {
-            throw new Error("WebGL renderer not available. Probable WebGL context loss, try refreshing the page.")
+            throw new Error("WebGL renderer not available. " +
+                            "Probable WebGL context loss, try refreshing the page.")
         }
     }
 

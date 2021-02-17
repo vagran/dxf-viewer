@@ -551,7 +551,12 @@ export class DxfScene {
         yield* this.textRenderer.Render({
             text: entity.text,
             size: entity.textHeight,
-            position: entity.startPoint,
+            startPos: entity.startPoint,
+            endPos: entity.endPoint,
+            rotation: entity.rotation,
+            hAlign: entity.halign,
+            vAlign: entity.valign,
+            widthFactor: entity.xScale,
             color, layer
         })
     }
@@ -1512,7 +1517,7 @@ class IndexedChunkWriter {
  * entity always shares single material.
  */
 export class Entity {
-    /** @param type {Entity.Type}
+    /** @param type {number} See Entity.Type
      * @param vertices {{x, y}[]}
      * @param indices {?number[]} Indices for indexed geometry.
      * @param layer {?string}
