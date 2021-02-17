@@ -1,9 +1,9 @@
 import * as three from "three"
-import {OrbitControls} from "three/examples/jsm/controls/OrbitControls"
 import {BatchingKey} from "./BatchingKey"
 import {DxfWorker} from "./DxfWorker"
 import {MaterialKey} from "./MaterialKey"
 import {ColorCode, DxfScene} from "./DxfScene"
+import {OrbitControls} from "./OrbitControls"
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
