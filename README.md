@@ -24,9 +24,9 @@ TODO: npm
    minimizing total required number of draw calls.
  * Instanced rendering - features which are rendered multiple times with different transforms (e.g.
    DXF block instances) are rendered by a single draw call using instanced rendering WebGL feature.
- * Multiple fonts support. List of fonts can be specified for text rendering. Fonts are lazy-loaded,
-   once a character encountered which glyph is not yet available through already loaded fonts, next
-   font is fetched and checked for the necessary glyph.
+ * Multiple fonts support. List of fonts can be specified for text rendering. Raw TTF files are
+   supported. Fonts are lazy-loaded, once a character encountered which glyph is not yet available 
+   through already loaded fonts, next font is fetched and checked for the necessary glyph.
  * Layers - layers are taken into account when creating rendering batches so that they can be easily
    hidden/shown.
    

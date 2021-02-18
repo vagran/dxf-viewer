@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "author": "Artyom Lebedev<arlebedev@ugcs.com>",
   "license": "MIT",
+  "repository": "https://github.com/vagran/dxf-viewer",
   "keywords": [
     "dxf",
     "viewer",
