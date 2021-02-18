@@ -75,17 +75,6 @@ export class DxfViewer {
         }
         domContainer.appendChild(this.canvas)
 
-        const controls = this.controls = new OrbitControls(camera, this.canvas)
-        controls.enableRotate = false
-        controls.mouseButtons = {
-            LEFT: three.MOUSE.PAN
-        }
-        controls.zoomSpeed = 3
-        controls.addEventListener("change", () => {
-            this._Emit("viewChanged")
-            this.Render()
-        })
-
         this.canvas.addEventListener("pointerdown", this._OnPointerEvent.bind(this))
         this.canvas.addEventListener("pointerup", this._OnPointerEvent.bind(this))
 
@@ -133,7 +122,9 @@ export class DxfViewer {
         this.canvasWidth = width
         this.canvasHeight = height
         this.renderer.setSize(width, height)
-        this.controls.update()
+        if (this.controls) {
+            this.controls.update()
+        }
         this._Emit("resized", {width, height})
         this._Emit("viewChanged")
         this.Render()
@@ -203,7 +194,7 @@ export class DxfViewer {
 
         this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
                      scene.bounds.minY - scene.origin.y, scene.bounds.maxY - scene.origin.y)
-
+        this._CreateControls()
         this.Render()
     }
 
@@ -212,9 +203,13 @@ export class DxfViewer {
         this.renderer.render(this.scene, this.camera)
     }
 
-    /** @return {Iterable<String>} List of layer names. */
+    /** @return {Iterable<{name:String, color:number}>} List of layer names. */
     GetLayers() {
-        return this.layers.keys()
+        const result = []
+        for (const lyr of this.layers.values()) {
+            result.push({name: lyr.name, color: lyr.color})
+        }
+        return result
     }
 
     ShowLayer(name, show) {
@@ -235,6 +230,10 @@ export class DxfViewer {
         if (this.worker) {
             this.worker.Destroy(true)
             this.worker = null
+        }
+        if (this.controls) {
+            this.controls.dispose()
+            this.controls = null
         }
         this.scene.clear()
         for (const layer of this.layers.values()) {
@@ -275,11 +274,14 @@ export class DxfViewer {
         const aspect = this.canvasWidth / this.canvasHeight
         const height = width / aspect
         const cam = this.camera
-        cam.left = center.x - width / 2
-        cam.right = center.x + width / 2
-        cam.top = center.y + height / 2
-        cam.bottom = center.y - height / 2
+        cam.left = -width / 2
+        cam.right = width / 2
+        cam.top = height / 2
+        cam.bottom = -height / 2
         cam.zoom = 1
+        cam.position.set(center.x, center.y, 1)
+        cam.rotation.set(0, 0, 0)
+        cam.updateMatrix()
         cam.updateProjectionMatrix()
         this._Emit("viewChanged")
     }
@@ -353,6 +355,21 @@ export class DxfViewer {
         }
     }
 
+    _CreateControls() {
+        const controls = this.controls = new OrbitControls(this.camera, this.canvas)
+        controls.enableRotate = false
+        controls.mouseButtons = {
+            LEFT: three.MOUSE.PAN
+        }
+        controls.zoomSpeed = 3
+        controls.target = new three.Vector3(this.camera.position.x, this.camera.position.y, 0)
+        controls.addEventListener("change", () => {
+            this._Emit("viewChanged")
+            this.Render()
+        })
+        controls.update()
+    }
+
     _Emit(eventName, data = null) {
         this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, { detail: data }))
     }
@@ -376,7 +393,7 @@ export class DxfViewer {
     }
 
     _OnResize(entry) {
-        this.SetSize(entry.contentRect.width, entry.contentRect.height)
+        this.SetSize(Math.floor(entry.contentRect.width), Math.floor(entry.contentRect.height))
     }
 
     _LoadBatch(scene, batch) {
