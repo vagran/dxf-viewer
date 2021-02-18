@@ -1,8 +1,8 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer"
-import "./RBTree"
 import {BatchingKey} from "./BatchingKey"
 import {Matrix3, Vector2} from "three"
 import {TextRenderer} from "./TextRenderer"
+import {RBTree} from "./RBTree"
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000

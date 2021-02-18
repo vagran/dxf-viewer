@@ -1,6 +1,6 @@
 /** Based on bintrees package (https://github.com/vadimg/js_bintrees). Fixed web-worker support. */
 
-RBTree = (function(window) {
+export const RBTree = (function(window) {
 var global = window;
 var require = function(name) {
     var fn = require.m[name];

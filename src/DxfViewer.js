@@ -4,6 +4,7 @@ import {DxfWorker} from "./DxfWorker"
 import {MaterialKey} from "./MaterialKey"
 import {ColorCode, DxfScene} from "./DxfScene"
 import {OrbitControls} from "./OrbitControls"
+import {RBTree} from "./RBTree"
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
