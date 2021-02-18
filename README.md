@@ -4,7 +4,9 @@ This package provides DXF 2D viewer component written in JavaScript. It renders 
 (via [three.js](https://threejs.org) library). It was carefully crafted with performance in mind, 
 intended for drawing huge real-world files without performance problems.
 
-The usage example and demo is available here: 
+The usage example is available here: https://github.com/vagran/dxf-viewer-example-src
+
+Deployed demo: https://vagran.github.io/dxf-viewer-example/
 
 The package is released under the MIT License.
 
@@ -13,7 +15,11 @@ This is community version of the viewer. It is initially published in the
 [Atlas](https://atlas.ugcs.com) project. There it will be mostly maintained for project-specific 
 needs. The community version will receive all generic features and bug fixes.
 
-TODO: npm
+## Install
+
+```bash
+npm install dxf-viewer
+```
 
 ## Features
 
