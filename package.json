@@ -4,7 +4,7 @@
   "description": "JavaScript DXF file viewer",
   "main": "src/index.js",
   "author": "Artyom Lebedev<arlebedev@ugcs.com>",
-  "license": "MIT",
+  "license": "Mozilla Public License 2.0",
   "repository": "https://github.com/vagran/dxf-viewer",
   "keywords": [
     "dxf",

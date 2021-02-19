@@ -8,7 +8,7 @@ The usage example is available here: https://github.com/vagran/dxf-viewer-exampl
 
 Deployed demo: https://vagran.github.io/dxf-viewer-example/
 
-The package is released under the MIT License.
+The package is released under the Mozilla Public License 2.0.
 
 This is community version of the viewer. It is initially published in the
 [corporate repository](https://github.com/ugcs/ugcs-dxf-viewer) and is used in production in
