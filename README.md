@@ -11,7 +11,7 @@ Deployed demo: https://vagran.github.io/dxf-viewer-example/
 The package is released under the MIT License.
 
 This is community version of the viewer. It is initially published in the
-[corporate repository](https://bitbucket.org/sphengineering/dxf-viewer) and is used in production in
+[corporate repository](https://github.com/ugcs/ugcs-dxf-viewer) and is used in production in
 [Atlas](https://atlas.ugcs.com) project. There it will be mostly maintained for project-specific 
 needs. The community version will receive all generic features and bug fixes.
 
