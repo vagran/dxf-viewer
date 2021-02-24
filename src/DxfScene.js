@@ -261,6 +261,9 @@ export class DxfScene {
         }
 
         let numSegments = Math.floor(aAbs / this.options.arcTessellationAngle)
+        if (numSegments < this.options.minArcTessellationSubdivisions) {
+            numSegments = this.options.minArcTessellationSubdivisions
+        }
         if (numSegments > 1) {
             const startAngle = Math.atan2(startVtx.y - center.y, startVtx.x - center.x)
             const step = a / numSegments
@@ -1672,6 +1675,8 @@ export const ColorCode = Object.freeze({
 DxfScene.DefaultOptions = {
     /** Target angle for each segment of tessellated arc. */
     arcTessellationAngle: 10 / 180 * Math.PI,
+    /** Divide arc to at least the specified number of segments. */
+    minArcTessellationSubdivisions: 8,
     /** Text rendering options. */
     textOptions: TextRenderer.DefaultOptions
 }
