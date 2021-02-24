@@ -654,7 +654,14 @@ export class DxfScene {
     }
 
     *_DecomposePolyline(entity, blockCtx = null) {
-        const verticesCount = entity.vertices.length
+        let entityVertices, verticesCount
+        if (entity.includesCurveFitVertices || entity.includesSplineFitVertices) {
+            entityVertices = entity.vertices.filter(v => v.splineVertex || v.curveFittingVertex)
+            verticesCount = entityVertices.length
+        } else {
+            entityVertices = entity.vertices
+            verticesCount = entity.vertices.length
+        }
         if (verticesCount < 2) {
             return
         }
@@ -662,8 +669,8 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const _this = this
         let startIdx = 0
-        let curPlainLine = this._IsPlainLine(entity.vertices[0])
-        let curLineType = this._GetLineType(entity, entity.vertices[0], blockCtx)
+        let curPlainLine = this._IsPlainLine(entityVertices[0])
+        let curLineType = this._GetLineType(entity, entityVertices[0], blockCtx)
         let curVertices = null
 
         function *CommitSegment(endIdx) {
@@ -675,20 +682,20 @@ export class DxfScene {
             if (endIdx === verticesCount && startIdx === 0) {
                 isClosed = true
                 if (vertices === null) {
-                    vertices = entity.vertices
+                    vertices = entityVertices
                 }
             } else if (endIdx === verticesCount - 1 && startIdx === 0) {
                 if (vertices === null) {
-                    vertices = entity.vertices
+                    vertices = entityVertices
                 }
             } else if (endIdx === verticesCount) {
                 if (vertices === null) {
-                    vertices = entity.vertices.slice(startIdx, endIdx)
-                    vertices.push(entity.vertices[0])
+                    vertices = entityVertices.slice(startIdx, endIdx)
+                    vertices.push(entityVertices[0])
                 }
             } else {
                 if (vertices === null) {
-                    vertices = entity.vertices.slice(startIdx, endIdx + 1)
+                    vertices = entityVertices.slice(startIdx, endIdx + 1)
                 }
             }
 
@@ -705,28 +712,28 @@ export class DxfScene {
 
             startIdx = endIdx
             if (endIdx !== verticesCount) {
-                curPlainLine = _this._IsPlainLine(entity.vertices[endIdx])
-                curLineType = _this._GetLineType(entity, entity.vertices[endIdx])
+                curPlainLine = _this._IsPlainLine(entityVertices[endIdx])
+                curLineType = _this._GetLineType(entity, entityVertices[endIdx])
             }
             curVertices = null
         }
 
         for (let vIdx = 1; vIdx <= verticesCount; vIdx++) {
-            const prevVtx = entity.vertices[vIdx - 1]
+            const prevVtx = entityVertices[vIdx - 1]
             let vtx
             if (vIdx === verticesCount) {
                 if (!entity.shape) {
                     yield* CommitSegment(vIdx - 1)
                     break
                 }
-                vtx = entity.vertices[0]
+                vtx = entityVertices[0]
             } else {
-                vtx = entity.vertices[vIdx]
+                vtx = entityVertices[vIdx]
             }
 
             if (Boolean(prevVtx.bulge) && curPlainLine) {
                 if (curVertices === null) {
-                    curVertices = entity.vertices.slice(startIdx, vIdx)
+                    curVertices = entityVertices.slice(startIdx, vIdx)
                 }
                 this._GenerateBulgeVertices(curVertices, prevVtx, vtx, prevVtx.bulge)
             } else if (curVertices !== null) {
