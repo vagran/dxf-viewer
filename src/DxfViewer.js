@@ -208,7 +208,7 @@ export class DxfViewer {
     GetLayers() {
         const result = []
         for (const lyr of this.layers.values()) {
-            result.push({name: lyr.name, color: lyr.color})
+            result.push({name: lyr.name, color: this._TransformColor(lyr.color)})
         }
         return result
     }
@@ -573,23 +573,34 @@ export class DxfViewer {
         if (!this.options.colorCorrection && !this.options.blackWhiteInversion) {
             return color
         }
+        /* Just black and white inversion. */
+        const bkgLum = Luminance(this.clearColor)
+        if (color === 0xffffff && bkgLum >= 0.8) {
+            return 0
+        }
+        if (color === 0 && bkgLum <= 0.2) {
+            return 0xffffff
+        }
         if (!this.options.colorCorrection) {
-            /* Just black and white inversion. */
-            const bkgLum = Luminance(this.clearColor)
-            if (color === 0xffffff && bkgLum >= 0.8) {
-                return 0
-            }
-            if (color === 0 && bkgLum <= 0.2) {
-                return 0xffffff
-            }
             return color
         }
-        //XXX not implemented
-        // const MIN_TARGET_RATIO = 1.5
-        // const contrast = ContrastRatio(color, this.clearColor)
-        // const diff = contrast >= 1 ? contrast : 1 / contrast
-        // if (diff < MIN_TARGET_RATIO) {
-        // }
+        const fgLum = Luminance(color)
+        const MIN_TARGET_RATIO = 1.5
+        const contrast = ContrastRatio(color, this.clearColor)
+        const diff = contrast >= 1 ? contrast : 1 / contrast
+        if (diff < MIN_TARGET_RATIO) {
+            let targetLum
+            if (bkgLum > 0.5) {
+                targetLum = bkgLum / 2
+            } else {
+                targetLum = bkgLum * 2
+            }
+            if (targetLum > fgLum) {
+                color = Lighten(color, targetLum / fgLum)
+            } else {
+                color = Darken(color, fgLum / targetLum)
+            }
+        }
         return color
     }
 }
