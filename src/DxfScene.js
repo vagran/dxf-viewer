@@ -582,8 +582,10 @@ export class DxfScene {
                 console.warn("Unresolved nested block reference: " + entity.name)
             }
             const nestedCtx = blockCtx.NestedBlockContext(block, entity)
-            for (const entity of block.data.entities) {
-                this._ProcessDxfEntity(entity, nestedCtx)
+            if (block.data.entities) {
+                for (const entity of block.data.entities) {
+                    this._ProcessDxfEntity(entity, nestedCtx)
+                }
             }
             return
         }
