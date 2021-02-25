@@ -54,4 +54,5 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Hatching
  * Infilled polygons - everything is drawn with outlines now.
  * Block instancing in a grid. Grid attributes are ignored now.
+ * Dimensions
  * Many less commonly used DXF features.
