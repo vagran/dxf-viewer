@@ -48,12 +48,13 @@ export class DxfScene {
      *  searched sequentially in each provided font.
      */
     async Build(dxf, fontFetchers) {
+        const header = dxf.header || {}
         /* 0 - CCW, 1 - CW */
-        this.angBase = dxf.header["$ANGBASE"] || 0
+        this.angBase = header["$ANGBASE"] || 0
         /* Zero angle direction, 0 is +X */
-        this.angDir = dxf.header["$ANGDIR"] || 0
-        this.pdMode = dxf.header["$PDMODE"] || 0
-        this.pdSize = dxf.header["$PDSIZE"] || 0
+        this.angDir = header["$ANGDIR"] || 0
+        this.pdMode = header["$PDMODE"] || 0
+        this.pdSize = header["$PDSIZE"] || 0
 
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
