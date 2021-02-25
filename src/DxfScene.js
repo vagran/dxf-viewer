@@ -659,6 +659,36 @@ export class DxfScene {
                          })
     }
 
+    /** Mirror entity vertices if necessary in case of extrusionDirection with negative Z specified.
+     *
+     * @param entity Entity to check.
+     * @param vertices {?{x,y}[]} Vertices array to use instead of entity vertices attribute.
+     * @return {{x,y}[]} Vertices array with mirrored X if necessary. All attributes preserved.
+     */
+    _MirrorEntityVertices(entity, vertices = null) {
+        if (!entity.extrusionDirection || entity.extrusionDirection.z >= 0) {
+            return vertices ?? entity.vertices
+        }
+        if (!vertices || vertices === entity.vertices) {
+            vertices = entity.vertices.slice()
+        }
+        const n = vertices.length
+        for (let i = 0; i < n; i++) {
+            const v = vertices[i]
+            const _v = {x: -v.x}
+            for (const propName in v) {
+                if (!v.hasOwnProperty(propName)) {
+                    continue
+                }
+                if (propName !== "x") {
+                    _v[propName] = v[propName]
+                }
+            }
+            vertices[i] = _v
+        }
+        return vertices
+    }
+
     *_DecomposePolyline(entity, blockCtx = null) {
         let entityVertices, verticesCount
         if (entity.includesCurveFitVertices || entity.includesSplineFitVertices) {
@@ -671,6 +701,7 @@ export class DxfScene {
         if (verticesCount < 2) {
             return
         }
+        entityVertices = this._MirrorEntityVertices(entity, entityVertices)
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const _this = this
@@ -1432,9 +1463,18 @@ class BlockContext {
      */
     GetInsertionTransform(entity) {
         const mInsert = new Matrix3().translate(-this.origin.x, -this.origin.y)
-        mInsert.scale(entity.xScale || 1, entity.yScale || 1)
-        mInsert.rotate(-(entity.rotation || 0) * Math.PI / 180)
-        mInsert.translate(entity.position.x, entity.position.y)
+        let yScale = entity.yScale || 1
+        const xScale = entity.xScale || 1
+        const rotation = -(entity.rotation || 0) * Math.PI / 180
+        let x = entity.position.x
+        const y = entity.position.y
+        if (entity.zScale < 0) {
+            yScale = -yScale
+            x = -x
+        }
+        mInsert.scale(xScale, yScale)
+        mInsert.rotate(rotation)
+        mInsert.translate(x, y)
         if (this.type !== BlockContext.Type.INSTANTIATION) {
             return mInsert
         }
