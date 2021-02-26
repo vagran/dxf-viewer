@@ -57,7 +57,8 @@ export class DxfWorker {
             resp.data = await this._ProcessRequestMessage(msg.data.type, msg.data.data, transfers,
                                                           msg.data.seq)
         } catch (error) {
-            resp.error = error
+            console.log(error)
+            resp.error = String(error)
         }
         this.worker.postMessage(resp, transfers)
         if (msg.type === DxfWorker.WorkerMsg.DESTROY) {
