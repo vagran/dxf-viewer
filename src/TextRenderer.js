@@ -421,7 +421,8 @@ class TextBlock {
         let origin = new Vector2()
         let scale = new Vector2(widthFactor, 1)
         let insertionPos =
-            hAlign === HAlign.LEFT || hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED ?
+            (hAlign === HAlign.LEFT && vAlign === VAlign.BASELINE) ||
+            hAlign === HAlign.FIT || hAlign === HAlign.ALIGNED ?
             new Vector2(startPos.x, startPos.y) : new Vector2(endPos.x, endPos.y)
 
         const GetFitScale = () => {
