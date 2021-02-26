@@ -41,6 +41,10 @@ npm install dxf-viewer
 There are still many incomplete features. I will try to implement some of them when I have some 
 time. Anything useful implemented in the corporate repository will be merged here as well.
 
+ * Stream parsing for input file. Currently, mostly relying on dxf-parser package which is not
+   stream parser and thus buffers whole the file before parsing. This prevents from supporting big
+   DXF file (above gigabyte) due to string size limit in JS engine (also making unnecessary memory
+   waste for the buffer).
  * Multiline text blocks (MTEXT group).
  * Text styling. Currently, text rendering is using just the specified fonts in the specified order.
    DXF style and font attributes are ignored. Text glyphs are always rendered infilled.
