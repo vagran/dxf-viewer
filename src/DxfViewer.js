@@ -755,8 +755,10 @@ class Batch {
             instanceBatch._GetInstanceColor(this.key.color) : this.key.color
 
         //XXX line type
-        const materialFactory = this.key.geometryType === BatchingKey.GeometryType.POINTS ?
-            this.viewer._GetSimplePointMaterial : this.viewer._GetSimpleColorMaterial
+        const materialFactory =
+            this.key.geometryType === BatchingKey.GeometryType.POINTS ||
+            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE ?
+                this.viewer._GetSimplePointMaterial : this.viewer._GetSimpleColorMaterial
 
         const material = materialFactory.call(this.viewer, this.viewer._TransformColor(color),
                                               instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
@@ -764,6 +766,8 @@ class Batch {
         let objConstructor
         switch (this.key.geometryType) {
         case BatchingKey.GeometryType.POINTS:
+        /* This method also called for creating dots for shaped point instances. */
+        case BatchingKey.GeometryType.POINT_INSTANCE:
             objConstructor = three.Points
             break
         case BatchingKey.GeometryType.LINES:
@@ -826,7 +830,7 @@ class Batch {
         }
         if (this.hasOwnProperty("vertices")) {
             /* Dots for point shapes. */
-            yield this._CreatePointsObject(null)
+            yield* this._CreateObjects()
         }
     }
 

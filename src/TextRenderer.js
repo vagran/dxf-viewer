@@ -7,8 +7,6 @@ import {Matrix3, Vector2} from "three"
  * Helper class for rendering text.
  * Currently it is just basic very simplified implementation for MVP. Further work should include:
  *  * Support DXF text styles and weight.
- *  * Support text formatting and rotation.
- *  * Direct TTF files processing using opentype.js
  *  * Bitmap fonts generation in texture atlas for more optimal rendering.
  */
 export class TextRenderer {
@@ -394,8 +392,8 @@ class TextBlock {
      * @param startPos {{x,y}} TEXT group first alignment point.
      * @param endPos {?{x,y}} TEXT group second alignment point.
      * @param rotation {?number} Rotation attribute, deg.
-     * @param widthFactor {?number} Relative X scale factor (group 41)
-     * @param hAlign {?number} Horizontal text justification type code (group 72)
+     * @param widthFactor {?number} Relative X scale factor (group 41).
+     * @param hAlign {?number} Horizontal text justification type code (group 72).
      * @param vAlign {?number} Vertical text justification type code (group 73).
      * @param color {number}
      * @param layer {?string}
