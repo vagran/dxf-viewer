@@ -440,21 +440,21 @@ export class DxfScene {
 
         if (markType === PdMode.DOT) {
             yield new Entity({
-                                 type: Entity.Type.POINTS,
-                                 vertices: [entity.position],
-                                 layer, color,
-                                 lineType: null
-                             })
+                type: Entity.Type.POINTS,
+                vertices: [entity.position],
+                layer, color,
+                lineType: null
+            })
             return
         }
 
         const vertices = []
         this._CreatePointMarker(vertices, markType, entity.position)
         yield new Entity({
-                             type: Entity.Type.LINE_SEGMENTS,
-                             vertices, layer, color,
-                             lineType: null
-                         })
+            type: Entity.Type.LINE_SEGMENTS,
+            vertices, layer, color,
+            lineType: null
+        })
     }
 
     /** Create line segments for point marker.
@@ -503,6 +503,8 @@ export class DxfScene {
             name: POINT_SHAPE_BLOCK_NAME,
             position: { x: 0, y: 0}
         })
+        /* Fix block origin at zero. */
+        this.pointShapeBlock.offset = new Vector2(0, 0)
         const blockCtx = this.pointShapeBlock.DefinitionContext()
 
         const markType = this.pdMode & PdMode.MARK_MASK
@@ -510,10 +512,10 @@ export class DxfScene {
             const vertices = []
             this._CreatePointMarker(vertices, markType)
             const entity = new Entity({
-                                          type: Entity.Type.LINE_SEGMENTS,
-                                          vertices,
-                                          color: ColorCode.BY_BLOCK
-                                      })
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices,
+                color: ColorCode.BY_BLOCK
+            })
             this._ProcessEntity(entity, blockCtx)
         }
 
@@ -526,10 +528,10 @@ export class DxfScene {
                 {x: -r, y: -r}
             ]
             const entity = new Entity({
-                                          type: Entity.Type.POLYLINE, vertices,
-                                          color: ColorCode.BY_BLOCK,
-                                          shape: true
-                                      })
+                type: Entity.Type.POLYLINE, vertices,
+                color: ColorCode.BY_BLOCK,
+                shape: true
+            })
             this._ProcessEntity(entity, blockCtx)
         }
         if (this.pdMode & PdMode.CIRCLE) {
@@ -538,10 +540,10 @@ export class DxfScene {
                                        radius: this.pdSize * 0.5,
                                        tessellationAngle: POINT_CIRCLE_TESSELLATION_ANGLE})
             const entity = new Entity({
-                                          type: Entity.Type.POLYLINE, vertices,
-                                          color: ColorCode.BY_BLOCK,
-                                          shape: true
-                                      })
+                type: Entity.Type.POLYLINE, vertices,
+                color: ColorCode.BY_BLOCK,
+                shape: true
+            })
             this._ProcessEntity(entity, blockCtx)
         }
     }
@@ -1083,10 +1085,7 @@ export class DxfScene {
         }
         batch = new RenderBatch(key)
         this.batches.insert(batch)
-        if (key.blockName !== null &&
-            key.geometryType !== BatchingKey.GeometryType.BLOCK_INSTANCE &&
-            key.geometryType !== BatchingKey.GeometryType.POINT_INSTANCE) {
-
+        if (key.blockName !== null && !key.IsInstanced()) {
             /* Block definition batch. */
             const block = this.blocks.get(key.blockName)
             if (block) {
