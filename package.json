@@ -3,7 +3,7 @@
   "version": "1.0.8",
   "description": "JavaScript DXF file viewer",
   "main": "src/index.js",
-  "author": "Artyom Lebedev<arlebedev@ugcs.com>",
+  "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
   "license": "Mozilla Public License 2.0",
   "repository": "https://github.com/vagran/dxf-viewer",
   "keywords": [
