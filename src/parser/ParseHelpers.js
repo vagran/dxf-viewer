@@ -5,7 +5,7 @@ import AUTO_CAD_COLOR_INDEX from './AutoCadColorIndex';
  * @return {Number} truecolor value as a number
  */
 export function getAcadColor(index) {
-	return AUTO_CAD_COLOR_INDEX[index];
+    return AUTO_CAD_COLOR_INDEX[index];
 }
 
 /**
