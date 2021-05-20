@@ -600,6 +600,10 @@ DxfParser.prototype._parse = function(dxfString) {
 					layer.frozen = ((curr.value & 1) != 0 || (curr.value & 2) != 0);
 					curr = scanner.next();
 					break;
+                case 420: // TrueColor Color
+                    layer.color = curr.value;
+                    curr = scanner.next();
+                    break;
 				case 0:
 					// New Layer
 					if(curr.value === 'LAYER') {
