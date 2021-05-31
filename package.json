@@ -15,7 +15,7 @@
     "cad"
   ],
   "dependencies": {
-    "three": "^0.127.0",
+    "three": "^0.128.0",
     "loglevel": "^1.7.1",
     "opentype.js": "^1.3.3"
   }
