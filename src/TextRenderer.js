@@ -51,8 +51,8 @@ export class TextRenderer {
             }
         }
         let charMissing = false
-        for (const char of Array.from(text)) {
-            if (char.charCodeAt(0) < 0x20) {
+        for (const char of text) {
+            if (char.codePointAt(0) < 0x20) {
                 /* Control character. */
                 continue
             }
@@ -106,7 +106,7 @@ export class TextRenderer {
     *Render({text, startPos, endPos, rotation = 0, widthFactor = 1, hAlign = 0, vAlign = 0,
              color, layer = null, size}) {
         const block = new TextBlock(size)
-        for (const char of Array.from(text)) {
+        for (const char of text) {
             const shape = this._GetCharShape(char)
             if (!shape) {
                 continue
@@ -234,7 +234,7 @@ class Font {
             if (glyph.unicode === undefined) {
                 continue
             }
-            this.charMap.set(String.fromCharCode(glyph.unicode), glyph)
+            this.charMap.set(String.fromCodePoint(glyph.unicode), glyph)
         }
         /* Scale to transform the paths to size 1. */
         //XXX not really clear what is the resulting unit, check, review and comment it later

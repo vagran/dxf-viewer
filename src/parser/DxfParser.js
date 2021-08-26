@@ -597,7 +597,7 @@ DxfParser.prototype._parse = function(dxfString) {
                     curr = scanner.next();
                     break;
                 case 70: // frozen layer
-                    layer.frozen = ((curr.value & 1) != 0 || (curr.value & 2) != 0);
+                    layer.frozen = ((curr.value & 1) !== 0 || (curr.value & 2) !== 0);
                     curr = scanner.next();
                     break;
                 case 420: // TrueColor Color
