@@ -58,6 +58,7 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Smoothed polyline (curve-fit/spline-fit addition vertices).
  * Hatching
  * Infilled polygons - everything is drawn with outlines now.
+ * Projected 3D mesh rendering (3DFACE entities).
  * Block instancing in a grid. Grid attributes are ignored now.
  * Dimensions
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
