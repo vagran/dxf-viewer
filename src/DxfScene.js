@@ -1467,10 +1467,6 @@ class BlockContext {
         const rotation = -(entity.rotation || 0) * Math.PI / 180
         let x = entity.position.x
         const y = entity.position.y
-        if (entity.zScale < 0) {
-            yScale = -yScale
-            x = -x
-        }
         mInsert.scale(xScale, yScale)
         mInsert.rotate(rotation)
         mInsert.translate(x, y)
