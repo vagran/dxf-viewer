@@ -13,8 +13,6 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
 
         switch(curr.code) {
         case 3:
-            entity.text ? entity.text += curr.value : entity.text = curr.value;
-            break;
         case 1:
             entity.text ? entity.text += curr.value : entity.text = curr.value;
             break;

@@ -63,4 +63,7 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Dimensions
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored.
+ * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z 
+   (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
+   processed.
  * Many less commonly used DXF features.

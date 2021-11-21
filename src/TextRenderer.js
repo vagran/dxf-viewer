@@ -259,10 +259,8 @@ class Font {
         if (!glyph) {
             return null
         }
-        let path = null
-        let x, y, cpx, cpy, cpx1, cpy1, cpx2, cpy2
         const scale = this.scale
-        path = new ShapePath()
+        const path = new ShapePath()
         for (const cmd of glyph.path.commands) {
             switch (cmd.type) {
 
@@ -330,8 +328,8 @@ const VAlign = Object.freeze({
 /** Encapsulates calculations for a text block. */
 //XXX multiline text
 class TextBlock {
-    constructor(size) {
-        this.size = size
+    constructor(fontSize) {
+        this.fontSize = fontSize
         /* Element is {shape: CharShape, vertices: ?{Vector2}[]} */
         this.glyphs = []
         this.bounds = null
@@ -354,14 +352,14 @@ class TextBlock {
         } else {
             offset = 0
         }
-        const x = this.curX + offset * this.size
+        const x = this.curX + offset * this.fontSize
         let vertices
         if (shape.vertices) {
-            vertices = shape.GetVertices({x, y: 0}, this.size)
-            const xMin = x + shape.bounds.xMin * this.size
-            const xMax = x + shape.bounds.xMax * this.size
-            const yMin = shape.bounds.yMin * this.size
-            const yMax = shape.bounds.yMax * this.size
+            vertices = shape.GetVertices({x, y: 0}, this.fontSize)
+            const xMin = x + shape.bounds.xMin * this.fontSize
+            const xMax = x + shape.bounds.xMax * this.fontSize
+            const yMin = shape.bounds.yMin * this.fontSize
+            const yMax = shape.bounds.yMax * this.fontSize
             /* Leading/trailing spaces not accounted intentionally now. */
             if (this.bounds === null) {
                 this.bounds = {xMin, xMax, yMin, yMax}
@@ -382,7 +380,7 @@ class TextBlock {
         } else {
             vertices = null
         }
-        this.curX = x + shape.advance * this.size
+        this.curX = x + shape.advance * this.fontSize
         this.glyphs.push({shape, vertices})
         this.prevChar = char
         this.prevFont = shape.font

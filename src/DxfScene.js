@@ -3,6 +3,7 @@ import {BatchingKey} from "./BatchingKey"
 import {Matrix3, Vector2} from "three"
 import {TextRenderer} from "./TextRenderer"
 import {RBTree} from "./RBTree"
+import {MTextFormatParser} from "./MTextFormatParser";
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
@@ -106,16 +107,40 @@ export class DxfScene {
     }
 
     async _FetchFonts(dxf) {
+
+        const ProcessEntity = async (entity) => {
+            let ret
+            if (entity.type === "TEXT") {
+                ret = await this.textRenderer.FetchFonts(entity.text)
+            } else if (entity.type === "MTEXT") {
+                const parser = new MTextFormatParser()
+                parser.Parse(entity.text)
+                //XXX formatted MTEXT may specify some fonts explicitly, this is not yet supported
+                for (const text of parser.GetText()) {
+                    if (!await this.textRenderer.FetchFonts(text)) {
+                        ret = false
+                        break
+                    }
+                }
+                ret = true
+            } else {
+                throw new Error("Bad entity type")
+            }
+            if (!ret) {
+                this.hasMissingChars = true
+            }
+            return ret
+        }
+
         for (const entity of dxf.entities) {
             if (entity.type === "TEXT" || entity.type === "MTEXT") {
-                if (!await this.textRenderer.FetchFonts(entity.text)) {
+                if (!await ProcessEntity(entity)) {
                     /* Failing to resolve some character means that all fonts have been loaded and
                      * checked. No mean to check the rest strings. However until it is encountered,
                      * all strings should be checked, even if all fonts already loaded. This needed
                      * to properly set hasMissingChars which allows displaying some warning in a
                      * viewer.
                      */
-                    this.hasMissingChars = true
                     return
                 }
             }
@@ -124,8 +149,7 @@ export class DxfScene {
             if (block.data.hasOwnProperty("entities")) {
                 for (const entity of block.data.entities) {
                     if (entity.type === "TEXT" || entity.type === "MTEXT") {
-                        if (!await this.textRenderer.FetchFonts(entity.text)) {
-                            this.hasMissingChars = true
+                        if (!await ProcessEntity(entity)) {
                             return
                         }
                     }
@@ -1466,7 +1490,7 @@ class BlockContext {
         let xScale = entity.xScale || 1
         const rotation = -(entity.rotation || 0) * Math.PI / 180
         let x = entity.position.x
-        let y = entity.position.y
+        const y = entity.position.y
         if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
             xScale = -xScale
             x = -x
