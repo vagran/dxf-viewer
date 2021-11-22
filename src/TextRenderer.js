@@ -614,7 +614,6 @@ TextBox.Paragraph = class {
             const chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
             if (boxWidth !== null && curWidth !== 0 && curWidth + chunkWidth > boxWidth) {
                 CommitLine()
-                continue
             }
             chunk.position = curWidth
             curWidth += chunkWidth
