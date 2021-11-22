@@ -161,7 +161,7 @@ export class MTextFormatParser {
                 continue
 
             case State.PARAGRAPH3:
-                curEntities.push({type: EntityType.PARAGRAPH, alignment: c})
+                curEntities.push({type: EntityType.PARAGRAPH_ALIGNMENT, alignment: c})
                 state = State.SKIP_FORMAT
                 continue
 

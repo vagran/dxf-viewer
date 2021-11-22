@@ -391,6 +391,8 @@ class TextBox {
             }
         }
 
+        let curAlignment = TextBox.Paragraph.Alignment.LEFT
+
         for (const item of FlattenItems(formattedText)) {
             switch(item.type) {
 
@@ -406,6 +408,7 @@ class TextBox {
 
             case MTextFormatParser.EntityType.PARAGRAPH:
                 this.curParagraph = new TextBox.Paragraph(this)
+                this.curParagraph.SetAlignment(curAlignment)
                 this.paragraphs.push(this.curParagraph)
                 break
 
@@ -431,6 +434,7 @@ class TextBox {
                 }
                 if (a !== null) {
                     this.curParagraph.SetAlignment(a)
+                    curAlignment = a
                 }
                 break
             }
@@ -775,7 +779,7 @@ TextBox.Paragraph.Line = class {
 
     ForEachChunk(handler) {
         for (let i = 0; i < this.numChunks; i++) {
-            handler(this.startChunkIdx + i, this.paragraph.chunks[this.startChunkIdx + i])
+            handler(this.paragraph.chunks[this.startChunkIdx + i])
         }
     }
 }
