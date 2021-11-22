@@ -532,7 +532,7 @@ class TextBox {
                     const chunk = p.chunks[chunkIdx]
                     let x = chunk.position
                     /* First chunk of continuation line never prepended by whitespace. */
-                    if (chunkIdx !== 0 && chunkIdx !== line.startChunkIdx) {
+                    if (chunkIdx === 0 || chunkIdx !== line.startChunkIdx) {
                         x += chunk.GetSpacingWidth()
                     }
                     const v = new Vector2(x, y)
@@ -573,7 +573,7 @@ TextBox.Paragraph = class {
     }
 
     FeedSpace() {
-        if (this.curChunk === null || this.curChunk.prevChar !== null) {
+        if (this.curChunk === null || this.curChunk.lastChar !== null) {
             this._AddChunk()
         }
         this.curChunk.PushSpace()
@@ -656,8 +656,9 @@ TextBox.Paragraph.Alignment = Object.freeze({
 
 TextBox.Paragraph.Chunk = class {
     /**
-     * @param paragraph
-     * @param prevChunk {?TextBox.Paragraph.Chunk}
+     * @param {TextBox.Paragraph} paragraph
+     * @param {number} fontSize
+     * @param {?TextBox.Paragraph.Chunk} prevChunk
      */
     constructor(paragraph, fontSize, prevChunk) {
         this.paragraph = paragraph
