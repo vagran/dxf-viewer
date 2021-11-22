@@ -190,6 +190,9 @@ export class DxfScene {
         case "TEXT":
             renderEntities = this._DecomposeText(entity, blockCtx)
             break
+        case "MTEXT":
+            renderEntities = this._DecomposeMText(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -580,13 +583,34 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         yield* this.textRenderer.Render({
             text: entity.text,
-            size: entity.textHeight,
+            fontSize: entity.textHeight,
             startPos: entity.startPoint,
             endPos: entity.endPoint,
             rotation: entity.rotation,
             hAlign: entity.halign,
             vAlign: entity.valign,
             widthFactor: entity.xScale,
+            color, layer
+        })
+    }
+
+    *_DecomposeMText(entity, blockCtx) {
+        if (!this.textRenderer.canRender) {
+            return
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const parser = new MTextFormatParser()
+        parser.Parse(entity.text)
+        yield* this.textRenderer.RenderMText({
+            formattedText: parser.GetContent(),
+            fontSize: entity.height,
+            position: entity.position,
+            rotation: entity.rotation,
+            direction: entity.direction,
+            attachment: entity.attachmentPoint,
+            lineSpacing: entity.lineSpacing,
+            width: entity.width,
             color, layer
         })
     }

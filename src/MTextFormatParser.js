@@ -19,8 +19,8 @@ const EntityType = Object.freeze({
     SCOPE: 1,
     PARAGRAPH: 2,
     NON_BREAKING_SPACE: 3,
-    /** "alignment" property is either "r", "c", "l", "j"(?) for right, center, left, justify
-     * alignment.
+    /** "alignment" property is either "r", "c", "l", "j", "d" for right, center, left, justify
+     * (seems to be the same as left), distribute (justify) alignment.
      */
     PARAGRAPH_ALIGNMENT: 4
 
@@ -92,7 +92,6 @@ export class MTextFormatParser {
                 curEntities = scopeStack[scopeStack.length - 1].content
             }
         }
-
 
         for ( ;curPos < n; curPos++) {
             const c = text.charAt(curPos)
@@ -208,6 +207,5 @@ export class MTextFormatParser {
         yield *TraverseItems(this.GetContent())
     }
 }
-
 
 MTextFormatParser.EntityType = EntityType

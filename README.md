@@ -61,6 +61,7 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Projected 3D mesh rendering (3DFACE entities).
  * Block instancing in a grid. Grid attributes are ignored now.
  * Dimensions
+ * Leaders
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored.
  * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z 

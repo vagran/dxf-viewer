@@ -2,6 +2,7 @@ import {DxfScene, Entity} from "./DxfScene"
 import {ShapePath} from "three/src/extras/core/ShapePath"
 import {ShapeUtils} from "three/src/extras/ShapeUtils"
 import {Matrix3, Vector2} from "three"
+import {MTextFormatParser} from "./MTextFormatParser";
 
 /**
  * Helper class for rendering text.
@@ -99,13 +100,13 @@ export class TextRenderer {
      * @param vAlign {?number} Vertical text justification type code (group 73).
      * @param color {number}
      * @param layer {?string}
-     * @param size {number}
+     * @param fontSize {number}
      * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
     *Render({text, startPos, endPos, rotation = 0, widthFactor = 1, hAlign = 0, vAlign = 0,
-             color, layer = null, size}) {
-        const block = new TextBlock(size)
+             color, layer = null, fontSize}) {
+        const block = new TextBlock(fontSize)
         for (const char of text) {
             const shape = this._GetCharShape(char)
             if (!shape) {
@@ -114,6 +115,29 @@ export class TextRenderer {
             block.PushChar(char, shape)
         }
         yield* block.Render(startPos, endPos, rotation, widthFactor, hAlign, vAlign, color, layer)
+    }
+
+    /**
+     * @param {MTextFormatEntity[]} formattedText Parsed formatted text.
+     * @param {{x, y}} position Insertion position.
+     * @param {Number} fontSize
+     * @param {?Number} width Text block width, no wrapping if undefined.
+     * @param {?Number} rotation Text block rotation in degrees.
+     * @param {?{x, y}} direction Text block orientation defined as direction vector. Takes a
+     * precedence over rotation if both provided.
+     * @param {number} attachment Attachment point, one of MTextAttachment values.
+     * @param {?number} lineSpacing Line spacing ratio relative to default one (5/3 of font size).
+     * @param {number} color
+     * @param {?string} layer
+     * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
+     *  glyph.
+     */
+    *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
+                 attachment, lineSpacing = 1, color, layer = null}) {
+        const box = new TextBox(fontSize, this._GetCharShape.bind(this))
+        box.FeedText(formattedText)
+        yield* box.Render(position, width, rotation, direction, attachment, lineSpacing, color,
+                          layer)
     }
 
     /** @return {CharShape} Shape for the specified character.
@@ -325,8 +349,437 @@ const VAlign = Object.freeze({
     TOP: 3
 })
 
-/** Encapsulates calculations for a text block. */
-//XXX multiline text
+/** MTEXT group attribute 71 values. */
+const MTextAttachment = Object.freeze({
+    TOP_LEFT: 1,
+    TOP_CENTER: 2,
+    TOP_RIGHT: 3,
+    MIDDLE_LEFT: 4,
+    MIDDLE_CENTER: 5,
+    MIDDLE_RIGHT: 6,
+    BOTTOM_LEFT: 7,
+    BOTTOM_CENTER: 8,
+    BOTTOM_RIGHT: 9
+})
+
+/** Encapsulates layout calculations for a multiline-line text block. */
+class TextBox {
+    /**
+     * @param fontSize
+     * @param {Function<CharShape, String>} charShapeProvider
+     */
+    constructor(fontSize, charShapeProvider) {
+        this.fontSize = fontSize
+        this.charShapeProvider = charShapeProvider
+        this.curParagraph = new TextBox.Paragraph(this)
+        this.paragraphs = [this.curParagraph]
+        this.spaceShape = charShapeProvider(" ")
+    }
+
+    /** Add some formatted text to the box.
+     * @param {MTextFormatEntity[]} formattedText Parsed formatted text.
+     */
+    FeedText(formattedText) {
+        /* For now advanced formatting is not implemented so scopes are just flattened. */
+        function *FlattenItems(items) {
+            for (const item of items) {
+                if (item.type === MTextFormatParser.EntityType.SCOPE) {
+                    yield *FlattenItems(item.content)
+                } else {
+                    yield item
+                }
+            }
+        }
+
+        for (const item of FlattenItems(formattedText)) {
+            switch(item.type) {
+
+            case MTextFormatParser.EntityType.TEXT:
+                for (const c of item.content) {
+                    if (c === " ") {
+                        this.curParagraph.FeedSpace()
+                    } else {
+                        this.curParagraph.FeedChar(c)
+                    }
+                }
+                break
+
+            case MTextFormatParser.EntityType.PARAGRAPH:
+                this.curParagraph = new TextBox.Paragraph(this)
+                this.paragraphs.push(this.curParagraph)
+                break
+
+            case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
+                this.curParagraph.FeedChar(" ")
+                break
+
+            case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
+                let a = null
+                switch (item.alignment) {
+                case "l":
+                    a = TextBox.Paragraph.Alignment.LEFT
+                    break
+                case "c":
+                    a = TextBox.Paragraph.Alignment.CENTER
+                    break
+                case "r":
+                    a = TextBox.Paragraph.Alignment.RIGHT
+                    break
+                case "d":
+                    a = TextBox.Paragraph.Alignment.JUSTIFY
+                    break
+                }
+                if (a !== null) {
+                    this.curParagraph.SetAlignment(a)
+                }
+                break
+            }
+        }
+    }
+
+    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer) {
+        for (const p of this.paragraphs) {
+            p.BuildLines(width)
+        }
+        if (width === null) {
+            /* Find maximal paragraph width which will define overall box width. */
+            width = 0
+            for (const p of this.paragraphs) {
+                const pWidth = p.GetMaxLineWidth()
+                if (pWidth > width) {
+                    width = pWidth
+                }
+            }
+        }
+        for (const p of this.paragraphs) {
+            p.ApplyAlignment(width)
+        }
+
+        /* Box local coordinates have top-left corner origin, so Y values are negative. The
+         * specified attachment should be used to obtain attachment point offset relatively to box
+         * CS origin.
+         */
+
+        if (direction !== null) {
+            /* Direction takes precedence over rotation if specified. */
+            rotation = Math.atan2(direction.y, direction.x) * 180 / Math.PI
+        }
+
+        const lineHeight = lineSpacing * 5 * this.fontSize / 3
+
+        let height = 0
+        for (const p of this.paragraphs) {
+            if (p.lines === null) {
+                /* Paragraph always occupies at least one line. */
+                height++
+            } else {
+                height += p.lines.length
+            }
+        }
+        height *= lineHeight
+
+        let origin = new Vector2()
+        switch (attachment) {
+        case MTextAttachment.TOP_LEFT:
+            break
+        case MTextAttachment.TOP_CENTER:
+            origin.x = width / 2
+            break
+        case MTextAttachment.TOP_RIGHT:
+            origin.x = width
+            break
+        case MTextAttachment.MIDDLE_LEFT:
+            origin.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_CENTER:
+            origin.x = width / 2
+            origin.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_RIGHT:
+            origin.x = width
+            origin.y = -height / 2
+            break
+        case MTextAttachment.BOTTOM_LEFT:
+            origin.y = -height
+            break
+        case MTextAttachment.BOTTOM_CENTER:
+            origin.x = width / 2
+            origin.y = -height
+            break
+        case MTextAttachment.BOTTOM_RIGHT:
+            origin.x = width
+            origin.y = -height
+            break
+        default:
+            throw new Error("Unhandled alignment")
+        }
+
+        /* Transform for each chunk insertion point. */
+        const transform = new Matrix3().translate(-origin.x, -origin.y)
+            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
+
+        let y = -(this.fontSize + (lineHeight - this.fontSize) / 2)
+        for (const p of this.paragraphs) {
+            if (p.lines === null) {
+                y -= lineHeight
+                continue
+            }
+            for (const line of p.lines) {
+                for (let chunkIdx = line.startChunkIdx;
+                     chunkIdx < line.startChunkIdx + line.numChunks;
+                     chunkIdx++) {
+
+                    const chunk = p.chunks[chunkIdx]
+                    let x = chunk.position
+                    /* First chunk of continuation line never prepended by whitespace. */
+                    if (chunkIdx !== 0 && chunkIdx !== line.startChunkIdx) {
+                        x += chunk.GetSpacingWidth()
+                    }
+                    const v = new Vector2(x, y)
+                    v.applyMatrix3(transform)
+                    if (chunk.block) {
+                        yield* chunk.block.Render(v, null, rotation, null,
+                                                  HAlign.LEFT, VAlign.BASELINE,
+                                                  color, layer)
+                    }
+                }
+                y -= lineHeight
+            }
+        }
+    }
+}
+
+TextBox.Paragraph = class {
+    constructor(textBox) {
+        this.textBox = textBox
+        this.chunks = []
+        this.curChunk = null
+        this.alignment = TextBox.Paragraph.Alignment.LEFT
+        this.lines = null
+    }
+
+    /** Feed character for current chunk. Spaces should be fed by FeedSpace() method. If space
+     * character is fed into this method, it is interpreted as non-breaking space.
+     */
+    FeedChar(c) {
+        const shape = this.textBox.charShapeProvider(c)
+        if (shape === null) {
+            return
+        }
+        if (this.curChunk === null) {
+            this._AddChunk()
+        }
+        this.curChunk.PushChar(c, shape)
+    }
+
+    FeedSpace() {
+        if (this.curChunk === null || this.curChunk.prevChar !== null) {
+            this._AddChunk()
+        }
+        this.curChunk.PushSpace()
+    }
+
+    SetAlignment(alignment) {
+        this.alignment = alignment
+    }
+
+    /** Group chunks into lines.
+     *
+     * @param {?number} boxWidth Box width. Do not wrap lines if null (one line is created).
+     */
+    BuildLines(boxWidth) {
+        if (this.curChunk === null) {
+            return
+        }
+        this.lines = []
+        let startChunkIdx = 0
+        let curChunkIdx = 0
+        let curWidth = 0
+
+        const CommitLine = () => {
+            this.lines.push(new TextBox.Paragraph.Line(this,
+                                                       startChunkIdx,
+                                                       curChunkIdx - startChunkIdx,
+                                                       curWidth))
+            startChunkIdx = curChunkIdx
+            curWidth = 0
+        }
+
+        for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
+            const chunk = this.chunks[curChunkIdx]
+            const chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
+            if (boxWidth !== null && curWidth !== 0 && curWidth + chunkWidth > boxWidth) {
+                CommitLine()
+                continue
+            }
+            chunk.position = curWidth
+            curWidth += chunkWidth
+        }
+        if (startChunkIdx !== curChunkIdx && curWidth !== 0) {
+            CommitLine()
+        }
+    }
+
+    GetMaxLineWidth() {
+        if (this.lines === null) {
+            return 0
+        }
+        let maxWidth = 0
+        for (const line of this.lines) {
+            if (line.width > maxWidth) {
+                maxWidth = line.width
+            }
+        }
+        return maxWidth
+    }
+
+    ApplyAlignment(boxWidth) {
+        if (this.lines) {
+            for (const line of this.lines) {
+                line.ApplyAlignment(boxWidth)
+            }
+        }
+    }
+
+    _AddChunk() {
+        this.curChunk = new TextBox.Paragraph.Chunk(this, this.textBox.fontSize, this.curChunk)
+        this.chunks.push(this.curChunk)
+    }
+}
+
+TextBox.Paragraph.Alignment = Object.freeze({
+    LEFT: 0,
+    CENTER: 1,
+    RIGHT: 2,
+    JUSTIFY: 3
+})
+
+TextBox.Paragraph.Chunk = class {
+    /**
+     * @param paragraph
+     * @param prevChunk {?TextBox.Paragraph.Chunk}
+     */
+    constructor(paragraph, fontSize, prevChunk) {
+        this.paragraph = paragraph
+        this.fontSize = fontSize
+        this.prevChunk = prevChunk
+        this.lastChar = null
+        this.lastShape = null
+        this.leadingSpaces = 0
+        this.spaceStartKerning = null
+        this.spaceEndKerning = null
+        this.block = null
+        this.position = null
+    }
+
+    PushSpace() {
+        if (this.block) {
+            throw new Error("Illegal operation")
+        }
+        this.leadingSpaces++
+    }
+
+    /**
+     * @param char {string}
+     * @param shape {CharShape}
+     */
+    PushChar(char, shape) {
+        if (this.spaceStartKerning === null) {
+            if (this.leadingSpaces === 0) {
+                this.spaceStartKerning = 0
+                this.spaceEndKerning = 0
+            } else {
+                if (this.prevChunk && this.prevChunk.lastShape &&
+                    this.prevChunk.fontSize === this.fontSize &&
+                    this.prevChunk.lastShape.font === this.paragraph.textBox.spaceShape.font) {
+
+                    this.spaceStartKerning =
+                        this.prevChunk.lastShape.font.GetKerning(this.prevChunk.lastChar, " ")
+                } else {
+                    this.spaceStartKerning = 0
+                }
+                if (shape.font === this.paragraph.textBox.spaceShape.font) {
+                    this.spaceEndKerning = shape.font.GetKerning(" ", char)
+                } else {
+                    this.spaceEndKerning = 0
+                }
+            }
+        }
+
+        if (this.block === null) {
+            this.block = new TextBlock(this.fontSize)
+        }
+        this.block.PushChar(char, shape)
+
+        this.lastChar = char
+        this.lastShape = shape
+    }
+
+    GetSpacingWidth() {
+        return (this.leadingSpaces * this.paragraph.textBox.spaceShape.advance +
+            this.spaceStartKerning + this.spaceEndKerning) * this.fontSize
+    }
+
+    GetWidth(withSpacing) {
+        if (this.block === null) {
+            return 0
+        }
+        let width = this.block.GetCurrentPosition()
+        if (withSpacing) {
+            width += this.GetSpacingWidth()
+        }
+        return width
+    }
+}
+
+TextBox.Paragraph.Line = class {
+    constructor(paragraph, startChunkIdx, numChunks, width) {
+        this.paragraph = paragraph
+        this.startChunkIdx = startChunkIdx
+        this.numChunks = numChunks
+        this.width = width
+    }
+
+    ApplyAlignment(boxWidth) {
+        switch (this.paragraph.alignment) {
+        case TextBox.Paragraph.Alignment.LEFT:
+            break
+        case TextBox.Paragraph.Alignment.CENTER: {
+            const offset = (boxWidth - this.width) / 2
+            this.ForEachChunk(chunk => chunk.position += offset)
+            break
+        }
+        case TextBox.Paragraph.Alignment.RIGHT: {
+            const offset = boxWidth - this.width
+            this.ForEachChunk(chunk => chunk.position += offset)
+            break
+        }
+        case TextBox.Paragraph.Alignment.JUSTIFY: {
+            const space = boxWidth - this.width
+            if (space <= 0 || this.numChunks === 1) {
+                break
+            }
+            const step = space / (this.numChunks - 1)
+            let offset = 0
+            this.ForEachChunk(chunk => {
+                chunk.position += offset
+                offset += step
+            })
+            break
+        }
+        default:
+            throw new Error("Unhandled alignment: " + this.paragraph.alignment)
+        }
+    }
+
+    ForEachChunk(handler) {
+        for (let i = 0; i < this.numChunks; i++) {
+            handler(this.startChunkIdx + i, this.paragraph.chunks[this.startChunkIdx + i])
+        }
+    }
+}
+
+/** Encapsulates calculations for a single-line text block. */
 class TextBlock {
     constructor(fontSize) {
         this.fontSize = fontSize
@@ -384,6 +837,10 @@ class TextBlock {
         this.glyphs.push({shape, vertices})
         this.prevChar = char
         this.prevFont = shape.font
+    }
+
+    GetCurrentPosition() {
+        return this.curX
     }
 
     /**
