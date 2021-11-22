@@ -391,7 +391,8 @@ class TextBox {
             }
         }
 
-        let curAlignment = TextBox.Paragraph.Alignment.LEFT
+        /* Null is default alignment which depends on attachment point. */
+        let curAlignment = null
 
         for (const item of FlattenItems(formattedText)) {
             switch(item.type) {
@@ -431,11 +432,12 @@ class TextBox {
                 case "d":
                     a = TextBox.Paragraph.Alignment.JUSTIFY
                     break
+                case "j":
+                    a = null
+                    break
                 }
-                if (a !== null) {
-                    this.curParagraph.SetAlignment(a)
-                    curAlignment = a
-                }
+                this.curParagraph.SetAlignment(a)
+                curAlignment = a
                 break
             }
         }
@@ -445,7 +447,7 @@ class TextBox {
         for (const p of this.paragraphs) {
             p.BuildLines(width)
         }
-        if (width === null) {
+        if (width === null || width === 0) {
             /* Find maximal paragraph width which will define overall box width. */
             width = 0
             for (const p of this.paragraphs) {
@@ -455,8 +457,23 @@ class TextBox {
                 }
             }
         }
+
+        let defaultAlignment = TextBox.Paragraph.Alignment.LEFT
+        switch (attachment) {
+        case MTextAttachment.TOP_CENTER:
+        case MTextAttachment.MIDDLE_CENTER:
+        case MTextAttachment.BOTTOM_CENTER:
+            defaultAlignment = TextBox.Paragraph.Alignment.CENTER
+            break
+        case MTextAttachment.TOP_RIGHT:
+        case MTextAttachment.MIDDLE_RIGHT:
+        case MTextAttachment.BOTTOM_RIGHT:
+            defaultAlignment = TextBox.Paragraph.Alignment.RIGHT
+            break
+        }
+
         for (const p of this.paragraphs) {
-            p.ApplyAlignment(width)
+            p.ApplyAlignment(width, defaultAlignment)
         }
 
         /* Box local coordinates have top-left corner origin, so Y values are negative. The
@@ -558,7 +575,7 @@ TextBox.Paragraph = class {
         this.textBox = textBox
         this.chunks = []
         this.curChunk = null
-        this.alignment = TextBox.Paragraph.Alignment.LEFT
+        this.alignment = null
         this.lines = null
     }
 
@@ -612,7 +629,9 @@ TextBox.Paragraph = class {
         for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
             const chunk = this.chunks[curChunkIdx]
             const chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
-            if (boxWidth !== null && curWidth !== 0 && curWidth + chunkWidth > boxWidth) {
+            if (boxWidth !== null && boxWidth !== 0 && curWidth !== 0 &&
+                curWidth + chunkWidth > boxWidth) {
+
                 CommitLine()
             }
             chunk.position = curWidth
@@ -636,10 +655,10 @@ TextBox.Paragraph = class {
         return maxWidth
     }
 
-    ApplyAlignment(boxWidth) {
+    ApplyAlignment(boxWidth, defaultAlignment) {
         if (this.lines) {
             for (const line of this.lines) {
-                line.ApplyAlignment(boxWidth)
+                line.ApplyAlignment(boxWidth, defaultAlignment)
             }
         }
     }
@@ -744,8 +763,9 @@ TextBox.Paragraph.Line = class {
         this.width = width
     }
 
-    ApplyAlignment(boxWidth) {
-        switch (this.paragraph.alignment) {
+    ApplyAlignment(boxWidth, defaultAlignment) {
+        let alignment = this.paragraph.alignment ?? defaultAlignment
+        switch (alignment) {
         case TextBox.Paragraph.Alignment.LEFT:
             break
         case TextBox.Paragraph.Alignment.CENTER: {
