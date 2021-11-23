@@ -6,6 +6,12 @@ import {ColorCode, DxfScene} from "./DxfScene"
 import {OrbitControls} from "./OrbitControls"
 import {RBTree} from "./RBTree"
 
+/** Level in "message" events. */
+const MessageLevel = Object.freeze({
+    INFO: "info",
+    WARN: "warn",
+    ERROR: "error"
+})
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
 export class DxfViewer {
@@ -193,8 +199,18 @@ export class DxfViewer {
 
         this._Emit("loaded")
 
-        this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
-                     scene.bounds.minY - scene.origin.y, scene.bounds.maxY - scene.origin.y)
+        if (scene.bounds) {
+            this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
+                         scene.bounds.minY - scene.origin.y, scene.bounds.maxY - scene.origin.y)
+        } else {
+            this._Message("Empty document", MessageLevel.WARN)
+        }
+
+        if (this.hasMissingChars) {
+            this._Message("Some characters cannot be properly displayed due to missing fonts",
+                          MessageLevel.WARN)
+        }
+
         this._CreateControls()
         this.Render()
     }
@@ -327,6 +343,7 @@ export class DxfViewer {
      *  * "pointerdown" - Details: {domEvent, position:{x,y}}, position is in scene coordinates.
      *  * "pointerup"
      *  * "viewChanged"
+     *  * "message" - Some message from the viewer. {message: string, level: string}.
      *
      * @param eventName {string}
      * @param eventHandler {function} Accepts event object.
@@ -373,6 +390,10 @@ export class DxfViewer {
 
     _Emit(eventName, data = null) {
         this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, { detail: data }))
+    }
+
+    _Message(message, level = MessageLevel.INFO) {
+        this._Emit("message", {message, level})
     }
 
     _OnPointerEvent(e) {
@@ -604,6 +625,8 @@ export class DxfViewer {
         return color
     }
 }
+
+DxfViewer.MessageLevel = MessageLevel
 
 DxfViewer.DefaultOptions = {
     canvasWidth: 400,
