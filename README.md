@@ -68,3 +68,5 @@ time. Anything useful implemented in the corporate repository will be merged her
    (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
    processed.
  * Many less commonly used DXF features.
+
+![samples](https://user-images.githubusercontent.com/6065976/143092164-cced2f5f-1af3-42a4-9a71-5dba68df06e7.png)
