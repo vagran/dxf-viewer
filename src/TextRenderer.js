@@ -539,7 +539,7 @@ class TextBox {
         const transform = new Matrix3().translate(-origin.x, -origin.y)
             .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
 
-        let y = -(this.fontSize + (lineHeight - this.fontSize) / 2)
+        let y = -this.fontSize
         for (const p of this.paragraphs) {
             if (p.lines === null) {
                 y -= lineHeight

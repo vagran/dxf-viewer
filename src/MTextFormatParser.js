@@ -33,7 +33,7 @@ const shortFormats = new Set([
 ])
 
 const longFormats = new Set([
-    "f", "p", "Q", "H", "W", "S", "A", "C", "T"
+    "f", "F", "p", "Q", "H", "W", "S", "A", "C", "T"
 ])
 
 const validEscapes = new Set([

@@ -45,10 +45,10 @@ time. Anything useful implemented in the corporate repository will be merged her
    stream parser and thus buffers whole the file before parsing. This prevents from supporting big
    DXF file (above gigabyte) due to string size limit in JS engine (also making unnecessary memory
    waste for the buffer).
- * Multiline text blocks (MTEXT group).
  * Text styling. Currently, text rendering is using just the specified fonts in the specified order.
    DXF style and font attributes are ignored. Text glyphs are always rendered infilled.
  * [Special characters](https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html) in text.
+ * Advanced formatting support for MTEXT (fonts, coloring, stacking).
  * Line patterns - all lines are rendered in continuous style for now. I am going to use 1-D texture
    generated on preparation stage, texture coordinates (which should account pattern continuity flag
    in DXF vertices attributes), and a dedicated shader to implement this feature.
