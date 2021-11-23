@@ -321,8 +321,7 @@ export class DxfScene {
      * @param tessellationAngle {?number} Arc tessellation angle, default value is taken from scene
      *  options.
      * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
-     * @param transform {?Matrix3} Optional transform matrix for the arc. Applied before the arc is
-     *  positioned to the specified center.
+     * @param transform {?Matrix3} Optional transform matrix for the arc. Applied as last operation.
      */
     _GenerateArcVertices({vertices, center, radius, startAngle = null, endAngle = null,
                           tessellationAngle = null, yRadius = null, transform = null}) {
@@ -371,10 +370,10 @@ export class DxfScene {
             }
             const a = startAngle + i * step
             const v = new Vector2(radius * Math.cos(a), yRadius * Math.sin(a))
+            v.add(center)
             if (transform) {
                 v.applyMatrix3(transform)
             }
-            v.add(center)
             vertices.push(v)
         }
     }
@@ -433,7 +432,6 @@ export class DxfScene {
                 v.y = tx * sin + ty * cos + entity.center.y
             }
         }
-        //XXX extrusion direction mirror
         yield new Entity({
                              type: Entity.Type.POLYLINE,
                              vertices, layer, color, lineType,
@@ -1114,15 +1112,15 @@ export class DxfScene {
      * @return {?Matrix3} Null if not transform required.
      */
     _GetEntityExtrusionTransform(entity) {
-        //XXX For now just mirror Y axis if extrusion Z is negative. Should be investigated for
-        // proper calculation.
+        //XXX For now just mirror X axis if extrusion Z is negative. No full support for arbitrary
+        // OCS yet.
         if (!entity.hasOwnProperty("extrusionDirection")) {
             return null
         }
         if (entity.extrusionDirection.z > 0) {
             return null
         }
-        return new Matrix3().scale(1, -1)
+        return new Matrix3().scale(-1, 1)
     }
 
     /** @return {RenderBatch} */
