@@ -41,6 +41,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 72:
             entity.drawingDirection = curr.value;
             break;
+        case 101:
+            helpers.skipEmbeddedObject(scanner);
+            break;
         default:
             helpers.checkCommonEntityProperties(entity, curr);
             break;
