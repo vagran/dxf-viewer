@@ -1509,17 +1509,16 @@ class BlockContext {
     GetInsertionTransform(entity) {
         const mInsert = new Matrix3().translate(-this.origin.x, -this.origin.y)
         const yScale = entity.yScale || 1
-        let xScale = entity.xScale || 1
+        const xScale = entity.xScale || 1
         const rotation = -(entity.rotation || 0) * Math.PI / 180
         let x = entity.position.x
         const y = entity.position.y
-        if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
-            xScale = -xScale
-            x = -x
-        }
         mInsert.scale(xScale, yScale)
         mInsert.rotate(rotation)
         mInsert.translate(x, y)
+        if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
+            mInsert.scale(-1, 1)
+        }
         if (this.type !== BlockContext.Type.INSTANTIATION) {
             return mInsert
         }
