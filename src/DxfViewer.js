@@ -463,7 +463,8 @@ export class DxfViewer {
             fragmentShader: shaders.fragment,
             depthTest: false,
             depthWrite: false,
-            glslVersion: three.GLSL3
+            glslVersion: three.GLSL3,
+            side: three.DoubleSide
         })
     }
 

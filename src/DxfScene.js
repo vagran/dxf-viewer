@@ -193,6 +193,12 @@ export class DxfScene {
         case "MTEXT":
             renderEntities = this._DecomposeMText(entity, blockCtx)
             break
+        case "3DFACE":
+            renderEntities = this._Decompose3DFace(entity, blockCtx)
+            break
+        case "SOLID":
+            renderEntities = this._DecomposeSolid(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -570,6 +576,93 @@ export class DxfScene {
                 shape: true
             })
             this._ProcessEntity(entity, blockCtx)
+        }
+    }
+
+    *_Decompose3DFace(entity, blockCtx) {
+        yield *this._DecomposeFace(entity, entity.vertices, blockCtx, this.options.wireframeMesh)
+    }
+
+    *_DecomposeSolid(entity, blockCtx) {
+        yield *this._DecomposeFace(entity, entity.points, blockCtx, false,
+                                   this._GetEntityExtrusionTransform(entity))
+    }
+
+    *_DecomposeFace(entity, vertices, blockCtx, wireframe, transform = null) {
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+
+        function IsValidTriangle(v1, v2, v3) {
+            const e1 = new Vector2().subVectors(v2, v1)
+            const e2 = new Vector2().subVectors(v3, v1)
+            const area = Math.abs(e1.cross(e2))
+            return area > Number.EPSILON
+        }
+
+        const v0 = new Vector2(vertices[0].x, vertices[0].y)
+        const v1 = new Vector2(vertices[1].x, vertices[1].y)
+        const v2 = new Vector2(vertices[2].x, vertices[2].y)
+        let v3 = null
+
+        let hasFirstTriangle = IsValidTriangle(v0, v1, v2)
+        let hasSecondTriangle = false
+
+        if (vertices.length > 3) {
+            /* Fourth vertex may be the same as one of the previous vertices, so additional triangle
+             * for degeneration.
+             */
+
+            v3 = new Vector2(vertices[3].x, vertices[3].y)
+            hasSecondTriangle = IsValidTriangle(v0, v2, v3)
+            if (transform) {
+                v3.applyMatrix3(transform)
+            }
+        }
+        if (transform) {
+            v0.applyMatrix3(transform)
+            v1.applyMatrix3(transform)
+            v2.applyMatrix3(transform)
+        }
+
+        if (!hasFirstTriangle && !hasSecondTriangle) {
+            return
+        }
+
+        if (wireframe) {
+            const _vertices = []
+            if (hasFirstTriangle && !hasSecondTriangle) {
+                _vertices.push(v0, v1, v2)
+            } if (!hasFirstTriangle && hasSecondTriangle) {
+                _vertices.push(v1, v3, v2)
+            } else {
+                _vertices.push(v0, v1, v3, v2)
+            }
+            yield new Entity({
+                type: Entity.Type.POLYLINE,
+                vertices: _vertices, layer, color,
+                shape: true
+            })
+
+        } else {
+            const _vertices = []
+            const indices = []
+            if (hasFirstTriangle) {
+                _vertices.push(v0, v1, v2)
+                indices.push(0, 1, 2)
+            }
+            if (hasSecondTriangle) {
+                if (!hasFirstTriangle) {
+                    _vertices.push(v1, v2)
+                    indices.push(0, 1, 2)
+                } else {
+                    indices.push(1, 2, 3)
+                }
+                _vertices.push(v3)
+            }
+            yield new Entity({
+                type: Entity.Type.TRIANGLES,
+                vertices: _vertices, indices, layer, color
+            })
         }
     }
 
@@ -1764,6 +1857,8 @@ DxfScene.DefaultOptions = {
     arcTessellationAngle: 10 / 180 * Math.PI,
     /** Divide arc to at least the specified number of segments. */
     minArcTessellationSubdivisions: 8,
+    /** Render meshes (3DFACE group) as wireframe instead of solid. */
+    wireframeMesh: false,
     /** Text rendering options. */
-    textOptions: TextRenderer.DefaultOptions
+    textOptions: TextRenderer.DefaultOptions,
 }
