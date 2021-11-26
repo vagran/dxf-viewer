@@ -655,7 +655,7 @@ DxfViewer.DefaultOptions = {
      * invisible on current background color.
      */
     blackWhiteInversion: true,
-    /** Size in pixels for rasterized points. */
+    /** Size in pixels for rasterized points (dot mark). */
     pointSize: 2,
     /** Target angle for each segment of tessellated arc. */
     arcTessellationAngle: 6 / 180 * Math.PI,

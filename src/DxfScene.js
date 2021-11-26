@@ -450,7 +450,7 @@ export class DxfScene {
             /* Points not displayed. */
             return
         }
-        if (this.pdSize <= 0) {
+        if (this.pdMode !== PdMode.DOT && this.pdSize <= 0) {
             /* Currently not supported. */
             return
         }
