@@ -613,7 +613,7 @@ export class DxfScene {
              */
 
             v3 = new Vector2(vertices[3].x, vertices[3].y)
-            hasSecondTriangle = IsValidTriangle(v0, v2, v3)
+            hasSecondTriangle = IsValidTriangle(v1, v3, v2)
             if (transform) {
                 v3.applyMatrix3(transform)
             }
