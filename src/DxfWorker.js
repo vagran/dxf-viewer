@@ -2,6 +2,8 @@ import {DxfFetcher} from "./DxfFetcher"
 import {DxfScene} from "./DxfScene"
 import opentype from "opentype.js"
 
+const MSG_SIGNATURE = "DxfWorkerMsg"
+
 /** Wraps web-worker instance and provides unified interface to its services, including the when
  * web-worker is not used and all heavy operations are performed in main thread.
  */
@@ -50,14 +52,18 @@ export class DxfWorker {
         }
     }
 
-    async _ProcessRequest(msg) {
-        const resp = {seq: msg.data.seq, type: msg.data.type}
+    async _ProcessRequest(event) {
+        const msg = event.data
+        if (msg.signature !== MSG_SIGNATURE) {
+            console.log(`Message with bad signature: ${msg}`)
+            return
+        }
+        const resp = {seq: msg.seq, type: msg.type, signature: MSG_SIGNATURE}
         const transfers = []
         try {
-            resp.data = await this._ProcessRequestMessage(msg.data.type, msg.data.data, transfers,
-                                                          msg.data.seq)
+            resp.data = await this._ProcessRequestMessage(msg.type, msg.data, transfers, msg.seq)
         } catch (error) {
-            console.log(error)
+            console.error(error)
             resp.error = String(error)
         }
         this.worker.postMessage(resp, transfers)
@@ -88,21 +94,26 @@ export class DxfWorker {
         }
     }
 
-    async _ProcessResponse(msg) {
-        const seq = msg.data.seq
+    async _ProcessResponse(event) {
+        const msg = event.data
+        if (msg.signature !== MSG_SIGNATURE) {
+            console.log(`Message with bad signature: ${msg}`)
+            return
+        }
+        const seq = msg.seq
         const req = this.requests.get(seq)
         if (!req) {
             console.error("Unmatched message sequence: ", seq)
             return
         }
-        const data = msg.data.data
-        if (msg.data.type === DxfWorker.WorkerMsg.PROGRESS && req.progressCbk) {
+        const data = msg.data
+        if (msg.type === DxfWorker.WorkerMsg.PROGRESS && req.progressCbk) {
             req.progressCbk(data.phase, data.size, data.totalSize)
             return
         }
         this.requests.delete(seq)
-        if (msg.data.hasOwnProperty("error")) {
-            req.SetError(msg.data.error)
+        if (msg.hasOwnProperty("error")) {
+            req.SetError(msg.error)
         } else {
             req.SetResponse(data)
         }
@@ -119,7 +130,7 @@ export class DxfWorker {
         const seq = this.reqSeq++
         const req = new DxfWorker.Request(seq, progressCbk)
         this.requests.set(seq, req)
-        this.worker.postMessage({ seq, type, data })
+        this.worker.postMessage({ seq, type, data, signature: MSG_SIGNATURE})
         return await req.GetResponse()
     }
 
@@ -127,7 +138,8 @@ export class DxfWorker {
         this.worker.postMessage({
             seq,
             type: DxfWorker.WorkerMsg.PROGRESS,
-            data: {phase, size, totalSize}
+            data: {phase, size, totalSize},
+            signature: MSG_SIGNATURE
         })
     }
 
