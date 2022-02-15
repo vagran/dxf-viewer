@@ -55,7 +55,7 @@ export class DxfWorker {
     async _ProcessRequest(event) {
         const msg = event.data
         if (msg.signature !== MSG_SIGNATURE) {
-            console.log(`Message with bad signature: ${msg}`)
+            console.log("Message with bad signature", msg)
             return
         }
         const resp = {seq: msg.seq, type: msg.type, signature: MSG_SIGNATURE}
@@ -97,7 +97,7 @@ export class DxfWorker {
     async _ProcessResponse(event) {
         const msg = event.data
         if (msg.signature !== MSG_SIGNATURE) {
-            console.log(`Message with bad signature: ${msg}`)
+            console.log("Message with bad signature", msg)
             return
         }
         const seq = msg.seq
