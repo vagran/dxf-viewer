@@ -1,5 +1,7 @@
 # DXF viewer
 
+*If you just need to view your DXF, [click here](https://vagran.github.io/dxf-viewer-example/).*
+
 This package provides DXF 2D viewer component written in JavaScript. It renders drawings using WebGL 
 (via [three.js](https://threejs.org) library). It was carefully crafted with performance in mind, 
 intended for drawing huge real-world files without performance problems.
