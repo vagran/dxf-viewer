@@ -152,6 +152,10 @@ export class DxfViewer {
      *  invoke DxfViewer.SetupWorker() function.
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
+        if (url === null || url === undefined) {
+            throw new Error("`url` parameter is not specified")
+        }
+
         this._EnsureRenderer()
 
         this.Clear()
@@ -535,9 +539,9 @@ export class DxfViewer {
             in vec3 instanceTransform1;
             ` : ""
         const fullInstanceTransform = instanceType === InstanceType.FULL ?
-            `  
+            `
             pos.xy = mat2(instanceTransform0[0], instanceTransform1[0],
-                          instanceTransform0[1], instanceTransform1[1]) * pos.xy + 
+                          instanceTransform0[1], instanceTransform1[1]) * pos.xy +
                      vec2(instanceTransform0[2], instanceTransform1[2]);
             ` : ""
 
@@ -546,7 +550,7 @@ export class DxfViewer {
             in vec2 instanceTransform;
             ` : ""
         const pointInstanceTransform = instanceType === InstanceType.POINT ?
-            `  
+            `
             pos.xy += instanceTransform;
             ` : ""
 
@@ -555,7 +559,7 @@ export class DxfViewer {
 
         return {
             vertex: `
-           
+
             precision highp float;
             precision highp int;
             in vec2 position;
@@ -564,7 +568,7 @@ export class DxfViewer {
             uniform mat4 modelViewMatrix;
             uniform mat4 projectionMatrix;
             ${pointSizeUniform}
-            
+
             void main() {
                 vec4 pos = vec4(position, 0.0, 1.0);
                 ${fullInstanceTransform}
@@ -574,12 +578,12 @@ export class DxfViewer {
             }
             `,
             fragment: `
-            
+
             precision highp float;
             precision highp int;
             uniform vec3 color;
             out vec4 fragColor;
-            
+
             void main() {
                 fragColor = vec4(color, 1.0);
             }
