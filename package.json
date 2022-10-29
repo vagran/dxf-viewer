@@ -1,22 +1,28 @@
 {
-  "name": "dxf-viewer",
-  "version": "1.0.15",
-  "description": "JavaScript DXF file viewer",
-  "main": "src/index.js",
-  "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
-  "license": "Mozilla Public License 2.0",
-  "repository": "https://github.com/vagran/dxf-viewer",
-  "keywords": [
-    "dxf",
-    "viewer",
-    "javascript",
-    "webgl",
-    "html5",
-    "cad"
-  ],
-  "dependencies": {
-    "three": "^0.137.5",
-    "loglevel": "^1.8.0",
-    "opentype.js": "^1.3.4"
-  }
+    "name": "dxf-viewer",
+    "version": "1.0.15",
+    "description": "JavaScript DXF file viewer",
+    "main": "src/index.js",
+    "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
+    "license": "Mozilla Public License 2.0",
+    "repository": "https://github.com/vagran/dxf-viewer",
+    "keywords": [
+        "dxf",
+        "viewer",
+        "javascript",
+        "webgl",
+        "html5",
+        "cad"
+    ],
+    "files": [
+        "src",
+        "README.md",
+        "LICENSE",
+        "CONTRIBUTORS"
+    ],
+    "dependencies": {
+        "three": "^0.137.5",
+        "loglevel": "^1.8.0",
+        "opentype.js": "^1.3.4"
+    }
 }
