@@ -12,10 +12,9 @@ Deployed demo: https://vagran.github.io/dxf-viewer-example/
 
 The package is released under the Mozilla Public License 2.0.
 
-This is community version of the viewer. It is initially published in the
-[corporate repository](https://github.com/ugcs/ugcs-dxf-viewer) and is used in production in
-[Atlas](https://atlas.ugcs.com) project. There it will be mostly maintained for project-specific 
-needs. The community version will receive all generic features and bug fixes.
+*The viewer was initially published in the
+[corporate repository](https://github.com/ugcs/ugcs-dxf-viewer) (mostly dead now) and is used in 
+production in [Atlas](https://atlas.ugcs.com) project.*
 
 ## Install
 
