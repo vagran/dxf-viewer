@@ -713,6 +713,7 @@ export class DxfScene {
      */
     _ProcessInsert(entity, blockCtx = null) {
         if (blockCtx) {
+            //XXX handle indirect recursion
             if (blockCtx.name === entity.name) {
                 console.warn("Recursive block reference: " + blockCtx.name)
                 return
@@ -745,8 +746,14 @@ export class DxfScene {
         const lineType = this._GetLineType(entity, null, null)
         //XXX apply extrusion direction
         const transform = block.InstantiationContext().GetInsertionTransform(entity)
-        /* Update bounding box and origin with transformed block origin. */
-        this._UpdateBounds(new Vector2().applyMatrix3(transform))
+
+        /* Update bounding box and origin with transformed block bounds corner points. */
+        const bounds = block.bounds
+        this._UpdateBounds(new Vector2(bounds.minX, bounds.minY).applyMatrix3(transform))
+        this._UpdateBounds(new Vector2(bounds.maxX, bounds.maxY).applyMatrix3(transform))
+        this._UpdateBounds(new Vector2(bounds.minX, bounds.maxY).applyMatrix3(transform))
+        this._UpdateBounds(new Vector2(bounds.maxX, bounds.minY).applyMatrix3(transform))
+
         transform.translate(-this.origin.x, -this.origin.y)
         //XXX grid instancing not supported yet
         if (block.flatten) {
@@ -1518,6 +1525,8 @@ class Block {
         /* Definition batches. Used for root blocks flattening. */
         this.batches = []
         this.flatten = false
+        /** Bounds in block coordinates (with offset applied). */
+        this.bounds = null
     }
 
     /** Set block flattening flag based on usage statistics.
@@ -1558,6 +1567,23 @@ class Block {
     InstantiationContext() {
         return new BlockContext(this, BlockContext.Type.INSTANTIATION)
     }
+
+    UpdateBounds(v) {
+        if (this.bounds === null) {
+            this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
+        } else {
+            if (v.x < this.bounds.minX) {
+                this.bounds.minX = v.x
+            } else if (v.x > this.bounds.maxX) {
+                this.bounds.maxX = v.x
+            }
+            if (v.y < this.bounds.minY) {
+                this.bounds.minY = v.y
+            } else if (v.y > this.bounds.maxY) {
+                this.bounds.maxY = v.y
+            }
+        }
+    }
 }
 
 class BlockContext {
@@ -1587,10 +1613,16 @@ class BlockContext {
         }
         this.block.verticesCount++
         if (this.block.offset === null) {
+            /* This is the first vertex. Take it as a block origin. So the result is always zero
+             * vector for the first vertex.
+             */
             this.block.offset = result
-            return new Vector2()
+            const v = new Vector2()
+            this.block.UpdateBounds(v)
+            return v
         }
         result.sub(this.block.offset)
+        this.block.UpdateBounds(result)
         return result
     }
 
