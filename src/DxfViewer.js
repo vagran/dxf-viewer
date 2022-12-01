@@ -381,9 +381,15 @@ export class DxfViewer {
         const controls = this.controls = new OrbitControls(this.camera, this.canvas)
         controls.enableRotate = false
         controls.mouseButtons = {
-            LEFT: three.MOUSE.PAN
+            LEFT: three.MOUSE.PAN,
+            MIDDLE: three.MOUSE.DOLLY
+        }
+        controls.touches = {
+            ONE: three.TOUCH.PAN,
+            TWO: three.TOUCH.DOLLY_PAN
         }
         controls.zoomSpeed = 3
+        controls.mouseZoomSpeedFactor = 0.05
         controls.target = new three.Vector3(this.camera.position.x, this.camera.position.y, 0)
         controls.addEventListener("change", () => {
             this._Emit("viewChanged")

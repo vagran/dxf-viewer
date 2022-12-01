@@ -51,6 +51,7 @@ export const OrbitControls = function ( object, domElement ) {
 	// Set to false to disable zooming
 	this.enableZoom = true;
 	this.zoomSpeed = 1.0;
+	this.mouseZoomSpeedFactor = 1;
 
 	// Set to false to disable rotating
 	this.enableRotate = true;
@@ -338,6 +339,7 @@ export const OrbitControls = function ( object, domElement ) {
 	var panEnd = new THREE.Vector2();
 	var panDelta = new THREE.Vector2();
 
+	var dollyCenter = new THREE.Vector2();
 	var dollyStart = new THREE.Vector2();
 	var dollyEnd = new THREE.Vector2();
 	var dollyDelta = new THREE.Vector2();
@@ -348,9 +350,9 @@ export const OrbitControls = function ( object, domElement ) {
 
 	}
 
-	function getZoomScale() {
+	function getZoomScale( isMouseMovement ) {
 
-		return Math.pow( 0.95, scope.zoomSpeed );
+		return Math.pow( 0.95, scope.zoomSpeed * ( isMouseMovement ? scope.mouseZoomSpeedFactor : 1 ));
 
 	}
 
@@ -512,6 +514,8 @@ export const OrbitControls = function ( object, domElement ) {
 
 	function handleMouseDownDolly( event ) {
 
+		const canvasRect = scope.domElement.getBoundingClientRect();
+		dollyCenter.set( event.clientX - canvasRect.left, event.clientY - canvasRect.top );
 		dollyStart.set( event.clientX, event.clientY );
 
 	}
@@ -548,11 +552,11 @@ export const OrbitControls = function ( object, domElement ) {
 
 		if ( dollyDelta.y > 0 ) {
 
-			dollyOut( getZoomScale() );
+			dollyOut( getZoomScale(true), dollyCenter );
 
 		} else if ( dollyDelta.y < 0 ) {
 
-			dollyIn( getZoomScale() );
+			dollyIn( getZoomScale(true), dollyCenter );
 
 		}
 
@@ -677,6 +681,10 @@ export const OrbitControls = function ( object, domElement ) {
 	}
 
 	function handleTouchStartDolly( event ) {
+		const canvasRect = scope.domElement.getBoundingClientRect();
+		dollyCenter.set(
+			(event.touches[0].clientX + event.touches[1].clientX) / 2 - canvasRect.left,
+			(event.touches[0].clientY + event.touches[1].clientY) / 2 - canvasRect.top );
 
 		var dx = event.touches[ 0 ].pageX - event.touches[ 1 ].pageX;
 		var dy = event.touches[ 0 ].pageY - event.touches[ 1 ].pageY;
@@ -762,9 +770,9 @@ export const OrbitControls = function ( object, domElement ) {
 
 		dollyEnd.set( 0, distance );
 
-		dollyDelta.set( 0, Math.pow( dollyEnd.y / dollyStart.y, scope.zoomSpeed ) );
+		dollyDelta.set( 0, dollyEnd.y / dollyStart.y );
 
-		dollyOut( dollyDelta.y );
+		dollyOut( dollyDelta.y, dollyCenter );
 
 		dollyStart.copy( dollyEnd );
 
