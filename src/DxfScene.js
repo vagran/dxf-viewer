@@ -14,6 +14,8 @@ const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 /** Number of subdivisions per spline point. */
 const SPLINE_SUBDIVISION = 4
+/** Regex for parsing special characters in text entities. */
+const SPECIAL_CHARS_RE = /(?:%%([dpc]))|(?:\\U\+([0-9a-fA-F]{4}))/g
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -111,13 +113,13 @@ export class DxfScene {
         const ProcessEntity = async (entity) => {
             let ret
             if (entity.type === "TEXT") {
-                ret = await this.textRenderer.FetchFonts(entity.text)
+                ret = await this.textRenderer.FetchFonts(this._ParseSpecialChars(entity.text))
             } else if (entity.type === "MTEXT") {
                 const parser = new MTextFormatParser()
                 parser.Parse(entity.text)
                 //XXX formatted MTEXT may specify some fonts explicitly, this is not yet supported
                 for (const text of parser.GetText()) {
-                    if (!await this.textRenderer.FetchFonts(text)) {
+                    if (!await this.textRenderer.FetchFonts(this._ParseSpecialChars(text))) {
                         ret = false
                         break
                     }
@@ -673,7 +675,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         yield* this.textRenderer.Render({
-            text: entity.text,
+            text: this._ParseSpecialChars(entity.text),
             fontSize: entity.textHeight,
             startPos: entity.startPoint,
             endPos: entity.endPoint,
@@ -692,7 +694,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         const parser = new MTextFormatParser()
-        parser.Parse(entity.text)
+        parser.Parse(this._ParseSpecialChars(entity.text))
         yield* this.textRenderer.RenderMText({
             formattedText: parser.GetContent(),
             fontSize: entity.height,
@@ -1221,6 +1223,35 @@ export class DxfScene {
             return null
         }
         return new Matrix3().scale(-1, 1)
+    }
+
+    /**
+     * Parse special characters in text entities and convert them to corresponding unicode
+     * characters.
+     * https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html
+     * @param {string} text Raw string.
+     * @return {string} String with special characters replaced.
+     */
+    _ParseSpecialChars(text) {
+        return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
+            if (p1 !== undefined) {
+                switch (p1) {
+                case "d":
+                    return "\xb0"
+                case "p":
+                    return "\xb1"
+                case "c":
+                    return "\u2205"
+                }
+            } else if (p2 !== undefined) {
+                const code = parseInt(p2, 16)
+                if (isNaN(code)) {
+                    return match
+                }
+                return String.fromCharCode(code)
+            }
+            return match
+        })
     }
 
     /** @return {RenderBatch} */
