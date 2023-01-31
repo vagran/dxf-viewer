@@ -73,7 +73,6 @@ export class DxfViewer {
         renderer.setSize(this.canvasWidth, this.canvasHeight)
 
         this.canvas = renderer.domElement
-        this.canvas.getContext("webgl", { premultipliedAlpha: false })
         domContainer.style.display = "block"
         if (options.autoResize) {
             this.canvas.style.position = "absolute"
