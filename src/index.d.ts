@@ -60,6 +60,7 @@ export declare class DxfViewer {
     GetScene(): THREE.Scene
     GetCamera(): THREE.Camera
     GetOrigin(): THREE.Vector2
+    GetRenderer(): THREE.WebGLRenderer | null
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
 }
