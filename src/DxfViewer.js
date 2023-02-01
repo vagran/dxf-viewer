@@ -104,6 +104,14 @@ export class DxfViewer {
         return Boolean(this.renderer)
     }
 
+
+    /**
+     * @returns {three.WebGLRenderer | null} Returns the created WebGL canvas.
+     */
+    GetRenderer(){
+        return this.renderer;
+    }
+
     GetCanvas() {
         return this.canvas
     }
