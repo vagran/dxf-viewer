@@ -230,6 +230,8 @@ export class DxfViewer {
         this._EnsureRenderer()
         this.renderer.render(this.scene, this.camera)
     }
+
+     /** @return {OrbitControls} created OrbitControls */
     GetCreatedControllers() {
         return this.controls;
     }

@@ -63,6 +63,7 @@ export declare class DxfViewer {
     GetRenderer(): THREE.WebGLRenderer | null
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
+    GetCreatedControllers(): OrbitControls
 }
 
 export declare namespace DxfViewer {
