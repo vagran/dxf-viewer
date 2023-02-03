@@ -68,3 +68,6 @@ export declare class DxfViewer {
 export declare namespace DxfViewer {
     export function SetupWorker(): void
 }
+export declare namespace DxfWorker { 
+    export function GetWorker():Worker
+}

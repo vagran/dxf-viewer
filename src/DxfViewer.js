@@ -230,12 +230,22 @@ export class DxfViewer {
         this._EnsureRenderer()
         this.renderer.render(this.scene, this.camera)
     }
+    GetCreatedControllers() {
+        return this.controls;
+    }
 
     /** @return {Iterable<{name:String, color:number}>} List of layer names. */
     GetLayers() {
         const result = []
         for (const lyr of this.layers.values()) {
             result.push({name: lyr.name, color: this._TransformColor(lyr.color)})
+        }
+        return result
+    }
+    GetBlocks(){
+        const result = []
+        for (const block of  this.blocks.get(batch.key.blockName)){
+            result.push({name: block.name})
         }
         return result
     }

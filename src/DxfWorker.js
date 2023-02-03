@@ -25,6 +25,10 @@ export class DxfWorker {
             this.progressCbk = null
         }
     }
+    
+    GetWorker = function (){
+        return this.worker
+    }
 
     /**
      * @param url DXF file URL.
