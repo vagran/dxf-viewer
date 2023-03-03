@@ -82,6 +82,11 @@ export class DxfScene {
                 block?.RegisterInsert(entity)
             }
         }
+        for (const entity of dxf.entities) {
+            if (entity.type === 'DIMENSION') {
+                this._DecomposeDimension(entity, dxf);
+            }
+        }
 
         for (const block of this.blocks.values()) {
             if (block.data.hasOwnProperty("entities")) {
@@ -207,6 +212,19 @@ export class DxfScene {
         }
         for (const renderEntity of renderEntities) {
             this._ProcessEntity(renderEntity, blockCtx)
+        }
+    }
+
+    /**
+     * @param entity {Entity}
+     * @param dxf {?dxf}
+     */
+    _DecomposeDimension(entity, dxf) {
+        let decomposeBlock = dxf.blocks[entity.block];
+        if (decomposeBlock.entities) {
+            for (const entity of decomposeBlock.entities) {
+                this._ProcessDxfEntity(entity, entity.block);
+            }
         }
     }
 
