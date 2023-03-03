@@ -217,19 +217,6 @@ export class DxfScene {
 
     /**
      * @param entity {Entity}
-     * @param dxf {?dxf}
-     */
-    _DecomposeDimension(entity, dxf) {
-        let decomposeBlock = dxf.blocks[entity.block];
-        if (decomposeBlock.entities) {
-            for (const entity of decomposeBlock.entities) {
-                this._ProcessDxfEntity(entity, entity.block);
-            }
-        }
-    }
-
-    /**
-     * @param entity {Entity}
      * @param blockCtx {?BlockContext}
      */
     _ProcessEntity(entity, blockCtx = null) {
@@ -401,6 +388,20 @@ export class DxfScene {
                 v.applyMatrix3(transform)
             }
             vertices.push(v)
+        }
+    }
+
+    
+    /**
+     * @param entity {Entity}
+     * @param dxf {?dxf}
+     */
+     async _DecomposeDimension(entity, dxf) {
+        let decomposeBlock = dxf.blocks[entity.block];
+        if (decomposeBlock.entities) {
+            for (const entity of decomposeBlock.entities) {
+                this._ProcessDxfEntity(entity, entity.block);
+            }
         }
     }
 
