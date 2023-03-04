@@ -400,13 +400,7 @@ export class DxfScene {
         let decomposeBlock = data.blocks[entity.block];
         if (decomposeBlock && decomposeBlock.entities) {
             for (const entity of decomposeBlock.entities) {
-                switch (entity.dimensionType) {
-                    case 7:
-                        this._ProcessDxfEntity(entity, entity.block);
-                        break;
-                    default:
-                        break;
-                }
+                this._ProcessDxfEntity(entity, entity.block);
             }
         }
     }
