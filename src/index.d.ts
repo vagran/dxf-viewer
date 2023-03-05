@@ -46,21 +46,21 @@ export type EventName = "loaded" | "cleared" | "destroyed" | "resized" | "pointe
 
 export declare class DxfViewer {
     constructor(domContainer: HTMLElement, options: DxfViewerOptions | null)
-    HasRenderer(): boolean
-    GetCanvas(): HTMLCanvasElement
-    SetSize(width: number, height: number): void
-    Load(params: DxfViewerLoadParams): Promise<void>
-    Render(): void
-    GetLayers(): Iterable<LayerInfo>
-    ShowLayer(name: string, show: boolean): void
     Clear(): void
     Destroy(): void
-    SetView(center: THREE.Vector3, width: number): void
     FitView(minX: number, maxX: number, minY: number, maxY: number, padding: number): void
-    GetScene(): THREE.Scene
     GetCamera(): THREE.Camera
+    GetCanvas(): HTMLCanvasElement
+    GetLayers(): Iterable<LayerInfo>
     GetOrigin(): THREE.Vector2
     GetRenderer(): THREE.WebGLRenderer | null
+    GetScene(): THREE.Scene
+    HasRenderer(): boolean
+    Load(params: DxfViewerLoadParams): Promise<void>
+    Render(): void
+    SetSize(width: number, height: number): void
+    SetView(center: THREE.Vector3, width: number): void
+    ShowLayer(name: string, show: boolean): void
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
 }

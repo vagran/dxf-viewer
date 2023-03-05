@@ -104,9 +104,8 @@ export class DxfViewer {
         return Boolean(this.renderer)
     }
 
-
     /**
-     * @returns {three.WebGLRenderer | null} Returns the created WebGL canvas.
+     * @returns {three.WebGLRenderer | null} Returns the created Three.js renderer.
      */
     GetRenderer(){
         return this.renderer;
