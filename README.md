@@ -68,3 +68,7 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Many less commonly used DXF features.
 
 ![samples](https://user-images.githubusercontent.com/6065976/143092164-cced2f5f-1af3-42a4-9a71-5dba68df06e7.png)
+
+## Contributing
+
+See [contribution guideline](CONTRIBUTING.md) for details.
