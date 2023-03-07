@@ -15,7 +15,7 @@ const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 /** Number of subdivisions per spline point. */
 const SPLINE_SUBDIVISION = 4
 /** Regex for parsing special characters in text entities. */
-const SPECIAL_CHARS_RE = /(?:%%([dpc]))|(?:\\U\+([0-9a-fA-F]{4}))/g
+const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-fA-F]{4}))/g
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -1242,6 +1242,14 @@ export class DxfScene {
                     return "\xb1"
                 case "c":
                     return "\u2205"
+                case "o":
+                    /* Toggles overscore mode on and off, not implemented. */
+                    return ""
+                case "u":
+                    /* Toggles underscore mode on and off, not implemented. */
+                    return ""
+                case "%":
+                    return "%"
                 }
             } else if (p2 !== undefined) {
                 const code = parseInt(p2, 16)
