@@ -30,7 +30,7 @@ EntityParser.prototype.parseEntity = function(scanner, currentGroup) {
             entity.extrusionDirection = helpers.parsePoint(scanner);
             break;
         default: // check common entity attributes
-            helpers.checkCommonEntityProperties(entity, currentGroup);
+            helpers.checkCommonEntityProperties(entity, currentGroup, scanner);
             break;
         }
         currentGroup = scanner.next();

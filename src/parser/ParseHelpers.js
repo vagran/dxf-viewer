@@ -1,4 +1,5 @@
 import AUTO_CAD_COLOR_INDEX from './AutoCadColorIndex';
+import ExtendedDataParser from './ExtendedDataParser';
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
@@ -11,7 +12,7 @@ export function getAcadColor(index) {
 /**
  * Parses the 2D or 3D coordinate, vector, or point. When complete,
  * the scanner remains on the last group of the coordinate.
- * @param {*} scanner 
+ * @param {*} scanner
  */
 export function parsePoint(scanner) {
     var point = {};
@@ -39,7 +40,7 @@ export function parsePoint(scanner) {
         return point;
     }
     point.z = curr.value;
-    
+
     return point;
 }
 
@@ -64,10 +65,29 @@ export function skipEmbeddedObject(scanner) {
 /**
  * Attempts to parse codes common to all entities. Returns true if the group
  * was handled by this function.
- * @param {*} entity - the entity currently being parsed 
+ * @param {*} entity - the entity currently being parsed
  * @param {*} curr - the current group being parsed
  */
-export function checkCommonEntityProperties(entity, curr) {
+export function checkCommonEntityProperties(entity, curr, scanner) {
+    let xdataParser = null
+    while (curr.code >= 1000) {
+        if (xdataParser == null) {
+            xdataParser = new ExtendedDataParser()
+        }
+        if (xdataParser.Feed(curr)) {
+            xdataParser.Finish()
+            xdataParser = null
+        } else {
+            curr = scanner.next()
+        }
+    }
+    if (xdataParser) {
+        xdataParser.Finish(entity)
+        /* Groups following XDATA should be parsed on next iteration. */
+        scanner.rewind()
+        return true
+    }
+
     switch(curr.code) {
         case 0:
             entity.type = curr.value;
@@ -112,15 +132,6 @@ export function checkCommonEntityProperties(entity, curr) {
             break;
         case 420: // TrueColor Color
             entity.color = curr.value;
-            break;
-        case 1000: 
-            entity.extendedData = entity.extendedData || {};
-            entity.extendedData.customStrings = entity.extendedData.customStrings || []; 
-            entity.extendedData.customStrings.push(curr.value);
-            break;
-        case 1001: 
-            entity.extendedData = entity.extendedData || {};
-            entity.extendedData.applicationName = curr.value;
             break;
         default:
             return false;

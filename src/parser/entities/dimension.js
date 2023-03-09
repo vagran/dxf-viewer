@@ -16,6 +16,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 2: // Referenced block name
             entity.block = curr.value;
             break;
+        case 3: // Dimension style name
+            entity.styleName = curr.value;
+            break;
         case 10: // X coordinate of 'first alignment point'
             entity.anchorPoint = helpers.parsePoint(scanner);
             break;
@@ -53,7 +56,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.angle = curr.value;
             break;
         default: // check common entity attributes
-            helpers.checkCommonEntityProperties(entity, curr);
+            helpers.checkCommonEntityProperties(entity, curr, scanner);
             break;
         }
         curr = scanner.next();
@@ -61,5 +64,3 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
 
     return entity;
 };
-
-

@@ -50,7 +50,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.extrusionDirection = helpers.parsePoint(scanner);
             break;
         default:
-            helpers.checkCommonEntityProperties(entity, curr);
+            helpers.checkCommonEntityProperties(entity, curr, scanner);
             break;
         }
         curr = scanner.next();
@@ -84,7 +84,7 @@ function parseSeqEnd(scanner, curr) {
     curr = scanner.next();
     while(curr != 'EOF') {
         if (curr.code == 0) break;
-        helpers.checkCommonEntityProperties(entity, curr);
+        helpers.checkCommonEntityProperties(entity, curr, scanner);
         curr = scanner.next();
     }
 

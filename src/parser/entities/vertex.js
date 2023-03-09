@@ -52,10 +52,10 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.faceD = curr.value;
             break;
         default:
-            helpers.checkCommonEntityProperties(entity, curr);
+            helpers.checkCommonEntityProperties(entity, curr, scanner);
             break;
         }
-        
+
         curr = scanner.next();
     }
     return entity;

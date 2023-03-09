@@ -21,7 +21,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             curr = scanner.lastReadGroup;
             break;
         default:
-            helpers.checkCommonEntityProperties(entity, curr);
+            helpers.checkCommonEntityProperties(entity, curr, scanner);
             break;
         }
         curr = scanner.next();
@@ -35,7 +35,7 @@ function parse3dFaceVertices(scanner, curr) {
     var vertexIsStarted = false;
     var vertexIsFinished = false;
     var verticesPer3dFace = 4; // there can be up to four vertices per face, although 3 is most used for TIN
-    
+
     for (i = 0; i <= verticesPer3dFace; i++) {
         var vertex = {};
         while (curr !== 'EOF') {

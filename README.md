@@ -71,4 +71,4 @@ time. Anything useful implemented in the corporate repository will be merged her
 
 ## Contributing
 
-See [contribution guideline](CONTRIBUTING.md) for details.
+See [contribution guidelines](CONTRIBUTING.md) for details.
