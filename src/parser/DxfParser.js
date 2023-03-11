@@ -585,7 +585,9 @@ DxfParser.prototype._parse = function(dxfString) {
 
             switch(curr.code) {
                 case 2: // layer name
-                    layer.name = curr.value;
+                    layer.name = curr.value.replace(/\\u\+([0-9A-F]{4})/ig, function (_, group1) {
+                        return String.fromCharCode(parseInt(group1, 16));
+                    });
                     layerName = curr.value;
                     curr = scanner.next();
                     break;
