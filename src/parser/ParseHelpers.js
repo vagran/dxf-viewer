@@ -127,3 +127,14 @@ export function checkCommonEntityProperties(entity, curr) {
     }
     return true;
 }
+
+/**
+* Convert unicode characters (\U+XXXX) to its equivalent in ASCII characters
+* @param {string} text Raw string.
+* @return {string} String with special characters replaced.
+*/
+export function parseUnicodeChars(text) {
+    return text.replace(/\\u\+([0-9A-F]{4})/ig, function (_, group1) {
+        return String.fromCharCode(parseInt(group1, 16));
+    });
+}

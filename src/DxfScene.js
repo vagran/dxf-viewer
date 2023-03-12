@@ -1225,14 +1225,14 @@ export class DxfScene {
         return new Matrix3().scale(-1, 1)
     }
 
-    /**
+     /**
      * Parse special characters in text entities and convert them to corresponding unicode
      * characters.
      * https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html
      * @param {string} text Raw string.
      * @return {string} String with special characters replaced.
      */
-    _ParseSpecialChars(text) {
+      _ParseSpecialChars(text) {
         return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
             if (p1 !== undefined) {
                 switch (p1) {
@@ -1354,6 +1354,7 @@ export class DxfScene {
         for (const layer of this.layers.values()) {
             scene.layers.push({
                 name: layer.name,
+                normalizedName: layer.normalizedName,
                 color: layer.color
             })
         }
