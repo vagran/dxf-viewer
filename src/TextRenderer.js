@@ -2,7 +2,47 @@ import {DxfScene, Entity} from "./DxfScene"
 import {ShapePath} from "three/src/extras/core/ShapePath"
 import {ShapeUtils} from "three/src/extras/ShapeUtils"
 import {Matrix3, Vector2} from "three"
-import {MTextFormatParser} from "./MTextFormatParser";
+import {MTextFormatParser} from "./MTextFormatParser"
+
+/** Regex for parsing special characters in text entities. */
+const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-fA-F]{4}))/g
+
+/**
+ * Parse special characters in text entities and convert them to corresponding unicode
+ * characters.
+ * https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html
+ * @param {string} text Raw string.
+ * @return {string} String with special characters replaced.
+ */
+export function ParseSpecialChars(text) {
+    return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
+        if (p1 !== undefined) {
+            switch (p1) {
+            case "d":
+                return "\xb0"
+            case "p":
+                return "\xb1"
+            case "c":
+                return "\u2205"
+            case "o":
+                /* Toggles overscore mode on and off, not implemented. */
+                return ""
+            case "u":
+                /* Toggles underscore mode on and off, not implemented. */
+                return ""
+            case "%":
+                return "%"
+            }
+        } else if (p2 !== undefined) {
+            const code = parseInt(p2, 16)
+            if (isNaN(code)) {
+                return match
+            }
+            return String.fromCharCode(code)
+        }
+        return match
+    })
+}
 
 /**
  * Helper class for rendering text.
@@ -88,6 +128,22 @@ export class TextRenderer {
 
     get canRender() {
         return this.fonts !== null && this.fonts.length > 0
+    }
+
+    /** Get width in model space units for a single line of text.
+     * @param text {string}
+     * @param fontSize {number}
+     */
+    GetLineWidth(text, fontSize) {
+        const block = new TextBlock(fontSize)
+        for (const char of text) {
+            const shape = this._GetCharShape(char)
+            if (!shape) {
+                continue
+            }
+            block.PushChar(char, shape)
+        }
+        return block.GetCurrentPosition()
     }
 
     /**
@@ -332,7 +388,7 @@ class Font {
 }
 
 /** TEXT group attribute 72 values. */
-const HAlign = Object.freeze({
+export const HAlign = Object.freeze({
     LEFT: 0,
     CENTER: 1,
     RIGHT: 2,
@@ -342,7 +398,7 @@ const HAlign = Object.freeze({
 })
 
 /** TEXT group attribute 73 values. */
-const VAlign = Object.freeze({
+export const VAlign = Object.freeze({
     BASELINE: 0,
     BOTTOM: 1,
     MIDDLE: 2,

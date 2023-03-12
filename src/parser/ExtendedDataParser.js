@@ -74,6 +74,11 @@ export default class ExtendedDataParser {
             return false
         }
 
+        if (this.lastString !== null) {
+            curSection.values.push(this._CreateValue(1000, this.lastString))
+            this.lastString = null
+        }
+
         curSection.values.push(this._CreateValue(curr.code, curr.value))
 
         return false

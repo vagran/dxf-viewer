@@ -75,7 +75,7 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
             xdataParser = new ExtendedDataParser()
         }
         if (xdataParser.Feed(curr)) {
-            xdataParser.Finish()
+            xdataParser.Finish(entity)
             xdataParser = null
         } else {
             curr = scanner.next()

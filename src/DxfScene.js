@@ -1,9 +1,12 @@
-import {DynamicBuffer, NativeType} from "./DynamicBuffer"
-import {BatchingKey} from "./BatchingKey"
-import {Matrix3, Vector2} from "three"
-import {TextRenderer} from "./TextRenderer"
-import {RBTree} from "./RBTree"
-import {MTextFormatParser} from "./MTextFormatParser";
+import { DynamicBuffer, NativeType } from "./DynamicBuffer"
+import { BatchingKey } from "./BatchingKey"
+import { Matrix3, Vector2 } from "three"
+import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer"
+import { RBTree } from "./RBTree"
+import { MTextFormatParser } from "./MTextFormatParser"
+import dimStyleCodes from './parser/DimStyleCodes'
+import { LinearDimension } from "./LinearDimension"
+
 
 /** Use 16-bit indices for indexed geometry. */
 const INDEXED_CHUNK_SIZE = 0x10000
@@ -14,8 +17,39 @@ const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 /** Number of subdivisions per spline point. */
 const SPLINE_SUBDIVISION = 4
-/** Regex for parsing special characters in text entities. */
-const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-fA-F]{4}))/g
+
+
+/** Default values for system variables. Entry may be either value or function to call for obtaining
+ * a value, the function `this` argument is DxfScene.
+ */
+const DEFAULT_VARS = {
+    DIMCLRT: 0,
+    /* https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2016/ENU/AutoCAD-Core/files/GUID-A17A69D7-25EF-4F57-B4EB-D53A56AB909C-htm.html */
+    DIMTXT: function() {
+        //XXX should select value for imperial or metric units
+        return 2.5 //XXX 0.18 for imperial
+    },
+    DIMDEC: 2, //XXX 4 for imperial,
+    DIMDSEP: ".", //XXX "," for imperial,
+    DIMRND: 0,
+    DIMZIN: 8, //XXX 0 for imperial,
+    DIMLFAC: 1,
+    DIMCLRD: 0,
+    DIMCLRE: 0,
+    DIMFXLON: false,
+    DIMFXL: 1,
+    DIMASZ: 2.5,//XXX 0.18 for imperial
+    DIMDLE: 0,
+    DIMEXE: 1.25, //XXX 0.18 for imperial
+    DIMEXO: 0.625, // XXX 0.0625 for imperial
+    DIMGAP: 0.625,//XXX for imperial
+    DIMSOXD: false,
+    DIMSE1: 0,
+    DIMSE2: 0,
+    DIMSD1: 0,
+    DIMSD2: 0,
+    DIMSAH: 0
+}
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
@@ -39,6 +73,10 @@ export class DxfScene {
         this.layers = new Map()
         /* Indexed by block name, value is Block. */
         this.blocks = new Map()
+        /** Indexed by dimension style name, value is DIMSTYLE object from parsed DXF. */
+        this.dimStyles = new Map()
+        /** Indexed by variable name (without leading '$'). */
+        this.vars = new Map()
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -59,11 +97,25 @@ export class DxfScene {
         this.pdMode = header["$PDMODE"] || 0
         this.pdSize = header["$PDSIZE"] || 0
 
+        for (const [name, value] of Object.entries(header)) {
+            if (name.startsWith("$")) {
+                this.vars.set(name.slice(1), value)
+            }
+        }
+
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 this.layers.set(layer.name, layer)
             }
         }
+
+        if(dxf.tables && dxf.tables.dimstyle) {
+            for (const [, style] of Object.entries(dxf.tables.dimstyle.dimStyles)) {
+                this.dimStyles.set(style.name, style)
+            }
+        }
+
+        console.log(JSON.stringify(Array.from(this.dimStyles.values())))//XXX
 
         if (dxf.blocks) {
             for (const [, block] of Object.entries(dxf.blocks)) {
@@ -113,18 +165,32 @@ export class DxfScene {
         const ProcessEntity = async (entity) => {
             let ret
             if (entity.type === "TEXT") {
-                ret = await this.textRenderer.FetchFonts(this._ParseSpecialChars(entity.text))
+                ret = await this.textRenderer.FetchFonts(ParseSpecialChars(entity.text))
+
             } else if (entity.type === "MTEXT") {
                 const parser = new MTextFormatParser()
                 parser.Parse(entity.text)
+                ret = true
                 //XXX formatted MTEXT may specify some fonts explicitly, this is not yet supported
                 for (const text of parser.GetText()) {
-                    if (!await this.textRenderer.FetchFonts(this._ParseSpecialChars(text))) {
+                    if (!await this.textRenderer.FetchFonts(ParseSpecialChars(text))) {
                         ret = false
                         break
                     }
                 }
+
+            } else if (entity.type === "DIMENSION") {
                 ret = true
+                const dim = this._CreateLinearDimension(entity)
+                if (dim) {
+                    for (const text of dim.GetTexts()) {
+                        if (!await this.textRenderer.FetchFonts(text)) {
+                            ret = false
+                            break
+                        }
+                    }
+                }
+
             } else {
                 throw new Error("Bad entity type")
             }
@@ -135,7 +201,7 @@ export class DxfScene {
         }
 
         for (const entity of dxf.entities) {
-            if (entity.type === "TEXT" || entity.type === "MTEXT") {
+            if (entity.type === "TEXT" || entity.type === "MTEXT" || entity.type === "DIMENSION") {
                 if (!await ProcessEntity(entity)) {
                     /* Failing to resolve some character means that all fonts have been loaded and
                      * checked. No mean to check the rest strings. However until it is encountered,
@@ -150,7 +216,9 @@ export class DxfScene {
         for (const block of this.blocks.values()) {
             if (block.data.hasOwnProperty("entities")) {
                 for (const entity of block.data.entities) {
-                    if (entity.type === "TEXT" || entity.type === "MTEXT") {
+                    if (entity.type === "TEXT" || entity.type === "MTEXT" ||
+                        entity.type === "DIMENSION") {
+
                         if (!await ProcessEntity(entity)) {
                             return
                         }
@@ -200,6 +268,9 @@ export class DxfScene {
             break
         case "SOLID":
             renderEntities = this._DecomposeSolid(entity, blockCtx)
+            break
+        case "DIMENSION":
+            renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
         default:
             console.log("Unhandled entity type: " + entity.type)
@@ -257,11 +328,11 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         yield new Entity({
-                             type: Entity.Type.LINE_SEGMENTS,
-                             vertices: entity.vertices,
-                             layer, color,
-                             lineType: this._GetLineType(entity, entity.vertices[0])
-                         })
+            type: Entity.Type.LINE_SEGMENTS,
+            vertices: entity.vertices,
+            layer, color,
+            lineType: this._GetLineType(entity, entity.vertices[0])
+        })
     }
 
     /** Generate vertices for bulged line segment.
@@ -395,10 +466,10 @@ export class DxfScene {
                                    startAngle: entity.startAngle, endAngle: entity.endAngle,
                                    transform: this._GetEntityExtrusionTransform(entity)})
         yield new Entity({
-                             type: Entity.Type.POLYLINE,
-                             vertices, layer, color, lineType,
-                             shape: entity.endAngle === undefined
-                         })
+            type: Entity.Type.POLYLINE,
+            vertices, layer, color, lineType,
+            shape: entity.endAngle === undefined
+        })
     }
 
     *_DecomposeCircle(entity, blockCtx) {
@@ -409,10 +480,10 @@ export class DxfScene {
         this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
                                    transform: this._GetEntityExtrusionTransform(entity)})
         yield new Entity({
-                             type: Entity.Type.POLYLINE,
-                             vertices, layer, color, lineType,
-                             shape: true
-                         })
+            type: Entity.Type.POLYLINE,
+            vertices, layer, color, lineType,
+            shape: true
+        })
     }
 
     *_DecomposeEllipse(entity, blockCtx) {
@@ -441,10 +512,10 @@ export class DxfScene {
             }
         }
         yield new Entity({
-                             type: Entity.Type.POLYLINE,
-                             vertices, layer, color, lineType,
-                             shape: entity.endAngle === undefined
-                         })
+            type: Entity.Type.POLYLINE,
+            vertices, layer, color, lineType,
+            shape: entity.endAngle === undefined
+        })
     }
 
     *_DecomposePoint(entity, blockCtx) {
@@ -675,7 +746,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         yield* this.textRenderer.Render({
-            text: this._ParseSpecialChars(entity.text),
+            text: ParseSpecialChars(entity.text),
             fontSize: entity.textHeight,
             startPos: entity.startPoint,
             endPos: entity.endPoint,
@@ -694,7 +765,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         const parser = new MTextFormatParser()
-        parser.Parse(this._ParseSpecialChars(entity.text))
+        parser.Parse(ParseSpecialChars(entity.text))
         yield* this.textRenderer.RenderMText({
             formattedText: parser.GetContent(),
             fontSize: entity.height,
@@ -706,6 +777,138 @@ export class DxfScene {
             width: entity.width,
             color, layer
         })
+    }
+
+    /**
+     * @return {?LinearDimension} Dimension handler instance, null if not possible to create from
+     * the provided entity.
+     */
+    _CreateLinearDimension(entity) {
+        const type = (entity.dimensionType || 0) & 0xf
+        /* For now support linear dimensions only. */
+        if ((type != 0 && type != 1) || !entity.linearOrAngularPoint1 ||
+            !entity.linearOrAngularPoint2 || !entity.anchorPoint) {
+
+            return null
+        }
+
+        let style = null
+        if (entity.hasOwnProperty("styleName")) {
+            style = this.dimStyles.get(entity.styleName)
+        }
+
+        const dim = new LinearDimension({
+            p1: new Vector2().copy(entity.linearOrAngularPoint1),
+            p2: new Vector2().copy(entity.linearOrAngularPoint2),
+            anchor: new Vector2().copy(entity.anchorPoint),
+            isAligned: type == 1,
+            angle: entity.angle,
+            text: entity.text
+
+        /* styleResolver */
+        }, valueName => {
+            return this._GetDimStyleValue(valueName, entity, style)
+
+        /* textWidthCalculator */
+        }, (text, fontSize) => {
+            return this.textRenderer.GetLineWidth(text, fontSize)
+        })
+
+        if (!dim.IsValid) {
+            console.warn("Invalid dimension geometry detected for " + entity.handle)
+            return null
+        }
+
+        return dim
+    }
+
+    *_DecomposeDimension(entity, blockCtx) {
+        /* https://ezdxf.readthedocs.io/en/stable/tutorials/linear_dimension.html
+         * https://ezdxf.readthedocs.io/en/stable/tables/dimstyle_table_entry.html
+         */
+
+        const dim = this._CreateLinearDimension(entity)
+        if (!dim) {
+            return
+        }
+
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const transform = this._GetEntityExtrusionTransform(entity)
+
+        const layout = dim.GenerateLayout()
+
+        for (const line of layout.lines) {
+            const vertices = []
+
+            if (transform) {
+                line.start.applyMatrix3(transform)
+                line.end.applyMatrix3(transform)
+            }
+            vertices.push(line.start, line.end)
+
+            yield new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices,
+                layer,
+                color: line.color ?? color
+            })
+        }
+
+        if (this.textRenderer.canRender) {
+            for (const text of layout.texts) {
+                yield* this.textRenderer.Render({
+                    text: text.text,
+                    fontSize: text.size,
+                    startPos: text.position,
+                    rotation: text.angle,
+                    hAlign: HAlign.CENTER,
+                    vAlign: VAlign.MIDDLE,
+                    color: text.color ?? color,
+                    layer
+                })
+            }
+        }
+
+        //XXX
+
+        console.log(JSON.stringify(entity))//XXX
+    }
+
+    _GetDimStyleValue(valueName, entity, style) {
+        const entries = entity?.xdata?.ACAD?.DSTYLE?.values
+        if (entries) {
+            let isVarCode = true
+            let found = false
+            for (const e of entries) {
+                if (isVarCode) {
+                    if (e.code != 1070) {
+                        /* Unexpected group code. */
+                        break
+                    }
+                    if (dimStyleCodes.get(e.value) == valueName) {
+                        found = true
+                    }
+                } else if (found) {
+                    return e.value
+                }
+                isVarCode = !isVarCode
+            }
+        }
+        if (style && style.hasOwnProperty(valueName)) {
+            return style[valueName]
+        }
+        if (this.vars.has(valueName)) {
+            return this.vars.get(valueName)
+        }
+        if (DEFAULT_VARS.hasOwnProperty(valueName)) {
+            const value = DEFAULT_VARS[valueName]
+            if (value instanceof Function) {
+                return value.call(this)
+            }
+            return value
+        }
+        return null
     }
 
     /**
@@ -1223,43 +1426,6 @@ export class DxfScene {
             return null
         }
         return new Matrix3().scale(-1, 1)
-    }
-
-    /**
-     * Parse special characters in text entities and convert them to corresponding unicode
-     * characters.
-     * https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html
-     * @param {string} text Raw string.
-     * @return {string} String with special characters replaced.
-     */
-    _ParseSpecialChars(text) {
-        return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
-            if (p1 !== undefined) {
-                switch (p1) {
-                case "d":
-                    return "\xb0"
-                case "p":
-                    return "\xb1"
-                case "c":
-                    return "\u2205"
-                case "o":
-                    /* Toggles overscore mode on and off, not implemented. */
-                    return ""
-                case "u":
-                    /* Toggles underscore mode on and off, not implemented. */
-                    return ""
-                case "%":
-                    return "%"
-                }
-            } else if (p2 !== undefined) {
-                const code = parseInt(p2, 16)
-                if (isNaN(code)) {
-                    return match
-                }
-                return String.fromCharCode(code)
-            }
-            return match
-        })
     }
 
     /** @return {RenderBatch} */

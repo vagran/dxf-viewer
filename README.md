@@ -71,4 +71,9 @@ time. Anything useful implemented in the corporate repository will be merged her
 
 ## Contributing
 
-See [contribution guidelines](CONTRIBUTING.md) for details.
+See [contribution guidelines](CONTRIBUTING.md) for details about making PRs. The project also
+requires various example files for testing purposes. If you encounter any issues with DXF rendering,
+it would be greatly appreciated if you could provide an example file that demonstrates the problem
+by attaching it to a created issue. Creating minimal examples in CAD software can also be very
+helpful. Additionally, creating examples in various proprietary CAD software to which I do not have
+access would be highly valuable.
