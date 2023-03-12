@@ -1,4 +1,5 @@
 import {Vector2} from "three"
+import { ParseSpecialChars } from "./TextRenderer"
 
 /**
  * @property {{color: ?number, start: Vector2, end: Vector2}[]} lines
@@ -38,6 +39,9 @@ export class LinearDimension {
      * @property {?number} angle Rotation angle for rotated dimension, deg.
      * @property {boolean} isAligned Dimension line is parallel to base line for aligned dimension.
      * @property {?string} text Dimension text pattern.
+     * @property {?Vector2} textAnchor Text location (middle point) override.
+     * @property {?number} textRotation Rotation angle of the dimension text away from its default
+     *  orientation (the direction of the dimension line)
      */
 
     /**
@@ -79,6 +83,7 @@ export class LinearDimension {
         const textWidth = this.textWidthCalculator(text, fontSize)
         const textColor = this.styleResolver("DIMCLRT")
 
+        let textAnchor = this.params.textAnchor
 
         if (true) { //XXX check if arrows and text fit into dimension space
             const start = this.d1.clone()
@@ -92,10 +97,13 @@ export class LinearDimension {
             }
             result.AddLine(start, end, dimColor)
 
-            //XXX for now just always draw the text above dimension line with fixed gap
-            const textAnchor = this.vDim.clone().multiplyScalar(this.d1.distanceTo(this.d2) / 2)
-                .add(this.d1).add(this.vDimNorm.clone().multiplyScalar(fontSize * 0.75))
-            const angle = this.vDimNorm.angle() * 180 / Math.PI - 90
+            if (!textAnchor) {
+                //XXX for now just always draw the text above dimension line with fixed gap
+                textAnchor = this.vDim.clone().multiplyScalar(this.d1.distanceTo(this.d2) / 2)
+                    .add(this.d1).add(this.vDimNorm.clone().multiplyScalar(fontSize * 0.75))
+            }
+            const angle = this.vDimNorm.angle() * 180 / Math.PI - 90 +
+                (this.params.textRotation ?? 0)
             result.AddText(text, fontSize, angle, textColor, textAnchor)
 
         } else {
@@ -183,7 +191,68 @@ export class LinearDimension {
     }
 
     _GetText() {
-        //XXX
-        return "42.00mm"
+        if (this.params.text == " ") {
+            /* Space indicates empty text. */
+            return ""
+        }
+        if ((this.params.text ?? "") != "" && this.params.text.indexOf("<>") == -1) {
+            /* No value placeholder, just return the text. */
+            return ParseSpecialChars(this.params.text)
+        }
+
+        let measurement = this.d2.distanceTo(this.d1)
+        measurement *= this.styleResolver("DIMLFAC") ?? 1
+
+        const rnd = this.styleResolver("DIMRND") ?? 0
+        if (rnd > 0) {
+            const n = Math.round(measurement / rnd)
+            measurement = rnd * n
+        }
+
+        const zeroSupp = this.styleResolver("DIMZIN") ?? 0
+        const leadZeroSupp = (zeroSupp & 4) != 0
+        const trailingZeroSupp = (zeroSupp & 8) != 0
+
+        let measText = measurement.toFixed(this.styleResolver("DIMDEC") ?? 2)
+
+        if (trailingZeroSupp) {
+            measText = measText.replace(/.0+$/, "")
+        }
+
+        if (leadZeroSupp) {
+            measText = measText.replace(/^0+/, "")
+        }
+
+        if (measText.startsWith(".")) {
+            measText = "0" + measText
+        } else if (measText == "") {
+            measText = "0"
+        }
+        if (measText.endsWith(".")) {
+            measText = measText.substring(0, measText.length - 1)
+        }
+
+        let decSep = this.styleResolver("DIMDSEP") ?? "."
+        if (!isNaN(decSep)) {
+            decSep = String.fromCharCode(decSep)
+        }
+        if (decSep != ".") {
+            measText = measText.replace(".", decSep)
+        }
+
+        const suffix = this.styleResolver("DIMPOST") ?? ""
+        if (suffix != "") {
+            if (suffix.indexOf("<>") != -1) {
+                measText = suffix.replaceAll("<>", measText)
+            } else {
+                measText += suffix
+            }
+        }
+
+        if ((this.params.text ?? "") != "") {
+            measText = this.params.text.replaceAll("<>", measText)
+        }
+
+        return ParseSpecialChars(measText)
     }
 }

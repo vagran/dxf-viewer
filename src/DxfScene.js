@@ -30,7 +30,7 @@ const DEFAULT_VARS = {
         return 2.5 //XXX 0.18 for imperial
     },
     DIMDEC: 2, //XXX 4 for imperial,
-    DIMDSEP: ".", //XXX "," for imperial,
+    DIMDSEP: ".".charCodeAt(0), //XXX "," for imperial,
     DIMRND: 0,
     DIMZIN: 8, //XXX 0 for imperial,
     DIMLFAC: 1,
@@ -803,7 +803,9 @@ export class DxfScene {
             anchor: new Vector2().copy(entity.anchorPoint),
             isAligned: type == 1,
             angle: entity.angle,
-            text: entity.text
+            text: entity.text,
+            textAnchor: entity.middleOfText ? new Vector2().copy(entity.middleOfText) : null,
+            textRotation: entity.textRotation
 
         /* styleResolver */
         }, valueName => {
@@ -857,6 +859,10 @@ export class DxfScene {
 
         if (this.textRenderer.canRender) {
             for (const text of layout.texts) {
+                if (transform) {
+                    //XXX does not affect text rotation and mirroring
+                    text.position.applyMatrix3(transform)
+                }
                 yield* this.textRenderer.Render({
                     text: text.text,
                     fontSize: text.size,
