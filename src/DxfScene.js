@@ -23,32 +23,34 @@ const SPLINE_SUBDIVISION = 4
  * a value, the function `this` argument is DxfScene.
  */
 const DEFAULT_VARS = {
-    DIMCLRT: 0,
     /* https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2016/ENU/AutoCAD-Core/files/GUID-A17A69D7-25EF-4F57-B4EB-D53A56AB909C-htm.html */
     DIMTXT: function() {
         //XXX should select value for imperial or metric units
         return 2.5 //XXX 0.18 for imperial
     },
-    DIMDEC: 2, //XXX 4 for imperial,
-    DIMDSEP: ".".charCodeAt(0), //XXX "," for imperial,
-    DIMRND: 0,
-    DIMZIN: 8, //XXX 0 for imperial,
-    DIMLFAC: 1,
+    DIMASZ: 2.5,//XXX 0.18 for imperial
     DIMCLRD: 0,
     DIMCLRE: 0,
-    DIMFXLON: false,
-    DIMFXL: 1,
-    DIMASZ: 2.5,//XXX 0.18 for imperial
+    DIMCLRT: 0,
+    DIMDEC: 2, //XXX 4 for imperial,
     DIMDLE: 0,
+    DIMDSEP: ".".charCodeAt(0), //XXX "," for imperial,
     DIMEXE: 1.25, //XXX 0.18 for imperial
     DIMEXO: 0.625, // XXX 0.0625 for imperial
+    DIMFXL: 1,
+    DIMFXLON: false,
     DIMGAP: 0.625,//XXX for imperial
-    DIMSOXD: false,
-    DIMSE1: 0,
-    DIMSE2: 0,
+    DIMLFAC: 1,
+    DIMRND: 0,
+    DIMSAH: 0,
+    DIMSCALE: 1,
     DIMSD1: 0,
     DIMSD2: 0,
-    DIMSAH: 0
+    DIMSE1: 0,
+    DIMSE2: 0,
+    DIMSOXD: false,
+    DIMTSZ: 0,
+    DIMZIN: 8, //XXX 0 for imperial,
 }
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
@@ -114,8 +116,6 @@ export class DxfScene {
                 this.dimStyles.set(style.name, style)
             }
         }
-
-        console.log(JSON.stringify(Array.from(this.dimStyles.values())))//XXX
 
         if (dxf.blocks) {
             for (const [, block] of Object.entries(dxf.blocks)) {
@@ -857,6 +857,22 @@ export class DxfScene {
             })
         }
 
+        for (const triangle of layout.triangles) {
+            if (transform) {
+                for (const v of triangle.vertices) {
+                    v.applyMatrix3(transform)
+                }
+            }
+
+            yield new Entity({
+                type: Entity.Type.TRIANGLES,
+                vertices: triangle.vertices,
+                indices: triangle.indices,
+                layer,
+                color: triangle.color ?? color
+            })
+        }
+
         if (this.textRenderer.canRender) {
             for (const text of layout.texts) {
                 if (transform) {
@@ -875,10 +891,6 @@ export class DxfScene {
                 })
             }
         }
-
-        //XXX
-
-        console.log(JSON.stringify(entity))//XXX
     }
 
     _GetDimStyleValue(valueName, entity, style) {

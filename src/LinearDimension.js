@@ -1,9 +1,10 @@
-import {Vector2} from "three"
+import {Vector2, Matrix3} from "three"
 import { ParseSpecialChars } from "./TextRenderer"
 
 /**
  * @property {{color: ?number, start: Vector2, end: Vector2}[]} lines
- * @property {{color: ?number, vertices: Vector2[]}[]} triangles On or more triangles in each item.
+ * @property {{color: ?number, vertices: Vector2[]}[], indices: number[]} triangles On or more
+ *  triangles in each item.
  * @property {{text: string, size: number, angle: number, color: number, position: Vector2}[]} texts
  *   Each item position is specified as middle point of the rendered text.
  */
@@ -19,13 +20,22 @@ export class DimensionLayout {
     }
 
     /** Add one or more triangles. */
-    AddTriangles(vertices, color = null) {
-        this.triangles.push({vertices, color})
+    AddTriangles(vertices, indices, color = null) {
+        this.triangles.push({vertices, indices, color})
     }
 
     AddText(text, size, angle, color, position) {
         this.texts.push({text, size, angle, color, position})
     }
+}
+
+const arrowHeadShape = {
+    vertices: [
+        new Vector2(0, 0),
+        new Vector2(1, -0.25),
+        new Vector2(1, 0.25)
+    ],
+    indices: [0, 1, 2]
 }
 
 /** Encapsulates all calculations about linear dimensions layout. */
@@ -77,43 +87,51 @@ export class LinearDimension {
         /* Dimension line(s). */
         const dimSize = this.d1.distanceTo(this.d2)
         const dimColor = this.styleResolver("DIMCLRD")
+        let dimScale = this.styleResolver("DIMSCALE") ?? 1
+        if (dimScale == 0) {
+            /* No any auto calculation implemented, since no support for paper space. */
+            dimScale = 1
+        }
 
         const text = this._GetText()
-        const fontSize = this.styleResolver("DIMTXT") ?? 1
+        const fontSize = (this.styleResolver("DIMTXT") ?? 1) * dimScale
         const textWidth = this.textWidthCalculator(text, fontSize)
         const textColor = this.styleResolver("DIMCLRT")
+        const arrowSize = (this.styleResolver("DIMASZ") ?? 1) * dimScale
+        const tickSize = (this.styleResolver("DIMTSZ") ?? 0) * dimScale
 
         let textAnchor = this.params.textAnchor
+        let flipArrows = false
 
-        if (true) { //XXX check if arrows and text fit into dimension space
-            const start = this.d1.clone()
-            const dimExt = this.styleResolver("DIMDLE") ?? 0
-            if (dimExt != 0) {
-                start.add(this.vDim.clone().multiplyScalar(-dimExt))
-            }
-            const end = this.d2.clone()
-            if (dimExt != 0) {
-                end.add(this.vDim.clone().multiplyScalar(dimExt))
-            }
-            result.AddLine(start, end, dimColor)
-
-            if (!textAnchor) {
-                //XXX for now just always draw the text above dimension line with fixed gap
-                textAnchor = this.vDim.clone().multiplyScalar(this.d1.distanceTo(this.d2) / 2)
-                    .add(this.d1).add(this.vDimNorm.clone().multiplyScalar(fontSize * 0.75))
-            }
-            const angle = this.vDimNorm.angle() * 180 / Math.PI - 90 +
-                (this.params.textRotation ?? 0)
-            result.AddText(text, fontSize, angle, textColor, textAnchor)
-
-        } else {
-            //XXX
+        const start = this.d1.clone()
+        const dimExt = (this.styleResolver("DIMDLE") ?? 0) * dimScale
+        if (dimExt != 0) {
+            start.add(this.vDim.clone().multiplyScalar(-dimExt))
         }
+        const end = this.d2.clone()
+        if (dimExt != 0) {
+            end.add(this.vDim.clone().multiplyScalar(dimExt))
+        }
+        result.AddLine(start, end, dimColor)
+
+        if (dimSize < arrowSize * 2) {
+            flipArrows = true
+        }
+
+        if (!textAnchor) {
+            //XXX for now just always draw the text above dimension line with fixed gap
+            textAnchor = this.vDim.clone().multiplyScalar(this.d1.distanceTo(this.d2) / 2)
+                .add(this.d1).add(this.vDimNorm.clone().multiplyScalar(fontSize * 0.75))
+        }
+        const angle = this.vDimNorm.angle() * 180 / Math.PI - 90 +
+            (this.params.textRotation ?? 0)
+        result.AddText(text, fontSize, angle, textColor, textAnchor)
+
 
         /* Extension lines. */
         const extColor = this.styleResolver("DIMCLRE")
-        const extOffset = this.styleResolver("DIMEXO") ?? 0
-        const extExt = this.styleResolver("DIMEXE") ?? 0
+        const extOffset = (this.styleResolver("DIMEXO") ?? 0) * dimScale
+        const extExt = (this.styleResolver("DIMEXE") ?? 0) * dimScale
 
         const DrawExtLine = (basePt, dimPt) => {
             const vExt = dimPt.clone().sub(basePt)
@@ -140,9 +158,56 @@ export class LinearDimension {
             DrawExtLine(this.params.p2, this.d2)
         }
 
-        //XXX
+        /* Draw arrows (or anything defined as dimension shape). Assuming shape is defined
+         * horizontally for left side with the origin in the dimension point, scale corresponding to
+         * size 1. Calculate appropriate transform for the shape.
+         */
+        //XXX check suppression by DIMSOXD, DIMSD1, DIMSD2
+        for (let i = 0; i < 2; i++) {
+            const dimPt = i == 0 ? this.d1 : this.d2
+            let flip = i == 1
+            if (flipArrows) {
+                flip = !flip
+            }
+
+            let transform = new Matrix3().identity()
+            if (tickSize > 0) {
+                transform.scale(tickSize, tickSize)
+            } else {
+                transform.scale(arrowSize, arrowSize)
+                /* Tick is not flipped. */
+                if (flip) {
+                    transform.scale(-1, 1)
+                }
+            }
+
+            const angle = -this.vDim.angle()
+            transform.rotate(angle)
+
+            transform.translate(dimPt.x, dimPt.y)
+
+            if (tickSize > 0) {
+                this._CreateTick(result, transform, dimColor)
+            } else {
+                this._CreateArrowShape(result, transform, dimColor)
+            }
+        }
 
         return result
+    }
+
+    _CreateArrowShape(layout, transform, color) {
+        const vertices = []
+        for (const v of arrowHeadShape.vertices) {
+            vertices.push(v.clone().applyMatrix3(transform))
+        }
+        layout.AddTriangles(vertices, arrowHeadShape.indices, color)
+    }
+
+    _CreateTick(layout, transform, color) {
+        layout.AddLine(new Vector2(0.5, 0.5).applyMatrix3(transform),
+                       new Vector2(-0.5, -0.5).applyMatrix3(transform),
+                       color)
     }
 
     /** Calculate and set basic geometric parameters (some points and vectors which define the
