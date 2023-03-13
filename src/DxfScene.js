@@ -133,6 +133,12 @@ export class DxfScene {
             if (entity.type === "INSERT") {
                 const block = this.blocks.get(entity.name)
                 block?.RegisterInsert(entity)
+
+            } else if (entity.type == "DIMENSION") {
+                if ((entity.block ?? null) !== null) {
+                    const block = this.blocks.get(entity.block)
+                    block?.RegisterInsert(entity)
+                }
             }
         }
 
@@ -826,6 +832,20 @@ export class DxfScene {
     }
 
     *_DecomposeDimension(entity, blockCtx) {
+        if ((entity.block ?? null) !== null && this.blocks.has(entity.block)) {
+            /* Dimension may have pre-rendered block attached. Then just render this block instead
+             * of synthesizing dimension geometry from parameters.
+             *
+             * Create dummy INSERT entity.
+             */
+            const insert = {
+                name: entity.block,
+                position: {x: 0, y: 0}
+            }
+            this._ProcessInsert(insert, blockCtx)
+            return
+        }
+
         /* https://ezdxf.readthedocs.io/en/stable/tutorials/linear_dimension.html
          * https://ezdxf.readthedocs.io/en/stable/tables/dimstyle_table_entry.html
          */
@@ -1776,6 +1796,7 @@ class Block {
         return this.offset !== null
     }
 
+    /** @param {{}} entity May be either INSERT or DIMENSION. */
     RegisterInsert(entity) {
         this.useCount++
     }
