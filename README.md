@@ -80,3 +80,7 @@ examples in CAD software can also be very helpful. Additionally, creating exampl
 proprietary CAD software to which I do not have access would be highly valuable. Since the entrance
 level to start coding in this project is quite high, it is often more useful to receive a detailed
 issue report with sample files rather than a pull request.
+
+## Donations
+
+Want to say thanks to the project maintainer? Here is the link: [![Donate](https://img.shields.io/static/v1?label=Donate&message=PayPal&color=orange&logo=paypal)](https://www.paypal.com/donate?business=artyom.lebedev@gmail.com&no_recurring=0&item_name=To+support+`dxf-viewer`+project+maintenance.+Thank+you!&currency_code=EUR)
