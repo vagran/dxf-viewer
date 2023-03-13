@@ -58,7 +58,8 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Smoothed polyline (curve-fit/spline-fit addition vertices).
  * Hatching
  * Block instancing in a grid. Grid attributes are ignored now.
- * Dimensions
+ * Dimensions-specific features and styles (various pre-defined arrowhead blocks, text positioning
+   tuning, limits and tolerances). Dimensions types other than linear ones.
  * Leaders
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored.
@@ -71,9 +72,13 @@ time. Anything useful implemented in the corporate repository will be merged her
 
 ## Contributing
 
-See [contribution guidelines](CONTRIBUTING.md) for details about making PRs. The project also
-requires various example files for testing purposes. If you encounter any issues with DXF rendering,
-it would be greatly appreciated if you could provide an example file that demonstrates the problem
-by attaching it to a created issue. Creating minimal examples in CAD software can also be very
-helpful. Additionally, creating examples in various proprietary CAD software to which I do not have
-access would be highly valuable.
+Please refer to the [contribution guidelines](CONTRIBUTING.md) for details on how to make pull
+requests (PRs). The project also requires various example files for testing purposes. If you
+encounter any issues with DXF rendering, it would be greatly appreciated if you could provide an
+example file that demonstrates the problem by attaching it to a created issue. Creating minimal
+examples in CAD software can also be very helpful. Additionally, creating examples in various
+proprietary CAD software to which I do not have access would be highly valuable. Due to quite high
+entrance level to start coding in this project, it is often more useful to get detailed issue report
+with sample files than a pull-request. Since the entrance level to start coding in this project is
+quite high, it is often more useful to receive a detailed issue report with sample files rather than
+a pull request.
