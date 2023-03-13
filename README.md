@@ -77,8 +77,6 @@ requests (PRs). The project also requires various example files for testing purp
 encounter any issues with DXF rendering, it would be greatly appreciated if you could provide an
 example file that demonstrates the problem by attaching it to a created issue. Creating minimal
 examples in CAD software can also be very helpful. Additionally, creating examples in various
-proprietary CAD software to which I do not have access would be highly valuable. Due to quite high
-entrance level to start coding in this project, it is often more useful to get detailed issue report
-with sample files than a pull-request. Since the entrance level to start coding in this project is
-quite high, it is often more useful to receive a detailed issue report with sample files rather than
-a pull request.
+proprietary CAD software to which I do not have access would be highly valuable. Since the entrance
+level to start coding in this project is quite high, it is often more useful to receive a detailed
+issue report with sample files rather than a pull request.
