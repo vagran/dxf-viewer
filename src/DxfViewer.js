@@ -176,7 +176,7 @@ export class DxfViewer {
         this.hasMissingChars = scene.hasMissingChars
 
         for (const layer of scene.layers) {
-            this.layers.set(layer.name, new Layer(layer.name, layer.color))
+            this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color))
         }
 
         /* Load all blocks on the first pass. */
@@ -234,7 +234,11 @@ export class DxfViewer {
     GetLayers() {
         const result = []
         for (const lyr of this.layers.values()) {
-            result.push({name: lyr.name, color: this._TransformColor(lyr.color)})
+            result.push({
+                name: lyr.name,
+                displayName: lyr.displayName,
+                color: this._TransformColor(lyr.color)
+            })
         }
         return result
     }
@@ -888,8 +892,9 @@ class Batch {
 }
 
 class Layer {
-    constructor(name, color) {
+    constructor(name, displayName, color) {
         this.name = name
+        this.displayName = displayName
         this.color = color
         this.objects = []
     }

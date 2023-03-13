@@ -107,6 +107,7 @@ export class DxfScene {
 
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
+                layer.displayName = ParseSpecialChars(layer.name)
                 this.layers.set(layer.name, layer)
             }
         }
@@ -1538,6 +1539,7 @@ export class DxfScene {
         for (const layer of this.layers.values()) {
             scene.layers.push({
                 name: layer.name,
+                displayName: layer.displayName,
                 color: layer.color
             })
         }

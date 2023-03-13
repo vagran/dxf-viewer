@@ -38,6 +38,7 @@ export type DxfViewerLoadParams = {
 
 export type LayerInfo = {
     name: string,
+    displayName: string,
     color: number
 }
 
