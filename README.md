@@ -1,4 +1,4 @@
-# DXF viewer
+# DXF viewer [![npm](https://img.shields.io/npm/v/dxf-viewer)](https://www.npmjs.com/package/dxf-viewer)
 
 *If you just need to view your DXF, [click here](https://vagran.github.io/dxf-viewer-example/).*
 
