@@ -10,12 +10,6 @@ The usage example is available here: https://github.com/vagran/dxf-viewer-exampl
 
 Deployed demo: https://vagran.github.io/dxf-viewer-example/
 
-The package is released under the Mozilla Public License 2.0.
-
-*The viewer was initially published in the
-[corporate repository](https://github.com/ugcs/ugcs-dxf-viewer) (mostly dead now) and is used in
-production in [Atlas](https://atlas.ugcs.com) project.*
-
 ## Install
 
 ```bash
@@ -66,6 +60,7 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z
    (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
    processed.
+ * Paper space, layouts (sheets), viewports.
  * Many less commonly used DXF features.
 
 ![samples](https://user-images.githubusercontent.com/6065976/143092164-cced2f5f-1af3-42a4-9a71-5dba68df06e7.png)
@@ -80,6 +75,11 @@ examples in CAD software can also be very helpful. Additionally, creating exampl
 proprietary CAD software to which I do not have access would be highly valuable. Since the entrance
 level to start coding in this project is quite high, it is often more useful to receive a detailed
 issue report with sample files rather than a pull request.
+
+## License
+
+This project is licensed under the terms of the
+[Mozilla Public License 2.0](https://choosealicense.com/licenses/mpl-2.0/).
 
 ## Donations
 
