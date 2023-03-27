@@ -279,6 +279,9 @@ export class DxfScene {
         case "DIMENSION":
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
+        case "HATCH":
+            renderEntities = this._DecomposeHatch(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -912,6 +915,11 @@ export class DxfScene {
                 })
             }
         }
+    }
+
+    *_DecomposeHatch(entity, blockCtx) {
+        //XXX not implemented yet
+        console.log(JSON.stringify(entity))
     }
 
     _GetDimStyleValue(valueName, entity, style) {

@@ -16,6 +16,7 @@ import Polyline from './entities/polyline';
 import Solid from './entities/solid';
 import Spline from './entities/spline';
 import Text from './entities/text';
+import Hatch from './entities/hatch';
 import dimStyleCodes from './DimStyleCodes';
 //import Vertex from './entities/';
 
@@ -45,6 +46,7 @@ function registerDefaultEntityHandlers(dxfParser) {
     dxfParser.registerEntityHandler(Solid);
     dxfParser.registerEntityHandler(Spline);
     dxfParser.registerEntityHandler(Text);
+    dxfParser.registerEntityHandler(Hatch);
     //dxfParser.registerEntityHandler(require('./entities/vertex'));
 }
 
