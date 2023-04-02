@@ -1,3 +1,6 @@
+import { Vector2 } from "three"
+import { Matrix2 } from '../math/Matrix2'
+
 const EPSILON = 1e-6
 
 export class HatchCalculator {
@@ -6,7 +9,7 @@ export class HatchCalculator {
   /**
    * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
    * 
-   * @param {Point[][]} boundaryPaths 
+   * @param {Vector2[]} boundaryPaths 
    */
   constructor(boundaryPaths) {
     this.boundaryPaths = boundaryPaths
@@ -16,8 +19,8 @@ export class HatchCalculator {
   /**
    * Clip `line` on masking defined by `boundaryPaths`
    * 
-   * @param {[Point, Point]} line 
-   * @returns {[Point, Point][]} clipped line segments
+   * @param {[Vector2, Vector2]} line 
+   * @returns {[Vector2, Vector2][]} clipped line segments
    */
   ClipLine(line) {
     // concat
@@ -32,14 +35,9 @@ export class HatchCalculator {
       : intersections
 
     return Array.from(new Array(segments.length / 2), (_, i) => {
-      const start = [
-        line[0].x + (line[1].x - line[0].x) * segments[2 * i],
-        line[0].y + (line[1].y - line[0].y) * segments[2 * i],
-      ]
-      const end = [
-        line[0].x + (line[1].x - line[0].x) * segments[2 * i + 1],
-        line[0].y + (line[1].y - line[0].y) * segments[2 * i + 1],
-      ]
+      const diff = line[1].clone().sub(line[0])
+      const start = diff.copy().multiplyScalar(segments[2 * i]).add(line[0])
+      const end = diff.copy().multiplyScalar(segments[2 * i + 1]).add(line[0])
       return [start, end]
     })
   }
@@ -49,8 +47,8 @@ export class HatchCalculator {
    * each interpolation constant `t0`s. Note that they're not sorted.
    * Each `t0` is in [0, 1).
    * 
-   * @param {[Point, Point]} line 
-   * @param {Point[]} path 
+   * @param {[Vector2, Vector2]} line 
+   * @param {Vector2[]} path 
    * @returns {number[]} arrays of intersection lerp param t0 for line
    */
   _GetIntersections(line, path) {
@@ -74,26 +72,26 @@ export class HatchCalculator {
    * Note that start point of line is inclusive while the other is exclusive.
    * If there is no such `t0`, returns `undefined`
    * 
-   * @param {[Point, Point]} line0 
-   * @param {[Point, Point]} line1 
+   * @param {[Vector2, Vector2]} line0 
+   * @param {[Vector2, Vector2]} line1 
    * @returns {number | undefined} t0
    */
   _GetIntersection(line0, line1) {
     const [s0, e0] = line0
     const [s1, e1] = line1
-    const diff0 = { x: e0.x - s0.x, y: e0.y - s0.y }
-    const diff1 = { x: s1.x - e1.x, y: s1.y - e1.y }
+    const diff0 = e0.clone().sub(s0)
+    const diff1 = s1.clone().sub(e1)
     
-    const det = diff0.x * diff1.y - diff0.y * diff1.x
-    if (Math.abs(det) < EPSILON) return undefined
-
-    const A = this._GetInverse2x2(
+    const A = (new Matrix2(
       diff0.x, diff1.x,
       diff0.y, diff1.y,
-      det
-    )
-    const b = { x: s1.x - s0.x, y: s1.y - s0.y }
-    const [t0, t1] = this._MatMul(A, b)
+    ))
+    const det = A.det()
+    if (Math.abs(det) < EPSILON) return undefined
+
+    const AInverse = A.inverse(det)
+    const b = s1.clone().sub(s0)
+    const { x: t0, y: t1 } = AInverse.multiply(b)
 
     // one side is exclusive to avoid duplicated counting, 
     // when intersection point is exactly a vertex of edges
@@ -101,29 +99,15 @@ export class HatchCalculator {
     return t0
   }
 
-  _GetInverse2x2(a00, a01, a10, a11, det) {
-    return [
-      a11 / det, -a01 / det,
-      -a10 / det, a00 / det,
-    ]
-  }
-
-  _MatMul([a00, a01, a10, a11], b0, b1) {
-    return [
-      a00 * b0 + a01 * b1,
-      a10 * b0 + a11 * b1
-    ]
-  }
-
   /**
    * Return whether `point` is inside of union of `paths`
    * 
-   * @param {Point} point 
+   * @param {Vector2} point 
    * @returns {boolean} is `point` inside of union of `paths`
    */
   _IsInside(point) {
     const p = this._GetFarthestCenterOnPath(point)
-    const q = [2 * p.x - point.x, 2 * p.y - point.y]
+    const q = p.clone().multiplyScalar(2).sub(point)
 
     // use odd even rule
     let count = 0
@@ -136,8 +120,8 @@ export class HatchCalculator {
   /**
    * Return the most farthest edge's center point of paths
    * 
-   * @param {Point} point 
-   * @returns {Point} Farthest center of edges on path
+   * @param {Vector2} point 
+   * @returns {Vector2} Farthest center of edges on path
    */
   _GetFarthestCenterOnPath(point) {
     let dMaxPoint = null
@@ -145,13 +129,12 @@ export class HatchCalculator {
     for (const path of this.boundaryPaths) {
       for (let i = 0; i < path.length; ++i) {
         const j = (i + 1) % path.length
-        const x = (path[i].x + path[j].x) * 0.5
-        const y = (path[i].y + path[j].y) * 0.5
-        const dSq = (point.x - x) ** 2 + (point.y - y) ** 2
+        const m = path[i].clone().add(path[j]).divideScalar(2)
+        const dSq = point.distanceToSquared(m)
 
         if (dMaxSq < dSq) {
           dMaxSq = dSq
-          dMaxPoint = { x, y }
+          dMaxPoint = m
         }
       }
     }
