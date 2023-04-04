@@ -9,7 +9,7 @@ export class HatchCalculator {
     /**
      * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
      *
-     * @param {Vector2[]} boundaryPaths
+     * @param {Vector2[][]} boundaryPaths
      */
     constructor(boundaryPaths) {
         this.boundaryPaths = boundaryPaths
