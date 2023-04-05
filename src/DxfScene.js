@@ -6,7 +6,7 @@ import { RBTree } from "./RBTree"
 import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
-import { HatchCalculator } from "./hatch/patternFillCalculator"
+import { HatchCalculator, HatchStyle } from "./hatch/patternFillCalculator"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -922,6 +922,18 @@ export class DxfScene {
         //XXX not implemented yet
         console.log(JSON.stringify(entity))
 
+        if (entity.isSolid) {
+            //XXX solid hatch not yet supported
+            return
+        }
+
+        const style = entity.hatchStyle ?? 0
+
+        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
+            //XXX other styles not yet supported
+            return
+        }
+
         const boundaryLoops = this._GetHatchBoundaryLoops(entity)
         if (boundaryLoops.length == 0) {
             console.warn("HATCH entity with empty boundary loops array " +
@@ -929,13 +941,35 @@ export class DxfScene {
             return
         }
 
-        console.log(JSON.stringify(boundaryLoops))//XXX
-
-        const calc = new HatchCalculator(boundaryLoops)
+        const calc = new HatchCalculator(boundaryLoops, style)
 
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         const transform = this._GetEntityExtrusionTransform(entity)
+
+        //XXX temporal stub
+        const pattern = {
+            lines: entity.definitionLines ?? [{
+                angle: 45, base: {x: 0, y: 0}, offset: {x: 0.1, y: 0.1}
+            }]
+        }
+
+        const seedPoints = entity.seedPoints ? entity.seedPoints : [0, 0]
+
+        for (const seedPoint of seedPoints) {
+            for (const line of pattern.lines) {
+
+                const patTransform = calc.GetPatternTransform({
+                    seedPoint,
+                    basePoint: line.base,
+                    angle: entity.patternAngle,
+                    scale: entity.patternScale
+                })
+
+                const bbox = calc.GetPatternBoundingBox(patTransform)
+                //XXX
+            }
+        }
 
         //XXX
     }
