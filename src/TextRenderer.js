@@ -62,7 +62,7 @@ export class TextRenderer {
         this.fontFetchers = fontFetchers
         this.fonts = []
 
-        this.options = Object.create(DxfScene.DefaultOptions)
+        this.options = Object.create(TextRenderer.DefaultOptions)
         if (options) {
             Object.assign(this.options, options)
         }
