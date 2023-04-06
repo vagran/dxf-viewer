@@ -94,9 +94,8 @@ export class DxfScene {
         const header = dxf.header || {}
         /* 0 - CCW, 1 - CW */
         this.angBase = header["$ANGBASE"] || 0
-        /* Zero angle direction, 0 is +X */
+        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
         this.angDir = header["$ANGDIR"] || 0
-        this.pdMode = header["$PDMODE"] || 0
         this.pdSize = header["$PDSIZE"] || 0
 
         for (const [name, value] of Object.entries(header)) {
@@ -435,11 +434,14 @@ export class DxfScene {
         } else {
             endAngle += this.angBase
         }
-        if (this.angDir) {
-            const tmp = startAngle
-            startAngle = endAngle
-            endAngle = tmp
-        }
+
+        //XXX not clear, seem in practice it does not alter arcs rendering.
+        // if (this.angDir) {
+        //     const tmp = startAngle
+        //     startAngle = endAngle
+        //     endAngle = tmp
+        // }
+
         while (endAngle <= startAngle) {
             endAngle += Math.PI * 2
         }
