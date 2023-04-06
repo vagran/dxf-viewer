@@ -1082,6 +1082,12 @@ export class DxfScene {
     }
 
     *_DecomposePolyline(entity, blockCtx = null) {
+
+        if (entity.isPolyfaceMesh) {
+            yield *this._DecomposePolyfaceMesh(entity, blockCtx)
+            return
+        }
+
         let entityVertices, verticesCount
         if (entity.includesCurveFitVertices || entity.includesSplineFitVertices) {
             entityVertices = entity.vertices.filter(v => v.splineVertex || v.curveFittingVertex)
@@ -1181,6 +1187,101 @@ export class DxfScene {
                 (curPlainLine && lineType !== curLineType)) {
 
                 yield* CommitSegment(vIdx)
+            }
+        }
+    }
+
+    *_DecomposePolyfaceMesh(entity, blockCtx = null) {
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+
+        const vertices = []
+        const faces = []
+
+        for (const v of entity.vertices) {
+            if (v.faces) {
+                const face = {
+                    indices: [],
+                    hiddenEdges: []
+                }
+                for (const vIdx of v.faces) {
+                    if (vIdx == 0) {
+                        break
+                    }
+                    face.indices.push(vIdx < 0 ? -vIdx - 1 : vIdx - 1)
+                    face.hiddenEdges.push(vIdx < 0)
+                }
+                if (face.indices.length == 3 || face.indices.length == 4) {
+                    faces.push(face)
+                }
+            } else {
+                vertices.push(new Vector2(v.x, v.y))
+            }
+        }
+
+        const polylines = []
+        const CommitLineSegment = (startIdx, endIdx) => {
+            if (polylines.length > 0) {
+                const prev = polylines[polylines.length - 1]
+                if (prev.indices[prev.indices.length - 1] == startIdx) {
+                    prev.indices.push(endIdx)
+                    return
+                }
+                if (prev.indices[0] == prev.indices[prev.indices.length - 1]) {
+                    prev.isClosed = true
+                }
+            }
+            polylines.push({
+                indices: [startIdx, endIdx],
+                isClosed: false
+            })
+        }
+
+        for (const face of faces) {
+
+            if (this.options.wireframeMesh) {
+                for (let i = 0; i < face.indices.length; i++) {
+                    if (face.hiddenEdges[i]) {
+                        continue
+                    }
+                    const nextIdx = i < face.indices.length - 1 ? i + 1 : 0
+                    CommitLineSegment(face.indices[i], face.indices[nextIdx])
+                }
+
+            } else {
+                let indices
+                if (face.indices.length == 3) {
+                    indices = face.indices
+                } else {
+                    indices = [face.indices[0], face.indices[1], face.indices[2],
+                               face.indices[0], face.indices[2], face.indices[3]]
+                }
+                yield new Entity({
+                    type: Entity.Type.TRIANGLES,
+                    vertices, indices, layer, color
+                })
+            }
+        }
+
+        if (this.options.wireframeMesh) {
+            for (const pl of polylines) {
+                if (pl.length == 2) {
+                    yield new Entity({
+                        type: Entity.Type.LINE_SEGMENTS,
+                        vertices: [vertices[pl.indices[0]], vertices[pl.indices[1]]],
+                        layer, color
+                    })
+                } else {
+                    const _vertices = []
+                    for (const vIdx of pl.indices) {
+                        _vertices.push(vertices[vIdx])
+                    }
+                    yield new Entity({
+                        type: Entity.Type.POLYLINE,
+                        vertices: _vertices, layer, color,
+                        shape: pl.isClosed
+                    })
+                }
             }
         }
     }
@@ -2135,7 +2236,7 @@ DxfScene.DefaultOptions = {
     arcTessellationAngle: 10 / 180 * Math.PI,
     /** Divide arc to at least the specified number of segments. */
     minArcTessellationSubdivisions: 8,
-    /** Render meshes (3DFACE group) as wireframe instead of solid. */
+    /** Render meshes (3DFACE group, POLYLINE polyface mesh) as wireframe instead of solid. */
     wireframeMesh: false,
     /** Text rendering options. */
     textOptions: TextRenderer.DefaultOptions,
