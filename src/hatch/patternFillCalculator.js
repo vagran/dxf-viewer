@@ -1,19 +1,28 @@
-import { Vector2 } from "three"
+import { Matrix3, Vector2, Box2 } from "three"
 import { Matrix2 } from '../math/Matrix2'
 import { UnionIntervals } from "./UnionIntervals"
 
 const EPSILON = 1e-6
 
+export const HatchStyle = Object.freeze({
+    ODD_PARITY: 0,
+    OUTERMOST: 1,
+    THROUGH_ENTIRE_AREA: 2
+})
+
 export class HatchCalculator {
     boundaryPaths
+    style
 
     /**
      * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
      *
-     * @param {Vector2[]} boundaryPaths
+     * @param {Vector2[][]} boundaryPaths
+     * @param {HatchStyle} style
      */
-    constructor(boundaryPaths) {
+    constructor(boundaryPaths, style) {
         this.boundaryPaths = boundaryPaths
+        this.style = style
     }
 
     /**
@@ -52,6 +61,38 @@ export class HatchCalculator {
 
         const unifiedTSegments = UnionIntervals(tSegments)
         return this._ToLineSegments(line, unifiedTSegments)
+    }
+
+    /**
+     * @return {Matrix3} Transformation from OCS to pattern space.
+     */
+    GetPatternTransform({seedPoint, basePoint, angle, scale}) {
+        const m = Matrix3.makeTranslation(-seedPoint.x, -seedPoint.y)
+        if (angle) {
+            m.rotate(-angle * Math.PI / 180)
+        }
+        if ((scale ?? 1) != 1) {
+            m.scale(1 / scale, 1 / scale)
+        }
+        if (basePoint) {
+            m.translate(basePoint.x, basePoint.y)
+        }
+        return m
+    }
+
+    /**
+     * @param {Matrix3} patTransform Transformation from OCS to pattern space previously obtained by
+     *  GetPatternTransform() method.
+     * @return {Box2} Pattern AABB in pattern coordinate space.
+     */
+    GetPatternBoundingBox(patTransform) {
+        const box = new Box2()
+        for (const path of this.boundaryPaths) {
+            for (const v of path) {
+                box.expandByPoint(v.clone().applyMatrix3(patTransform))
+            }
+        }
+        return box
     }
 
     /**

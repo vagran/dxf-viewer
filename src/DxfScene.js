@@ -6,6 +6,7 @@ import { RBTree } from "./RBTree"
 import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
+import { HatchCalculator, HatchStyle } from "./hatch/patternFillCalculator"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -920,6 +921,170 @@ export class DxfScene {
     *_DecomposeHatch(entity, blockCtx) {
         //XXX not implemented yet
         console.log(JSON.stringify(entity))
+
+        if (entity.isSolid) {
+            //XXX solid hatch not yet supported
+            return
+        }
+
+        const style = entity.hatchStyle ?? 0
+
+        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
+            //XXX other styles not yet supported
+            return
+        }
+
+        const boundaryLoops = this._GetHatchBoundaryLoops(entity)
+        if (boundaryLoops.length == 0) {
+            console.warn("HATCH entity with empty boundary loops array " +
+                "(perhaps some loop types are not implemented yet)")
+            return
+        }
+
+        const calc = new HatchCalculator(boundaryLoops, style)
+
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const transform = this._GetEntityExtrusionTransform(entity)
+
+        //XXX temporal stub
+        const pattern = {
+            lines: entity.definitionLines ?? [{
+                angle: 45, base: {x: 0, y: 0}, offset: {x: 0.1, y: 0.1}
+            }]
+        }
+
+        const seedPoints = entity.seedPoints ? entity.seedPoints : [0, 0]
+
+        for (const seedPoint of seedPoints) {
+            for (const line of pattern.lines) {
+
+                const patTransform = calc.GetPatternTransform({
+                    seedPoint,
+                    basePoint: line.base,
+                    angle: entity.patternAngle,
+                    scale: entity.patternScale
+                })
+
+                const bbox = calc.GetPatternBoundingBox(patTransform)
+                //XXX
+            }
+        }
+
+        //XXX
+    }
+
+    /** @return {Vector2[][]} Each loop is a list of points in OCS coordinates. */
+    _GetHatchBoundaryLoops(entity) {
+        if (!entity.boundaryLoops) {
+            return []
+        }
+
+        const result = []
+
+        const AddPoints = (vertices, points) => {
+            const n = points.length
+            if (n == 0) {
+                return
+            }
+            if (vertices.length == 0) {
+                vertices.push(points[0])
+            } else {
+                const lastPt = vertices[vertices.length - 1]
+                if (lastPt.x != points[0].x || lastPt.y != points[0].y) {
+                    vertices.push(points[0])
+                }
+            }
+            for (let i = 1; i < n; i++) {
+                vertices.push(points[i])
+            }
+        }
+
+        for (const loop of entity.boundaryLoops) {
+            const vertices = []
+
+            //XXX handle external references
+
+            if (loop.type & 2) {
+                /* Polyline. */
+                //XXX not implemented
+
+            } else if (loop.edges && loop.edges.length > 0) {
+                for (const edge of loop.edges) {
+                    switch (edge.type) {
+                    case 1:
+                        /* Line segment. */
+                        AddPoints(vertices, [edge.start, edge.end])
+                        break
+                    case 2: {
+                        /* Circular arc. */
+                        const arcVertices = []
+                        this._GenerateArcVertices({
+                            vertices: arcVertices,
+                            center: edge.start,
+                            radius: edge.radius,
+                            startAngle: edge.startAngle,
+                            endAngle: edge.endAngle
+                        })
+                        AddPoints(vertices, arcVertices)
+                        break
+                    }
+                    case 3: {
+                        /* Elliptic arc. */
+                        const center = edge.start
+                        const majorAxisEndPoint = edge.end
+                        const xR = Math.sqrt(majorAxisEndPoint.x * majorAxisEndPoint.x +
+                                             majorAxisEndPoint.y * majorAxisEndPoint.y)
+                        const axisRatio = edge.radius
+                        const yR = xR * axisRatio
+                        const rotation = Math.atan2(majorAxisEndPoint.y, majorAxisEndPoint.x)
+                        const arcVertices = []
+                        this._GenerateArcVertices({
+                            vertices: arcVertices,
+                            center,
+                            radius: xR,
+                            startAngle: edge.startAngle,
+                            endAngle: edge.endAngle,
+                            yRadius: yR
+                        })
+                        if (rotation !== 0) {
+                            //XXX should account angDir?
+                            const cos = Math.cos(rotation)
+                            const sin = Math.sin(rotation)
+                            for (const v of arcVertices) {
+                                const tx = v.x - center.x
+                                const ty = v.y - center.y
+                                /* Rotate the vertex around the ellipse center point. */
+                                v.x = tx * cos - ty * sin + center.x
+                                v.y = tx * sin + ty * cos + center.y
+                            }
+                        }
+                        AddPoints(vertices, arcVertices)
+                        break;
+                    }
+                    case 4:
+                        /* Spline. */
+                        //XXX
+                        break;
+                    default:
+                        console.warn("Unhandled hatch boundary loop edge type: " + edge.type)
+                    }
+                }
+            }
+
+            if (vertices.length > 2) {
+                const first = vertices[0]
+                const last = vertices[vertices.length - 1]
+                if (last.x == first.x && last.y == first.y) {
+                    vertices.length = vertices.length - 1
+                }
+            }
+            if (vertices.length > 2) {
+                result.push(vertices)
+            }
+        }
+
+        return result
     }
 
     _GetDimStyleValue(valueName, entity, style) {
