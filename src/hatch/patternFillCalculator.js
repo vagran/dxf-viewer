@@ -26,12 +26,29 @@ export class HatchCalculator {
     }
 
     /**
-     * Clip `line` on masking defined by `boundaryPaths`
+     * Clip `line` using strategy defined by `this.style`
      *
      * @param {[Vector2, Vector2]} line
      * @returns {[Vector2, Vector2][]} clipped line segments
      */
     ClipLine(line) {
+        if (this.style === HatchStyle.ODD_PARITY) {
+            return this._ClipLineOddParity(line)
+        }
+        if (this.style === HatchStyle.THROUGH_ENTIRE_AREA) {
+            return this._ClipLineUnion(line)
+        }
+        console.warn('Unsupported hatch style: HatchStyle.OUTERMOST')
+        return this._ClipLineUnion(line)
+    }
+
+    /**
+     * Clip `line` on masking defined by `boundaryPaths`
+     *
+     * @param {[Vector2, Vector2]} line
+     * @returns {[Vector2, Vector2][]} clipped line segments
+     */
+    _ClipLineOddParity(line) {
         // concat
         const intersections = this.boundaryPaths.reduce((intersections, path) => {
             intersections.push(...this._GetIntersections(line, path))
@@ -48,7 +65,7 @@ export class HatchCalculator {
      * @param {[Vector2, Vector2]} line 
      * @returns {[Vector2, Vector2][]} clipped line segments
      */
-    ClipLineUnion(line) {
+    _ClipLineUnion(line) {
         const tSegments = this.boundaryPaths.map((path) => {
             const intersections = this._GetIntersections(line, [path])
 
