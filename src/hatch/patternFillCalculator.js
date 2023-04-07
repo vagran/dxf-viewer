@@ -61,8 +61,8 @@ export class HatchCalculator {
 
     /**
      * Clip `line` on masking defined by union of `boundaryPaths`
-     * 
-     * @param {[Vector2, Vector2]} line 
+     *
+     * @param {[Vector2, Vector2]} line
      * @returns {[Vector2, Vector2][]} clipped line segments
      */
     _ClipLineUnion(line) {
@@ -81,32 +81,50 @@ export class HatchCalculator {
     }
 
     /**
+     * @param {Vector2} seedPoint Pattern seed point coordinates in OCS.
+     * @param {?number} angle Pattern rotation angle in degrees.
+     * @param {?number} scale Pattern scale.
      * @return {Matrix3} Transformation from OCS to pattern space.
      */
-    GetPatternTransform({seedPoint, basePoint, angle, scale}) {
-        const m = Matrix3.makeTranslation(-seedPoint.x, -seedPoint.y)
+    GetPatternTransform({seedPoint, angle, scale}) {
+        const m = new Matrix3().makeTranslation(-seedPoint.x, -seedPoint.y)
         if (angle) {
             m.rotate(-angle * Math.PI / 180)
         }
         if ((scale ?? 1) != 1) {
             m.scale(1 / scale, 1 / scale)
         }
-        if (basePoint) {
-            m.translate(basePoint.x, basePoint.y)
-        }
         return m
     }
 
     /**
      * @param {Matrix3} patTransform Transformation from OCS to pattern space previously obtained by
-     *  GetPatternTransform() method.
-     * @return {Box2} Pattern AABB in pattern coordinate space.
+     *      GetPatternTransform() method.
+     * @param {?Vector2} basePoint Line base point coordinate in pattern space.
+     * @param {?number} angle Line direction angle in degrees, CCW from +X direction.
+     * @return {Matrix3} Transformation from OCS to pattern line space. Line is started at origin
+     *  and directed into position X axis direction.
      */
-    GetPatternBoundingBox(patTransform) {
+    GetLineTransform({patTransform, basePoint, angle}) {
+        const m = patTransform.clone()
+        if (basePoint) {
+            m.translate(-basePoint.x, -basePoint.y)
+        }
+        if (angle) {
+            m.rotate(-angle * Math.PI / 180)
+        }
+        return m
+    }
+
+    /**
+     * @param {Matrix3} transform Transformation from OCS to target coordinates space.
+     * @return {Box2} Pattern AABB in target coordinate space.
+     */
+    GetBoundingBox(transform) {
         const box = new Box2()
         for (const path of this.boundaryPaths) {
             for (const v of path) {
-                box.expandByPoint(v.clone().applyMatrix3(patTransform))
+                box.expandByPoint(v.clone().applyMatrix3(transform))
             }
         }
         return box
@@ -172,9 +190,9 @@ export class HatchCalculator {
     /**
      * Transform relative intersection positions into
      * relative segments on line
-     * 
-     * @param {number[]} tPoints 
-     * @param {Vector2} firstPosition 
+     *
+     * @param {number[]} tPoints
+     * @param {Vector2} firstPosition
      * @returns {[number, number][]}
      */
     _RefineTSegments(tPoints, firstPosition) {
@@ -231,7 +249,7 @@ export class HatchCalculator {
 
     /**
      * Transform relative segments on line into line segments
-     * 
+     *
      * @param {[Vector2, Vector2]} line - Has start and end point of total line
      * @param {[number, number][]} tSegments - Has intervals in [0, 1]
      * @returns {[Vector2, Vector2][]}
@@ -239,7 +257,7 @@ export class HatchCalculator {
     _ToLineSegments(line, tSegments) {
         const [vs, ve] = line
         const diff = ve.clone().sub(vs)
-        return tSegments.map(([t1, t2]) => 
+        return tSegments.map(([t1, t2]) =>
             [
                 diff.clone().multiplyScalar(t1).add(vs),
                 diff.clone().multiplyScalar(t2).add(vs),

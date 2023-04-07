@@ -83,7 +83,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             break;
 
         case 52: // Hatch pattern angle (pattern fill only)
-            entity.patternAngle = curr.value;
+            entity.patternAngle = curr.value * Math.PI / 180;
             break;
 
         case 41: // Hatch pattern scale or spacing (pattern fill only)
@@ -174,10 +174,10 @@ function ParseBoundaryLoop(curr, scanner) {
                 e.radius = curr.value;
                 break;
             case 50:
-                e.startAngle = curr.value;
+                e.startAngle = curr.value * Math.PI / 180;
                 break;
             case 51:
-                e.endAngle = curr.value;
+                e.endAngle = curr.value * Math.PI / 180;
                 break;
             case 73:
                 e.isCcw = curr.value;
@@ -263,7 +263,11 @@ function ParseDefinitionLine(curr, scanner) {
     if (curr.code != 53) {
         return null
     }
-    const entity = {angle: curr.value, base: {x: 0, y: 0}, offset: {x: 0, y: 0}};
+    const entity = {
+        angle: curr.value * Math.PI / 180,
+        base: {x: 0, y: 0},
+        offset: {x: 0, y: 0}
+    };
     curr = scanner.next();
 
     let numDashes = 0;

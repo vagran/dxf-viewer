@@ -452,6 +452,11 @@ export class DxfScene {
         }
 
         const arcAngle = endAngle - startAngle
+
+        if (Math.abs(arcAngle - 2 * Math.PI) < 1e-6) {
+            isClosed = true
+        }
+
         let numSegments = Math.floor(arcAngle / tessellationAngle)
         if (numSegments === 0) {
             numSegments = 1
@@ -957,19 +962,27 @@ export class DxfScene {
             }]
         }
 
-        const seedPoints = entity.seedPoints ? entity.seedPoints : [0, 0]
+        const seedPoints = entity.seedPoints ? entity.seedPoints : [{x: 0, y: 0}]
 
         for (const seedPoint of seedPoints) {
-            for (const line of pattern.lines) {
 
-                const patTransform = calc.GetPatternTransform({
-                    seedPoint,
+            const patTransform = calc.GetPatternTransform({
+                seedPoint,
+                angle: entity.patternAngle,
+                scale: entity.patternScale
+            })
+
+            for (const line of pattern.lines) {
+                const lineTransform = calc.GetLineTransform({
+                    patTransform,
                     basePoint: line.base,
-                    angle: entity.patternAngle,
-                    scale: entity.patternScale
+                    angle: line.angle
                 })
 
-                const bbox = calc.GetPatternBoundingBox(patTransform)
+                const bbox = calc.GetBoundingBox(lineTransform)
+
+                console.log(JSON.stringify(bbox))//XXX
+
                 //XXX
             }
         }
