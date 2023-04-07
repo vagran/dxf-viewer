@@ -115,8 +115,8 @@ export class DxfViewer {
         return this.canvas
     }
 
-    GetDXF() {
-        return this.parsedDXF
+    GetDxf() {
+        return this.parsedDxf
     }
 
     SetSize(width, height) {
@@ -174,7 +174,7 @@ export class DxfViewer {
         const {scene, dxf} = await this.worker.Load(url, fonts, this.options, progressCbk)
         await this.worker.Destroy()
         this.worker = null
-        this.parsedDXF = dxf
+        this.parsedDxf = dxf
 
         this.origin = scene.origin
         this.bounds = scene.bounds
@@ -685,7 +685,7 @@ DxfViewer.DefaultOptions = {
     /** Scene generation options. */
     sceneOptions: DxfScene.DefaultOptions,
     /** Retain the simple object representing the parsed DXF - will consume a lot of additional memory */
-    retainParsedDXF: false,
+    retainParsedDxf: false,
 }
 
 DxfViewer.SetupWorker = function () {

@@ -155,10 +155,9 @@ export class DxfWorker {
         if (progressCbk) {
             progressCbk("prepare", 0, null)
         }
-        // console.log(">>>", JSON.stringify(dxf, null, 2))
         const dxfScene = new DxfScene(options)
         await dxfScene.Build(dxf, fontFetchers)
-        return {scene: dxfScene.scene, dxf: options.retainParsedDXF === true ? dxf : undefined }
+        return {scene: dxfScene.scene, dxf: options.retainParsedDxf === true ? dxf : undefined }
     }
 
     _CreateFontFetchers(urls, progressCbk) {
