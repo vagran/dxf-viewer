@@ -958,7 +958,10 @@ export class DxfScene {
         //XXX temporal stub
         const pattern = {
             lines: entity.definitionLines ?? [{
-                angle: 45, base: {x: 0, y: 0}, offset: {x: 0.1, y: 0.1}
+                angle: 45 * Math.PI / 180,
+                base: {x: 0, y: 0},
+                offset: {x: 0.1, y: 0.1},
+                dashes: [2, 1]
             }]
         }
 
@@ -973,21 +976,91 @@ export class DxfScene {
             })
 
             for (const line of pattern.lines) {
+                const angle = line.angle ?? 0
+
+                /* Transform offset vector to line CS. */
+                const sinA = Math.sin(-angle)
+                const cosA = Math.cos(-angle)
+                let offsetX = cosA * line.offset.x - sinA * line.offset.y
+                let offsetY = sinA * line.offset.x + cosA * line.offset.y
+                console.log("offset", offsetX, offsetY)//XXX
+
+                /* Normalize offset so that Y is always non-negative. Inverting offset vector
+                 * direction does not change lines positions.
+                 */
+                if (offsetY < 0) {
+                    offsetY = -offsetY
+                    offsetX = -offsetX
+                }
+
                 const lineTransform = calc.GetLineTransform({
                     patTransform,
                     basePoint: line.base,
-                    angle: line.angle
+                    angle: angle
                 })
 
                 const bbox = calc.GetBoundingBox(lineTransform)
 
                 console.log(JSON.stringify(bbox))//XXX
 
-                //XXX
+                /* First determine range of line indices. Line with index 0 goes through base point
+                 * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
+                 * offset vectors added to the base point.
+                 */
+                let minLineIdx, maxLineIdx
+                if (offsetY == 0) {
+                    /* Degenerated to single line. */
+                    minLineIdx = 0
+                    maxLineIdx = 0
+                } else {
+                    minLineIdx = Math.ceil(bbox.min.y / offsetY)
+                    maxLineIdx = Math.floor(bbox.max.y / offsetY)
+                }
+
+                console.log(minLineIdx, maxLineIdx)//XXX
+
+                let segmentLength
+                if (line.dashes && line.dashes.length > 1) {
+                    segmentLength = line.dashes.reduce((s, length) => s + length, 0)
+                } else {
+                    segmentLength = null
+                }
+
+                const ocsTransform = lineTransform.clone().invert()
+
+                const _this = this
+                function *RenderLine(y, xStart, xEnd) {
+                    const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
+                    const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
+                    const vertices = []
+                    for (const seg of calc.ClipLine([start, end])) {
+                        vertices.push(seg[0].applyMatrix3(transform))
+                        vertices.push(seg[1].applyMatrix3(transform))
+                    }
+                    yield new Entity({
+                        type: Entity.Type.LINE_SEGMENTS,
+                        vertices,
+                        layer, color
+                    })
+                }
+
+                for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
+                    //XXX
+                    const y = lineIdx * offsetY
+                    const xBase = lineIdx * offsetX
+                    /* Determine range for segment indices. One segment is one full sequence of
+                     * dashes. In case there is no dashes (solid line), just use hatch bounds.
+                     */
+                    if (segmentLength !== null) {
+                        //XXX
+                        
+                    } else {
+                        /* Single solid line. */
+                        yield *RenderLine(y, bbox.min.x, bbox.max.x)
+                    }
+                }
             }
         }
-
-        //XXX
     }
 
     /** @return {Vector2[][]} Each loop is a list of points in OCS coordinates. */
