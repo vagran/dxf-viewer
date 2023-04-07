@@ -144,7 +144,7 @@ export class HatchCalculator {
         const result = new Array(path.length)
         for (let i = 0; i < path.length; ++i) {
             const j = (i + 1) % path.length
-            const t0 = this._GetIntersection(line, path[i], path[j])
+            const t0 = this._GetIntersection(line, [path[i], path[j]])
 
             if (t0 === undefined) continue
             result[count++] = t0
@@ -217,7 +217,7 @@ export class HatchCalculator {
 
         // use odd even rule
         let count = 0
-        for (const path of this.paths) {
+        for (const path of this.boundaryPaths) {
             count += this._GetIntersections([point, q], path).length
         }
         return count % 2 === 1
