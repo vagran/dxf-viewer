@@ -1,5 +1,6 @@
 import { Matrix3, Vector2, Box2 } from "three"
 import { Matrix2 } from '../math/Matrix2'
+import { UnionIntervals } from "./UnionIntervals"
 
 const EPSILON = 1e-6
 
@@ -25,29 +26,58 @@ export class HatchCalculator {
     }
 
     /**
-     * Clip `line` on masking defined by `boundaryPaths`
+     * Clip `line` using strategy defined by `this.style`
      *
      * @param {[Vector2, Vector2]} line
      * @returns {[Vector2, Vector2][]} clipped line segments
      */
     ClipLine(line) {
+        if (this.style === HatchStyle.ODD_PARITY) {
+            return this._ClipLineOddParity(line)
+        }
+        if (this.style === HatchStyle.THROUGH_ENTIRE_AREA) {
+            return this._ClipLineUnion(line)
+        }
+        console.warn('Unsupported hatch style: HatchStyle.OUTERMOST')
+        return this._ClipLineUnion(line)
+    }
+
+    /**
+     * Clip `line` on masking defined by `boundaryPaths`
+     *
+     * @param {[Vector2, Vector2]} line
+     * @returns {[Vector2, Vector2][]} clipped line segments
+     */
+    _ClipLineOddParity(line) {
         // concat
         const intersections = this.boundaryPaths.reduce((intersections, path) => {
             intersections.push(...this._GetIntersections(line, path))
             return intersections
-        }, []).sort((a, b) => a - b)
+        }, [])
 
-        const isFirstInside = this._IsInside(line[0])
-        const segments = isFirstInside
-            ? [0, ...intersections]
-            : intersections
+        const tSegments = this._RefineTSegments(intersections, line[0])
+        return this._ToLineSegments(line, tSegments)
+    }
 
-        return Array.from(new Array(segments.length / 2), (_, i) => {
-            const diff = line[1].clone().sub(line[0])
-            const start = diff.copy().multiplyScalar(segments[2 * i]).add(line[0])
-            const end = diff.copy().multiplyScalar(segments[2 * i + 1]).add(line[0])
-            return [start, end]
-        })
+    /**
+     * Clip `line` on masking defined by union of `boundaryPaths`
+     * 
+     * @param {[Vector2, Vector2]} line 
+     * @returns {[Vector2, Vector2][]} clipped line segments
+     */
+    _ClipLineUnion(line) {
+        const tSegments = this.boundaryPaths.map((path) => {
+            const intersections = this._GetIntersections(line, [path])
+
+            if (!intersections.length) return []
+
+            return this._RefineTSegments(intersections, line[0])
+        }).reduce((acc, segments) => acc.concat(segments), [])
+
+        if (!tSegments.length) return []
+
+        const unifiedTSegments = UnionIntervals(tSegments)
+        return this._ToLineSegments(line, unifiedTSegments)
     }
 
     /**
@@ -140,6 +170,24 @@ export class HatchCalculator {
     }
 
     /**
+     * Transform relative intersection positions into
+     * relative segments on line
+     * 
+     * @param {number[]} tPoints 
+     * @param {Vector2} firstPosition 
+     * @returns {[number, number][]}
+     */
+    _RefineTSegments(tPoints, firstPosition) {
+        const isFirstInside = this._IsInside(firstPosition)
+        const segments = isFirstInside
+            ? [0, ...tPoints]
+            : tPoints
+        segments.sort((a, b) => a - b)
+        return Array.from(new Array(segments.length / 2), (_, i) =>
+            [segments[2 * i], segments[2 * i + 1]])
+    }
+
+    /**
      * Return whether `point` is inside of union of `paths`
      *
      * @param {Vector2} point
@@ -179,5 +227,23 @@ export class HatchCalculator {
             }
         }
         return dMaxPoint
+    }
+
+    /**
+     * Transform relative segments on line into line segments
+     * 
+     * @param {[Vector2, Vector2]} line - Has start and end point of total line
+     * @param {[number, number][]} tSegments - Has intervals in [0, 1]
+     * @returns {[Vector2, Vector2][]}
+     */
+    _ToLineSegments(line, tSegments) {
+        const [vs, ve] = line
+        const diff = ve.clone().sub(vs)
+        return tSegments.map(([t1, t2]) => 
+            [
+                diff.clone().multiplyScalar(t1).add(vs),
+                diff.clone().multiplyScalar(t2).add(vs),
+            ]
+        )
     }
 }
