@@ -400,11 +400,12 @@ export class DxfScene {
      * @param vertices Generated vertices pushed here.
      * @param center {{x, y}} Center vector.
      * @param radius {number}
-     * @param startAngle {?number} Start angle. Zero if not specified. Arc is drawn in CCW direction
-     *  from start angle towards end angle.
-     * @param endAngle {?number} Optional end angle. Full circle is drawn if not specified.
-     * @param tessellationAngle {?number} Arc tessellation angle, default value is taken from scene
-     *  options.
+     * @param startAngle {?number} Start angle in radians. Zero if not specified. Arc is drawn in
+     *  CCW direction from start angle towards end angle.
+     * @param endAngle {?number} Optional end angle in radians. Full circle is drawn if not
+     *  specified.
+     * @param tessellationAngle {?number} Arc tessellation angle in radians, default value is taken
+     *  from scene options.
      * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
      * @param transform {?Matrix3} Optional transform matrix for the arc. Applied as last operation.
      */
