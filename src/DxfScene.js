@@ -1028,14 +1028,19 @@ export class DxfScene {
 
                 const ocsTransform = lineTransform.clone().invert()
 
-                const _this = this
                 function *RenderLine(y, xStart, xEnd) {
                     const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
                     const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
                     const vertices = []
                     for (const seg of calc.ClipLine([start, end])) {
-                        vertices.push(seg[0].applyMatrix3(transform))
-                        vertices.push(seg[1].applyMatrix3(transform))
+                        const p1 = seg[0].clone()
+                        const p2 = seg[1].clone()
+                        if (transform) {
+                            p1.applyMatrix3(transform)
+                            p2.applyMatrix3(transform)
+                        }
+                        vertices.push(p1)
+                        vertices.push(p2)
                     }
                     yield new Entity({
                         type: Entity.Type.LINE_SEGMENTS,
@@ -1053,7 +1058,7 @@ export class DxfScene {
                      */
                     if (segmentLength !== null) {
                         //XXX
-                        
+
                     } else {
                         /* Single solid line. */
                         yield *RenderLine(y, bbox.min.x, bbox.max.x)
@@ -1103,7 +1108,8 @@ export class DxfScene {
                     switch (edge.type) {
                     case 1:
                         /* Line segment. */
-                        AddPoints(vertices, [edge.start, edge.end])
+                        AddPoints(vertices, [new Vector2(edge.start.x, edge.start.y),
+                                             new Vector2(edge.end.x, edge.end.y)])
                         break
                     case 2: {
                         /* Circular arc. */

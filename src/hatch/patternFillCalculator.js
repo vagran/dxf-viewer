@@ -82,14 +82,14 @@ export class HatchCalculator {
 
     /**
      * @param {Vector2} seedPoint Pattern seed point coordinates in OCS.
-     * @param {?number} angle Pattern rotation angle in degrees.
+     * @param {?number} angle Pattern rotation angle in radians.
      * @param {?number} scale Pattern scale.
      * @return {Matrix3} Transformation from OCS to pattern space.
      */
     GetPatternTransform({seedPoint, angle, scale}) {
         const m = new Matrix3().makeTranslation(-seedPoint.x, -seedPoint.y)
         if (angle) {
-            m.rotate(-angle * Math.PI / 180)
+            m.rotate(-angle)
         }
         if ((scale ?? 1) != 1) {
             m.scale(1 / scale, 1 / scale)
@@ -101,7 +101,7 @@ export class HatchCalculator {
      * @param {Matrix3} patTransform Transformation from OCS to pattern space previously obtained by
      *      GetPatternTransform() method.
      * @param {?Vector2} basePoint Line base point coordinate in pattern space.
-     * @param {?number} angle Line direction angle in degrees, CCW from +X direction.
+     * @param {?number} angle Line direction angle in radians, CCW from +X direction.
      * @return {Matrix3} Transformation from OCS to pattern line space. Line is started at origin
      *  and directed into position X axis direction.
      */
@@ -111,7 +111,7 @@ export class HatchCalculator {
             m.translate(-basePoint.x, -basePoint.y)
         }
         if (angle) {
-            m.rotate(-angle * Math.PI / 180)
+            m.rotate(-angle)
         }
         return m
     }
