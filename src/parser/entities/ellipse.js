@@ -23,9 +23,11 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.axisRatio = curr.value;
             break;
         case 41:
+            /* Already in radians. */
             entity.startAngle = curr.value;
             break;
         case 42:
+            /* Already in radians. */
             entity.endAngle = curr.value;
             break;
         case 2:

@@ -1,10 +1,10 @@
 {
     "name": "dxf-viewer",
-    "version": "1.0.22",
+    "version": "1.0.24",
     "description": "JavaScript DXF file viewer",
     "main": "src/index.js",
     "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
-    "license": "Mozilla Public License 2.0",
+    "license": "MPL-2.0",
     "repository": "https://github.com/vagran/dxf-viewer",
     "keywords": [
         "dxf",
