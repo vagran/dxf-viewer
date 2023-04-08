@@ -18,6 +18,14 @@ const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 /** Number of subdivisions per spline point. */
 const SPLINE_SUBDIVISION = 4
+/** Limit hatch lines number to some reasonable value to mitigate hanging and out-of-memory issues
+ * on bad files.
+ */
+const MAX_HATCH_LINES = 20000
+/** Limit hatch segments number per line to some reasonable value to mitigate hanging and
+ * out-of-memory issues on bad files.
+ */
+const MAX_HATCH_SEGMENTS = 20000
 
 
 /** Default values for system variables. Entry may be either value or function to call for obtaining
@@ -927,8 +935,6 @@ export class DxfScene {
     }
 
     *_DecomposeHatch(entity, blockCtx) {
-        //XXX not implemented yet
-        console.log(JSON.stringify(entity))
 
         if (entity.isSolid) {
             //XXX solid hatch not yet supported
@@ -960,8 +966,7 @@ export class DxfScene {
             lines: entity.definitionLines ?? [{
                 angle: 45 * Math.PI / 180,
                 base: {x: 0, y: 0},
-                offset: {x: 0.1, y: 0.1},
-                dashes: [2, 1]
+                offset: {x: -0.1, y: 0.1}
             }]
         }
 
@@ -983,7 +988,6 @@ export class DxfScene {
                 const cosA = Math.cos(-angle)
                 let offsetX = cosA * line.offset.x - sinA * line.offset.y
                 let offsetY = sinA * line.offset.x + cosA * line.offset.y
-                console.log("offset", offsetX, offsetY)//XXX
 
                 /* Normalize offset so that Y is always non-negative. Inverting offset vector
                  * direction does not change lines positions.
@@ -1001,8 +1005,6 @@ export class DxfScene {
 
                 const bbox = calc.GetBoundingBox(lineTransform)
 
-                console.log(JSON.stringify(bbox))//XXX
-
                 /* First determine range of line indices. Line with index 0 goes through base point
                  * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
                  * offset vectors added to the base point.
@@ -1017,11 +1019,17 @@ export class DxfScene {
                     maxLineIdx = Math.floor(bbox.max.y / offsetY)
                 }
 
-                console.log(minLineIdx, maxLineIdx)//XXX
+                if (maxLineIdx - minLineIdx > MAX_HATCH_LINES) {
+                    console.warn("Too many lines produced by hatching pattern")
+                    continue
+                }
 
                 let segmentLength
                 if (line.dashes && line.dashes.length > 1) {
                     segmentLength = line.dashes.reduce((s, length) => s + length, 0)
+                    if (segmentLength <= 0) {
+                        segmentLength = null
+                    }
                 } else {
                     segmentLength = null
                 }
@@ -1049,15 +1057,33 @@ export class DxfScene {
                     })
                 }
 
+                function *RenderSegment(x, y) {
+                    let isSpace = false
+                    for (const dashLength of line.dashes) {
+                        if (!isSpace) {
+                            yield *RenderLine(y, x, x + dashLength)
+                        }
+                        isSpace = !isSpace
+                        x += dashLength
+                    }
+                }
+
                 for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
-                    //XXX
                     const y = lineIdx * offsetY
                     const xBase = lineIdx * offsetX
                     /* Determine range for segment indices. One segment is one full sequence of
                      * dashes. In case there is no dashes (solid line), just use hatch bounds.
                      */
                     if (segmentLength !== null) {
-                        //XXX
+                        let minSegIdx = Math.floor((bbox.min.x - xBase) / segmentLength)
+                        let maxSegIdx = Math.floor((bbox.max.x - xBase) / segmentLength)
+                        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
+                            console.warn("Too many segments produced by hatching pattern line")
+                            continue
+                        }
+                        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
+                            yield *RenderSegment(xBase + segIdx * segmentLength, y)
+                        }
 
                     } else {
                         /* Single solid line. */

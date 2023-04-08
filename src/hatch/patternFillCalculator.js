@@ -89,7 +89,8 @@ export class HatchCalculator {
     GetPatternTransform({seedPoint, angle, scale}) {
         const m = new Matrix3().makeTranslation(-seedPoint.x, -seedPoint.y)
         if (angle) {
-            m.rotate(-angle)
+            /* Matrix3.rotate() inverts angle sign. */
+            m.rotate(angle)
         }
         if ((scale ?? 1) != 1) {
             m.scale(1 / scale, 1 / scale)
@@ -111,7 +112,8 @@ export class HatchCalculator {
             m.translate(-basePoint.x, -basePoint.y)
         }
         if (angle) {
-            m.rotate(-angle)
+            /* Matrix3.rotate() inverts angle sign. */
+            m.rotate(angle)
         }
         return m
     }
