@@ -197,9 +197,23 @@ export class HatchCalculator {
      */
     _RefineTSegments(tPoints, firstPosition) {
         const isFirstInside = this._IsInside(firstPosition)
-        const segments = isFirstInside
-            ? [0, ...tPoints]
-            : tPoints
+
+        // https://github.com/vagran/dxf-viewer/issues/36#issuecomment-1500802929
+        let segments
+        if (tPoints.length % 2) {
+            if (isFirstInside) {
+                segments = [0, ...tPoints]
+            } else {
+                segments = [...tPoints, 1]
+            }
+        } else {
+            if (isFirstInside) {
+                segments = [0, ...tPoints, 1]
+            } else {
+                segments = tPoints
+            }
+        }
+
         segments.sort((a, b) => a - b)
         return Array.from(new Array(segments.length / 2), (_, i) =>
             [segments[2 * i], segments[2 * i + 1]])
