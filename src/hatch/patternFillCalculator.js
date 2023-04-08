@@ -2,8 +2,6 @@ import { Matrix3, Vector2, Box2 } from "three"
 import { Matrix2 } from '../math/Matrix2'
 import { UnionIntervals } from "./UnionIntervals"
 
-const EPSILON = 1e-6
-
 export const HatchStyle = Object.freeze({
     ODD_PARITY: 0,
     OUTERMOST: 1,
@@ -55,7 +53,7 @@ export class HatchCalculator {
             return intersections
         }, [])
 
-        const tSegments = this._RefineTSegments(intersections, line[0])
+        const tSegments = this._RefineTSegments(line, intersections)
         return this._ToLineSegments(line, tSegments)
     }
 
@@ -71,7 +69,7 @@ export class HatchCalculator {
 
             if (!intersections.length) return []
 
-            return this._RefineTSegments(intersections, line[0])
+            return this._RefineTSegments(line, intersections)
         }).reduce((acc, segments) => acc.concat(segments), [])
 
         if (!tSegments.length) return []
@@ -174,12 +172,11 @@ export class HatchCalculator {
             diff0.x, diff1.x,
             diff0.y, diff1.y,
         ))
-        const det = A.det()
-        if (Math.abs(det) < EPSILON) return undefined
-
-        const AInverse = A.inverse(det)
         const b = s1.clone().sub(s0)
-        const { x: t0, y: t1 } = AInverse.multiply(b)
+        const v = A.solve(b)
+        if (!v) return undefined
+
+        const { x: t0, y: t1 } = v
 
         // one side is exclusive to avoid duplicated counting,
         // when intersection point is exactly a vertex of edges
@@ -191,32 +188,31 @@ export class HatchCalculator {
      * Transform relative intersection positions into
      * relative segments on line
      *
+     * @param {[Vector2, Vector2]} baseLine
      * @param {number[]} tPoints
-     * @param {Vector2} firstPosition
      * @returns {[number, number][]}
      */
-    _RefineTSegments(tPoints, firstPosition) {
-        const isFirstInside = this._IsInside(firstPosition)
+    _RefineTSegments(baseLine, tPoints) {
+        const [s, e] = baseLine
+        const diff = e.clone().sub(s)
 
-        // https://github.com/vagran/dxf-viewer/issues/36#issuecomment-1500802929
-        let segments
-        if (tPoints.length % 2) {
-            if (isFirstInside) {
-                segments = [0, ...tPoints]
-            } else {
-                segments = [...tPoints, 1]
-            }
-        } else {
-            if (isFirstInside) {
-                segments = [0, ...tPoints, 1]
-            } else {
-                segments = tPoints
+        tPoints.sort((a, b) => a - b)
+        
+        const tSegments = [0, ...tPoints, 1]
+        const result = []
+
+        for (let i = 0; i < tSegments.length - 1; ++i) {
+            // to overcome degenerate case when deciding inside or not
+            const r = Math.random()
+            const tMiddle = tSegments[i] * r + tSegments[i + 1] * (1 - r)
+            const vMiddle =  diff.clone().multiplyScalar(tMiddle).add(s)
+
+            if (this._IsInside(vMiddle)) {
+                result.push([tSegments[i], tSegments[i + 1]])
             }
         }
 
-        segments.sort((a, b) => a - b)
-        return Array.from(new Array(segments.length / 2), (_, i) =>
-            [segments[2 * i], segments[2 * i + 1]])
+        return result
     }
 
     /**
