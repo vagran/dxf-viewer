@@ -49,4 +49,29 @@ export class Matrix2 {
             -this.a10 / determinant, this.a00 / determinant,
         )
     }
+
+    /**
+     * Solve linear equation Ax = b using Gauss-Jordan reduction
+     * where A is `this`. If it's singular, return `undefined`
+     * @param {Vector2} b 
+     * @returns {Vector2 | undefined}
+     */
+    solve(b) {
+        if (this.a00 * this.a11 === this.a10 * this.a01) return undefined
+
+        if (Math.abs(this.a00) >= Math.abs(this.a10)) {
+            const alpha = this.a10 / this.a00
+            const beta = this.a11 - this.a01 * alpha
+            const gamma = b.y - b.x * alpha
+            const y = gamma / beta
+            const x = (b.x - this.a01 * y) / this.a00
+            return new Vector2(x, y)
+        }
+        const alpha = this.a00 / this.a10
+        const beta = this.a01 - this.a11 * alpha
+        const gamma = b.x - b.y * alpha
+        const y = gamma / beta
+        const x = (b.y - this.a11 * y) / this.a10
+        return new Vector2(x, y)
+    }
 }
