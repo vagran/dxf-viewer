@@ -193,7 +193,7 @@ export class HatchCalculator {
         }
 
         function GetNext(i) {
-            i == n - 1 ? 0 : i + 1
+            return i == n - 1 ? 0 : i + 1
         }
 
         return GetPrev(node1.edgeIndex) == node2.edgeIndex ||

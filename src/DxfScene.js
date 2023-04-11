@@ -1092,7 +1092,7 @@ export class DxfScene {
                         yield *RenderLine(y, bbox.min.x - margin, bbox.max.x + margin)
                     }
                 }
-                // yield *RenderLine(0, bbox.min.x - margin, bbox.max.x + margin)//XXX
+                // yield *RenderLine(0, bbox.min.x - margin, bbox.max.x + margin)//tmp debug XXX
             }
         }
     }
