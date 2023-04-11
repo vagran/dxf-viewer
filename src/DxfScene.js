@@ -6,7 +6,7 @@ import { RBTree } from "./RBTree"
 import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
-import { HatchCalculator, HatchStyle } from "./hatch/patternFillCalculator"
+import { HatchCalculator, HatchStyle } from "./hatch/HatchCalculator"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -935,7 +935,7 @@ export class DxfScene {
     }
 
     *_DecomposeHatch(entity, blockCtx) {
-
+        console.log(JSON.stringify(entity))//XXX
         if (entity.isSolid) {
             //XXX solid hatch not yet supported
             return
@@ -1004,6 +1004,7 @@ export class DxfScene {
                 })
 
                 const bbox = calc.GetBoundingBox(lineTransform)
+                const margin = (bbox.max.x - bbox.min.x) * 0.05
 
                 /* First determine range of line indices. Line with index 0 goes through base point
                  * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
@@ -1075,21 +1076,23 @@ export class DxfScene {
                      * dashes. In case there is no dashes (solid line), just use hatch bounds.
                      */
                     if (segmentLength !== null) {
-                        let minSegIdx = Math.floor((bbox.min.x - xBase) / segmentLength)
-                        let maxSegIdx = Math.floor((bbox.max.x - xBase) / segmentLength)
-                        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
-                            console.warn("Too many segments produced by hatching pattern line")
-                            continue
-                        }
-                        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
-                            yield *RenderSegment(xBase + segIdx * segmentLength, y)
-                        }
+                        //XXX
+                        // let minSegIdx = Math.floor((bbox.min.x - xBase) / segmentLength)
+                        // let maxSegIdx = Math.floor((bbox.max.x - xBase) / segmentLength)
+                        // if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
+                        //     console.warn("Too many segments produced by hatching pattern line")
+                        //     continue
+                        // }
+                        // for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
+                        //     yield *RenderSegment(xBase + segIdx * segmentLength, y)
+                        // }
 
                     } else {
                         /* Single solid line. */
-                        yield *RenderLine(y, bbox.min.x, bbox.max.x)
+                        yield *RenderLine(y, bbox.min.x - margin, bbox.max.x + margin)
                     }
                 }
+                // yield *RenderLine(0, bbox.min.x - margin, bbox.max.x + margin)//XXX
             }
         }
     }
