@@ -7,18 +7,221 @@ export const HatchStyle = Object.freeze({
     THROUGH_ENTIRE_AREA: 2
 })
 
+/** Force intersection at this distance from edge endpoint (parameter value). */
+const ENDPOINT_MARGIN = 1e-4
+
+/** @return {boolean} True if both edges crossed from the same side, false otherwise. */
+function EdgeSameSide(e1, e2) {
+    return (e1.intersection[2] > 0 && e2.intersection[2]) > 0 ||
+        (e1.intersection[2] < 0 && e2.intersection[2] < 0)
+}
+
+/** Context for one line clipping calculations. */
+class ClipCalculator {
+
+    constructor(boundaryLoops, style, line) {
+        this.style = style
+        this.line = line
+        this.lineDir = line[1].clone().sub(line[0]).normalize()
+
+        this.loops = []
+        for (let loopIdx = 0; loopIdx < boundaryLoops.length; loopIdx++) {
+            const loop = boundaryLoops[loopIdx]
+            const _loop = []
+            for (let vtxIdx = 0; vtxIdx < loop.length; vtxIdx++) {
+                _loop.push({
+                    idx: vtxIdx,
+                    start: loop[vtxIdx],
+                    end: loop[vtxIdx == loop.length - 1 ? 0 : vtxIdx + 1],
+                    loopIdx
+                })
+            }
+            this.loops.push(_loop)
+        }
+    }
+
+    /**
+     * @return {number[2][]} List of resulting line segments in parametric form. Parameter value 0
+     *  corresponds to the provided line start point, 1 - to end point.
+     */
+    Calculate() {
+        //XXX just odd parity now
+        this._ProcessEdges()
+        this._CreateNodes()
+        /* Sort from line start towards end. */
+        this.nodes.sort((e1, e2) => e1.intersection[0] - e2.intersection[0])
+        return this._GenerateClippedSegments()
+        // return [[0, 1]]//XXX
+    }
+
+    _ProcessEdges() {
+        for (const loop of this.loops) {
+            for (const edge of loop) {
+                const edgeVec = edge.end.clone().sub(edge.start)
+                const len = edgeVec.length()
+                edge.isZero = len <= Math.EPSILON
+                if (edge.isZero) {
+                    continue
+                }
+                edgeVec.divideScalar(len)
+                const a = edgeVec.cross(this.lineDir)
+                edge.isParallel = Math.abs(a) <= 1e-6
+                if (edge.isParallel) {
+                    continue
+                }
+                edge.intersection = IntersectSegmentsParametric(this.line[0], this.line[1],
+                    edge.start, edge.end, true)
+            }
+        }
+    }
+
+    /** Create intersection nodes. Each node with `toggle` property set causes line state change, so
+     * unnecessary changes should be filtered out inside this method. Node also can suppress or
+     * un-suppress line if currently enabled, this is done by setting `suppress` and
+     * `unsuppress` properties on the edge.
+     */
+    _CreateNodes() {
+        this.nodes = []
+        for (const loop of this.loops) {
+            for (let edge of loop) {
+                if (edge.isZero || edge.isParallel || edge.isProcessed) {
+                    continue
+                }
+
+                if (edge.intersection[1] < -ENDPOINT_MARGIN ||
+                    edge.intersection[1] > 1 + ENDPOINT_MARGIN) {
+                    /* No intersection. */
+                    continue
+                }
+
+                /* Some intersection exists, check if near endpoints. */
+                const isStartVtx = edge.intersection[1] <= ENDPOINT_MARGIN
+                if (isStartVtx || edge.intersection[1] >= 1 - ENDPOINT_MARGIN) {
+                    /* Intersection near start or end vertex, force connected edge check. */
+                    let [connEdge, isDirect] = this._GetConnectedEdge(edge, isStartVtx)
+                    if (!connEdge) {
+                        /* Some invalid case, ignore. */
+                        continue
+                    }
+                    edge.isProcessed = true
+                    connEdge.isProcessed = true
+                    if (isDirect) {
+                        if (EdgeSameSide(edge, connEdge)) {
+                            edge.toggle = true
+                            this.nodes.push(edge)
+                        }
+                    } else {
+                        /** Connected through colinear edge(s). Mark the first edge to temporarily
+                         * disable line if it is enabled. Second edge either toggles the state or
+                         * restores previous one.
+                         */
+                        if (edge.intersection[0] > connEdge.intersection[0]) {
+                            /* Set proper order, `edge` is the first intersection, `connEdge` - the
+                             * second one.
+                             */
+                            const tmp = connEdge
+                            connEdge = edge
+                            edge = tmp
+                        }
+
+                        edge.suppress = true
+                        connEdge.unsuppress = true
+
+                        this.nodes.push(edge)
+
+                        if (EdgeSameSide(edge, connEdge)) {
+                            connEdge.toggle = true
+                        }
+                        this.nodes.push(connEdge)
+                    }
+
+                } else {
+                    /* Clean inner intersection. */
+                    edge.isProcessed = true
+                    edge.toggle = true
+                    this.nodes.push(edge)
+                }
+            }
+        }
+    }
+
+    /**
+     * @param {Edge} edge
+     * @param {boolean} isStartVtx True for connected through start vertex, false for end vertex.
+     * @return {[?Edge, boolean]} Connected valid edge if found, null if not found (e.g. is the same
+     *  edge for some reason). Second value is true if directly connected, false if though colinear
+     *  edges.
+     */
+    _GetConnectedEdge(edge, isStartVtx) {
+        const loop = this.loops[edge.loopIdx]
+        let i = edge.idx
+        let isDirect = true
+        do {
+            if (isStartVtx) {
+                if (i == 0) {
+                    i = loop.length - 1
+                } else {
+                    i--
+                }
+            } else {
+                if (i == loop.length - 1) {
+                    i = 0
+                } else {
+                    i++
+                }
+            }
+            const connEdge = loop[i]
+            if (connEdge.isZero || connEdge.isParallel) {
+                isDirect = false
+            } else {
+                return [connEdge, isDirect]
+            }
+        } while (i != edge.idx)
+        return [null, false]
+    }
+
+    _GenerateClippedSegments() {
+        const result = []
+        let state = false
+        /* Incremented with each suppression, decremented with each un-suppression. */
+        let suppress = 0
+        /* Previous node when line was enabled. */
+        let prevNode = null
+
+        for (const node of this.nodes) {
+            if (node.suppress) {
+                suppress++
+            }
+            if (node.unsuppress) {
+                suppress--
+            }
+            if (node.toggle) {
+                state = !state
+            }
+            if (suppress == 0 && state && (node.unsuppress || node.toggle)) {
+                /* Just started new segment. */
+                prevNode = node
+            } else if ((suppress || !state) && prevNode) {
+                result.push([prevNode.intersection[0], node.intersection[0]])
+                prevNode = null
+            }
+        }
+        return result
+    }
+}
+
 export class HatchCalculator {
-    boundaryPaths
+    boundaryLoops
     style
 
     /**
      * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
      *
-     * @param {Vector2[][]} boundaryPaths
+     * @param {Vector2[][]} boundaryLoops
      * @param {HatchStyle} style
      */
-    constructor(boundaryPaths, style) {
-        this.boundaryPaths = boundaryPaths
+    constructor(boundaryLoops, style) {
+        this.boundaryLoops = boundaryLoops
         this.style = style
     }
 
@@ -30,20 +233,7 @@ export class HatchCalculator {
      * @returns {[Vector2, Vector2][]} clipped line segments
      */
     ClipLine(line) {
-        //XXX just odd parity now
-
-        const n = this.boundaryPaths.length
-        const nodes = []
-        for (let i = 0; i < n; i++) {
-            this._GetLoopIntersections(line, this.boundaryPaths[i], i, nodes)
-        }
-
-        /** Sort nodes from line start to end. */
-        nodes.sort((a, b) => a.lineParam - b.lineParam)
-
-        //XXX clip colinear
-        return this._GenerateClippedSegments(line, nodes)
-        // return [line]//XXX
+        return new ClipCalculator(this.boundaryLoops, this.style, line).Calculate()
     }
 
     /**
@@ -90,113 +280,11 @@ export class HatchCalculator {
      */
     GetBoundingBox(transform) {
         const box = new Box2()
-        for (const path of this.boundaryPaths) {
+        for (const path of this.boundaryLoops) {
             for (const v of path) {
                 box.expandByPoint(v.clone().applyMatrix3(transform))
             }
         }
         return box
-    }
-
-    /**
-     * @typedef LineNode
-     * @property {number} lineParam Line parameter of the intersection point (0 for line start
-     *  point, 1 - for end).
-     * @property {number} loopIndex Index of the loop intersected with.
-     * @property {number} edgeIndex Index of the intersected edge in the loop.
-     * @property {boolean} side Side of the edge intersected with.
-     */
-
-    /**
-     * @param {Vector2[2]} line Line segment defined by start and end points.
-     * @param {Vector2[2]} edge Edge segment defined by start and end points.
-     * @param {number} loopIndex Index of the loop the specified edge belongs to.
-     * @return {?LineNode} Intersection node, null if no intersection or colinear edge.
-     */
-    _GetEdgeIntersection(line, edge, loopIndex, edgeIndex) {
-        const params = IntersectSegmentsParametric(line[0], line[1], edge[0], edge[1])
-        if (!params) {
-            return null
-        }
-        return {
-            lineParam: params[0],
-            loopIndex,
-            edgeIndex,
-            side: params[2] > 0
-        }
-    }
-
-    /**
-     * Calculate intersections for the specified loop.
-     * @param {Vector2[2]} line Line segment defined by start and end points.
-     * @param {Vector2[]} loop Loop points.
-     * @param {number} loopIndex Index of the loop.
-     * @param {LineNode[]} result Intersection nodes appended to this array.
-     */
-    _GetLoopIntersections(line, loop, loopIndex, result) {
-        const n = loop.length
-        for (let i = 0; i < n; i++) {
-            const iNext = i == n - 1 ? 0 : i + 1
-            const node = this._GetEdgeIntersection(line, [loop[i], loop[iNext]], loopIndex, i)
-            if (node) {
-                result.push(node)
-            }
-        }
-        return result
-    }
-
-    /**
-     * Produce list of clipped line segment based on the provided list of intersection nodes.
-     * @param {Vector2[2]} line Line segment defined by start and end points.
-     * @param {LineNode[]} nodes
-     * @return {Vector2[2][]} List of clipped line segments.
-     */
-    _GenerateClippedSegments(line, nodes) {
-        const lineDir = line[1].clone().sub(line[0])
-        /* False when segment is clipped out, true when it is drawn. */
-        let state = false
-        let prevNode = null
-        const result = []
-        const n = nodes.length
-        for (let i = 0; i < n; i++) {
-            const node = nodes[i]
-            if (prevNode === null || prevNode.loopIndex != node.loopIndex ||
-                prevNode.side != node.side || !this._IsConnectedEdges(node, prevNode)) {
-
-                if (state && prevNode !== null &&
-                    (node.lineParam - prevNode.lineParam) > Number.EPSILON) {
-
-                    /* New segment is generated. */
-                    result.push([lineDir.clone().multiplyScalar(prevNode.lineParam).add(line[0]),
-                                 lineDir.clone().multiplyScalar(node.lineParam).add(line[0])])
-                }
-                state = !state
-            }
-            prevNode = node
-        }
-        return result
-    }
-
-    /**
-     * @param {LineNode} node1
-     * @param {LineNode} node2
-     * @return {boolean} True if intersected edges are connected edges of one loop.
-     */
-    _IsConnectedEdges(node1, node2) {
-        if (node1.loopIndex != node2.loopIndex) {
-            return false
-        }
-        const n = this.boundaryPaths[node1.loopIndex].length
-
-        function GetPrev(i) {
-            return i == 0 ? n - 1 : i - 1
-        }
-
-        function GetNext(i) {
-            return i == n - 1 ? 0 : i + 1
-        }
-
-        return GetPrev(node1.edgeIndex) == node2.edgeIndex ||
-               GetNext(node1.edgeIndex) == node2.edgeIndex
     }
 }

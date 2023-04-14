@@ -6,11 +6,13 @@ import { Vector2 } from "three"
  * @param {Vector2} a2 First segment end point.
  * @param {Vector2} b1 Second segment start point.
  * @param {Vector2} b2 Second segment end point.
+ * @param {boolean} force Force intersection calculation even if intersection point is out of
+ *  segment range.
  * @return {?number[3]} Parameters for the first and second segment in the intersection point
  *  (parameter value 0 corresponds to a start point, 1 - to an end point). Third number is segments
  *  direction vectors pseudo-cross-product. Null if there is no intersection.
  */
-export function IntersectSegmentsParametric(a1, a2, b1, b2) {
+export function IntersectSegmentsParametric(a1, a2, b1, b2, force = false) {
     const a = a2.clone().sub(a1)
     const b = b2.clone().sub(b1)
 
@@ -27,13 +29,13 @@ export function IntersectSegmentsParametric(a1, a2, b1, b2) {
     const c = b1.clone().sub(a1)
 
     const t = c.cross(b) / S
-    if (t < 0 || t > 1) {
+    if (!force && (t < 0 || t > 1)) {
         /* Intersection point is out the first segment endpoints. */
         return null
     }
 
     const u = c.cross(a) / S
-    if (u < 0 || u > 1) {
+    if (!force && (u < 0 || u > 1)) {
         /* Intersection point is out the second segment endpoints. */
         return null
     }
@@ -46,9 +48,7 @@ export function IntersectSegmentsParametric(a1, a2, b1, b2) {
  * @param {Vector2} a2 First segment end point.
  * @param {Vector2} b1 Second segment start point.
  * @param {Vector2} b2 Second segment end point.
- * @return {?number[2]} Parameters for the first and second segment in the intersection point (
- *  parameter value 0 corresponds to a start point, 1 - to an end point). Null if there is no
- *  intersection.
+ * @return {?Vector2} Intersection point coordinate, null if no intersection.
  */
 export function IntersectSegments(a1, a2, b1, b2) {
     const params = IntersectSegmentsParametric(a1, a2, b1, b2)

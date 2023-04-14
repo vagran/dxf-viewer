@@ -1040,10 +1040,11 @@ export class DxfScene {
                 function *RenderLine(y, xStart, xEnd) {
                     const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
                     const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
+                    const lineVec = end.clone().sub(start)
                     const vertices = []
                     for (const seg of calc.ClipLine([start, end])) {
-                        const p1 = seg[0].clone()
-                        const p2 = seg[1].clone()
+                        const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
+                        const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
                         if (transform) {
                             p1.applyMatrix3(transform)
                             p2.applyMatrix3(transform)
