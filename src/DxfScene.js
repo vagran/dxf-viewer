@@ -1025,75 +1025,100 @@ export class DxfScene {
                     continue
                 }
 
-                let segmentLength
+                let dashPatLength
                 if (line.dashes && line.dashes.length > 1) {
-                    segmentLength = line.dashes.reduce((s, length) => s + length, 0)
-                    if (segmentLength <= 0) {
-                        segmentLength = null
+                    dashPatLength = line.dashes.reduce((s, length) => s + length, 0)
+                    if (dashPatLength <= 0) {
+                        dashPatLength = null
                     }
                 } else {
-                    segmentLength = null
+                    dashPatLength = null
                 }
 
                 const ocsTransform = lineTransform.clone().invert()
 
-                function *RenderLine(y, xStart, xEnd) {
+                for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
+                    const y = lineIdx * offsetY
+                    const xBase = lineIdx * offsetX
+
+                    const xStart = bbox.min.x - margin
+                    const xEnd = bbox.max.x + margin
+                    const lineLength = xEnd - xStart
                     const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
                     const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
                     const lineVec = end.clone().sub(start)
-                    const vertices = []
-                    for (const seg of calc.ClipLine([start, end])) {
+                    const clippedSegments = calc.ClipLine([start, end])
+
+                    function GetParam(x) {
+                        return (x - xStart) / lineLength
+                    }
+
+                    function RenderSegment(seg) {
                         const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
                         const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
                         if (transform) {
                             p1.applyMatrix3(transform)
                             p2.applyMatrix3(transform)
                         }
-                        vertices.push(p1)
-                        vertices.push(p2)
+                        return new Entity({
+                            type: Entity.Type.LINE_SEGMENTS,
+                            vertices: [p1, p2],
+                            layer, color
+                        })
                     }
-                    yield new Entity({
-                        type: Entity.Type.LINE_SEGMENTS,
-                        vertices,
-                        layer, color
-                    })
-                }
 
-                function *RenderSegment(x, y) {
-                    let isSpace = false
-                    for (const dashLength of line.dashes) {
-                        if (!isSpace) {
-                            yield *RenderLine(y, x, x + dashLength)
+                    /** Clip segment against `clippedSegments`. */
+                    function *ClipSegment(segStart, segEnd) {
+                        for (const seg of clippedSegments) {
+                            if (seg[0] >= segEnd) {
+                                return
+                            }
+                            if (seg[1] <= segStart) {
+                                continue
+                            }
+                            const _start = Math.max(segStart, seg[0])
+                            const _end = Math.min(segEnd, seg[1])
+                            yield [_start, _end]
+                            segStart = _end
                         }
-                        isSpace = !isSpace
-                        x += dashLength
                     }
-                }
 
-                for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
-                    const y = lineIdx * offsetY
-                    const xBase = lineIdx * offsetX
                     /* Determine range for segment indices. One segment is one full sequence of
                      * dashes. In case there is no dashes (solid line), just use hatch bounds.
                      */
-                    if (segmentLength !== null) {
-                        //XXX
-                        // let minSegIdx = Math.floor((bbox.min.x - xBase) / segmentLength)
-                        // let maxSegIdx = Math.floor((bbox.max.x - xBase) / segmentLength)
-                        // if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
-                        //     console.warn("Too many segments produced by hatching pattern line")
-                        //     continue
-                        // }
-                        // for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
-                        //     yield *RenderSegment(xBase + segIdx * segmentLength, y)
-                        // }
+                    if (dashPatLength !== null) {
+                        let minSegIdx = Math.floor((xStart - xBase) / dashPatLength)
+                        let maxSegIdx = Math.floor((xEnd - xBase) / dashPatLength)
+                        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
+                            console.warn("Too many segments produced by hatching pattern line")
+                            continue
+                        }
+                        const segLengthParam = dashPatLength / lineLength
+
+                        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
+                            let segStartParam = GetParam(xBase + segIdx * dashPatLength)
+
+                            let isSpace = false
+                            for (const dashLength of line.dashes) {
+                                const dashLengthParam = dashLength / lineLength
+                                if (!isSpace) {
+                                    for (const seg of ClipSegment(segStartParam,
+                                                                  segStartParam + dashLengthParam)) {
+                                        yield RenderSegment(seg)
+                                    }
+                                }
+                                isSpace = !isSpace
+                                segStartParam += dashLengthParam
+                            }
+                        }
 
                     } else {
                         /* Single solid line. */
-                        yield *RenderLine(y, bbox.min.x - margin, bbox.max.x + margin)
+                        for (const seg of clippedSegments) {
+                            yield RenderSegment(seg)
+                        }
                     }
                 }
-                // yield *RenderLine(0, bbox.min.x - margin, bbox.max.x + margin)//tmp debug XXX
             }
         }
     }
