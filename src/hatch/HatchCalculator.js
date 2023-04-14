@@ -204,7 +204,9 @@ class ClipCalculator {
                 /* Just started new segment. */
                 prevNode = node
             } else if ((suppress || !state) && prevNode) {
-                result.push([prevNode.intersection[0], node.intersection[0]])
+                if (node.intersection[0] - prevNode.intersection[0] > Number.EPSILON) {
+                    result.push([prevNode.intersection[0], node.intersection[0]])
+                }
                 prevNode = null
             }
         }
@@ -252,7 +254,9 @@ class ClipCalculator {
                 /* Just started new segment. */
                 prevNode = node
             } else if ((suppress || IsOutside()) && prevNode) {
-                result.push([prevNode.intersection[0], node.intersection[0]])
+                if (node.intersection[0] - prevNode.intersection[0] > Number.EPSILON) {
+                    result.push([prevNode.intersection[0], node.intersection[0]])
+                }
                 prevNode = null
             }
         }
