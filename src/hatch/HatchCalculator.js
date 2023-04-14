@@ -45,13 +45,15 @@ class ClipCalculator {
      *  corresponds to the provided line start point, 1 - to end point.
      */
     Calculate() {
-        //XXX just odd parity now
         this._ProcessEdges()
         this._CreateNodes()
         /* Sort from line start towards end. */
         this.nodes.sort((e1, e2) => e1.intersection[0] - e2.intersection[0])
-        return this._GenerateClippedSegments()
-        // return [[0, 1]]//XXX
+        if (this.style == HatchStyle.ODD_PARITY) {
+            return this._GenerateOddParitySegments()
+        }
+        //XXX assume through all for all the reset style
+        return this._GenerateThroughAllSegments()
     }
 
     _ProcessEdges() {
@@ -180,7 +182,7 @@ class ClipCalculator {
         return [null, false]
     }
 
-    _GenerateClippedSegments() {
+    _GenerateOddParitySegments() {
         const result = []
         let state = false
         /* Incremented with each suppression, decremented with each un-suppression. */
@@ -206,6 +208,55 @@ class ClipCalculator {
                 prevNode = null
             }
         }
+
+        return result
+    }
+
+    _GenerateThroughAllSegments() {
+        const result = []
+        /* Incremented with each suppression, decremented with each un-suppression. */
+        let suppress = 0
+        /* Previous node when line was enabled. */
+        let prevNode = null
+        /** For each loop count number of crossing from each side. One side increments corresponding
+         * loop value, other decrements. When all values are zero, line is outside of any loop and
+         * should not be rendered.
+         */
+        const loopStack = new Array(this.loops.length).fill(0);
+
+        function IsOutside() {
+            for (const n of loopStack) {
+                if (n != 0) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        for (const node of this.nodes) {
+            if (node.suppress) {
+                suppress++
+            }
+            if (node.unsuppress) {
+                suppress--
+            }
+            const wasOutside = IsOutside()
+            if (node.toggle) {
+                if (node.intersection[2] > 0) {
+                    loopStack[node.loopIdx]++
+                } else {
+                    loopStack[node.loopIdx]--
+                }
+            }
+            if (suppress == 0 && !IsOutside() && (node.unsuppress || wasOutside)) {
+                /* Just started new segment. */
+                prevNode = node
+            } else if ((suppress || IsOutside()) && prevNode) {
+                result.push([prevNode.intersection[0], node.intersection[0]])
+                prevNode = null
+            }
+        }
+
         return result
     }
 }
