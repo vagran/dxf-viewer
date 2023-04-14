@@ -6,7 +6,7 @@ import { RBTree } from "./RBTree"
 import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
-import { HatchCalculator, HatchStyle } from "./hatch/HatchCalculator"
+import { HatchCalculator, HatchStyle } from "./HatchCalculator"
 
 
 /** Use 16-bit indices for indexed geometry. */
