@@ -7,6 +7,8 @@ import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
 import { HatchCalculator, HatchStyle } from "./HatchCalculator"
+import { LookupPattern } from "./Pattern"
+import "./patterns"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -961,14 +963,8 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const transform = this._GetEntityExtrusionTransform(entity)
 
-        //XXX temporal stub
-        const pattern = {
-            lines: entity.definitionLines ?? [{
-                angle: 45 * Math.PI / 180,
-                base: {x: 0, y: 0},
-                offset: {x: -0.1, y: 0.1}
-            }]
-        }
+        //XXX temporal
+        const pattern = LookupPattern("ANSI37")
 
         const seedPoints = entity.seedPoints ? entity.seedPoints : [{x: 0, y: 0}]
 
@@ -981,13 +977,9 @@ export class DxfScene {
             })
 
             for (const line of pattern.lines) {
-                const angle = line.angle ?? 0
 
-                /* Transform offset vector to line CS. */
-                const sinA = Math.sin(-angle)
-                const cosA = Math.cos(-angle)
-                let offsetX = cosA * line.offset.x - sinA * line.offset.y
-                let offsetY = sinA * line.offset.x + cosA * line.offset.y
+                let offsetX = line.offset.x
+                let offsetY = line.offset.y
 
                 /* Normalize offset so that Y is always non-negative. Inverting offset vector
                  * direction does not change lines positions.
@@ -1000,7 +992,7 @@ export class DxfScene {
                 const lineTransform = calc.GetLineTransform({
                     patTransform,
                     basePoint: line.base,
-                    angle: angle
+                    angle: line.angle ?? 0
                 })
 
                 const bbox = calc.GetBoundingBox(lineTransform)
@@ -1027,9 +1019,13 @@ export class DxfScene {
 
                 let dashPatLength
                 if (line.dashes && line.dashes.length > 1) {
-                    dashPatLength = line.dashes.reduce((s, length) => s + length, 0)
-                    if (dashPatLength <= 0) {
-                        dashPatLength = null
+                    dashPatLength = 0
+                    for (const dash of line.dashes) {
+                        if (dash < 0) {
+                            dashPatLength -= dash
+                        } else {
+                            dashPatLength += dash
+                        }
                     }
                 } else {
                     dashPatLength = null
@@ -1059,6 +1055,13 @@ export class DxfScene {
                         if (transform) {
                             p1.applyMatrix3(transform)
                             p2.applyMatrix3(transform)
+                        }
+                        if (seg[1] - seg[0] <= Math.EPSILON) {
+                            return new Entity({
+                                type: Entity.Type.POINTS,
+                                vertices: [p1],
+                                layer, color
+                            })
                         }
                         return new Entity({
                             type: Entity.Type.LINE_SEGMENTS,
@@ -1093,13 +1096,15 @@ export class DxfScene {
                             console.warn("Too many segments produced by hatching pattern line")
                             continue
                         }
-                        const segLengthParam = dashPatLength / lineLength
 
                         for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
                             let segStartParam = GetParam(xBase + segIdx * dashPatLength)
 
-                            let isSpace = false
-                            for (const dashLength of line.dashes) {
+                            for (let dashLength of line.dashes) {
+                                const isSpace = dashLength < 0
+                                if (isSpace) {
+                                    dashLength = - dashLength
+                                }
                                 const dashLengthParam = dashLength / lineLength
                                 if (!isSpace) {
                                     for (const seg of ClipSegment(segStartParam,
@@ -1107,7 +1112,6 @@ export class DxfScene {
                                         yield RenderSegment(seg)
                                     }
                                 }
-                                isSpace = !isSpace
                                 segStartParam += dashLengthParam
                             }
                         }
