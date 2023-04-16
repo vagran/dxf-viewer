@@ -61,7 +61,7 @@ class ClipCalculator {
             for (const edge of loop) {
                 const edgeVec = edge.end.clone().sub(edge.start)
                 const len = edgeVec.length()
-                edge.isZero = len <= Math.EPSILON
+                edge.isZero = len <= Number.EPSILON
                 if (edge.isZero) {
                     continue
                 }

@@ -7,7 +7,7 @@ import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
 import { HatchCalculator, HatchStyle } from "./HatchCalculator"
-import { LookupPattern } from "./Pattern"
+import { LookupPattern, Pattern } from "./Pattern"
 import "./patterns"
 
 
@@ -963,8 +963,20 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const transform = this._GetEntityExtrusionTransform(entity)
 
-        //XXX temporal
-        const pattern = LookupPattern("ANSI37")
+        let pattern = null
+        if (entity.patternName) {
+            pattern = LookupPattern(entity.patternName)
+            console.log(`Hatch pattern with name ${entity.patternName} not found`)
+        }
+        if (pattern == null && entity.definitionLines) {
+            pattern = new Pattern(entity.definitionLines)
+        }
+        if (pattern == null) {
+            pattern = LookupPattern("ANSI31")
+        }
+        if (!pattern) {
+            return
+        }
 
         const seedPoints = entity.seedPoints ? entity.seedPoints : [{x: 0, y: 0}]
 
@@ -1056,7 +1068,7 @@ export class DxfScene {
                             p1.applyMatrix3(transform)
                             p2.applyMatrix3(transform)
                         }
-                        if (seg[1] - seg[0] <= Math.EPSILON) {
+                        if (seg[1] - seg[0] <= Number.EPSILON) {
                             return new Entity({
                                 type: Entity.Type.POINTS,
                                 vertices: [p1],

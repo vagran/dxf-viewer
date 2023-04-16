@@ -68,14 +68,15 @@ export function RegisterPattern(pattern) {
     if (!pattern.name) {
         throw new Error("Anonymous pattern cannot be registered")
     }
-    if (patternsRegistry.has(pattern.name)) {
-        console.warn(`Pattern with name ${pattern.name} is already registered`)
+    const name = pattern.name.toUpperCase()
+    if (patternsRegistry.has(name)) {
+        console.warn(`Pattern with name ${name} is already registered`)
         return
     }
-    patternsRegistry.set(pattern.name, pattern)
+    patternsRegistry.set(name, pattern)
 }
 
 /** @return {?Pattern} */
 export function LookupPattern(name) {
-    return patternsRegistry.get(name)
+    return patternsRegistry.get(name.toUpperCase())
 }
