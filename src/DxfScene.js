@@ -966,7 +966,9 @@ export class DxfScene {
         let pattern = null
         if (entity.patternName) {
             pattern = LookupPattern(entity.patternName)
-            console.log(`Hatch pattern with name ${entity.patternName} not found`)
+            if (!pattern) {
+                console.log(`Hatch pattern with name ${entity.patternName} not found`)
+            }
         }
         if (pattern == null && entity.definitionLines) {
             pattern = new Pattern(entity.definitionLines)
