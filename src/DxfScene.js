@@ -463,10 +463,6 @@ export class DxfScene {
 
         const arcAngle = endAngle - startAngle
 
-        if (Math.abs(arcAngle - 2 * Math.PI) < 1e-6) {
-            isClosed = true
-        }
-
         let numSegments = Math.floor(arcAngle / tessellationAngle)
         if (numSegments === 0) {
             numSegments = 1
@@ -524,8 +520,18 @@ export class DxfScene {
                                  entity.majorAxisEndPoint.y * entity.majorAxisEndPoint.y)
         const yR = xR * entity.axisRatio
         const rotation = Math.atan2(entity.majorAxisEndPoint.y, entity.majorAxisEndPoint.x)
+
+        const startAngle = entity.startAngle ?? 0
+        let endAngle = entity.endAngle ?? startAngle + 2 * Math.PI
+        while (endAngle <= startAngle) {
+            endAngle += Math.PI * 2
+        }
+        const isClosed = (entity.endAngle ?? null) === null ||
+            Math.abs(endAngle - startAngle - 2 * Math.PI) < 1e-6
+
         this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
-                                   startAngle: entity.startAngle, endAngle: entity.endAngle,
+                                   startAngle: entity.startAngle,
+                                   endAngle: isClosed ? null : entity.endAngle,
                                    yRadius: yR,
                                    transform: this._GetEntityExtrusionTransform(entity)})
         if (rotation !== 0) {
@@ -540,10 +546,11 @@ export class DxfScene {
                 v.y = tx * sin + ty * cos + entity.center.y
             }
         }
+        
         yield new Entity({
             type: Entity.Type.POLYLINE,
             vertices, layer, color, lineType,
-            shape: entity.endAngle === undefined
+            shape: isClosed
         })
     }
 
