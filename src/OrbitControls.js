@@ -434,8 +434,10 @@ export const OrbitControls = function ( object, domElement ) {
 			} else if ( scope.object.isOrthographicCamera ) {
 
 				// orthographic
-				panLeft( deltaX * ( scope.object.right - scope.object.left ) / scope.object.zoom / element.clientWidth, scope.object.matrix );
-				panUp( deltaY * ( scope.object.top - scope.object.bottom ) / scope.object.zoom / element.clientHeight, scope.object.matrix );
+				panLeft( deltaX * ( scope.object.right - scope.object.left ) / scope.object.zoom /
+					element.clientWidth / window.devicePixelRatio, scope.object.matrix );
+				panUp( deltaY * ( scope.object.top - scope.object.bottom ) / scope.object.zoom /
+					element.clientHeight / window.devicePixelRatio, scope.object.matrix );
 
 			} else {
 
@@ -570,7 +572,8 @@ export const OrbitControls = function ( object, domElement ) {
 
 		panEnd.set( event.clientX, event.clientY );
 
-		panDelta.subVectors( panEnd, panStart ).multiplyScalar( scope.panSpeed );
+		panDelta.subVectors( panEnd, panStart )
+			.multiplyScalar( scope.panSpeed * window.devicePixelRatio );
 
 		pan( panDelta.x, panDelta.y );
 
@@ -589,8 +592,9 @@ export const OrbitControls = function ( object, domElement ) {
 	function handleMouseWheel( event ) {
 
 		const canvasRect = scope.domElement.getBoundingClientRect()
-		const zoomCenter = new THREE.Vector2(event.clientX - canvasRect.left,
-									   		 event.clientY - canvasRect.top)
+		const zoomCenter = new THREE.Vector2(
+			(event.clientX - canvasRect.left) * window.devicePixelRatio,
+			(event.clientY - canvasRect.top) * window.devicePixelRatio)
 
 		if ( event.deltaY < 0 ) {
 
@@ -684,7 +688,8 @@ export const OrbitControls = function ( object, domElement ) {
 		const canvasRect = scope.domElement.getBoundingClientRect();
 		dollyCenter.set(
 			(event.touches[0].clientX + event.touches[1].clientX) / 2 - canvasRect.left,
-			(event.touches[0].clientY + event.touches[1].clientY) / 2 - canvasRect.top );
+			(event.touches[0].clientY + event.touches[1].clientY) / 2 - canvasRect.top )
+			.multiplyScalar(window.devicePixelRatio);
 
 		var dx = event.touches[ 0 ].pageX - event.touches[ 1 ].pageX;
 		var dy = event.touches[ 0 ].pageY - event.touches[ 1 ].pageY;
@@ -753,7 +758,8 @@ export const OrbitControls = function ( object, domElement ) {
 
 		}
 
-		panDelta.subVectors( panEnd, panStart ).multiplyScalar( scope.panSpeed );
+		panDelta.subVectors( panEnd, panStart )
+			.multiplyScalar( scope.panSpeed * window.devicePixelRatio );
 
 		pan( panDelta.x, panDelta.y );
 
