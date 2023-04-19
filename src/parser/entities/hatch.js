@@ -161,17 +161,39 @@ function ParseBoundaryLoop(curr, scanner) {
         }
         const e = {type: curr.value}
         curr = scanner.next();
+        const isSpline = e.type == 4
 
         while (true) {
             switch (curr.code) {
             case 10:
-                e.start = helpers.parsePoint(scanner);
+                if (isSpline) {
+                    if (!e.controlPoints) {
+                        e.controlPoints = [];
+                    }
+                    e.controlPoints.push(helpers.parsePoint(scanner));
+                } else {
+                    e.start = helpers.parsePoint(scanner);
+                }
                 break;
             case 11:
-                e.end = helpers.parsePoint(scanner);
+                if (isSpline) {
+                    if (!e.fitPoints) {
+                        e.fitPoints = [];
+                    }
+                    e.fitPoints.push(helpers.parsePoint(scanner));
+                } else {
+                    e.end = helpers.parsePoint(scanner);
+                }
                 break;
             case 40:
-                e.radius = curr.value;
+                if (isSpline) {
+                    if (!e.knotValues) {
+                        e.knotValues = [];
+                    }
+                    e.knotValues.push(curr.value);
+                } else {
+                    e.radius = curr.value;
+                }
                 break;
             case 50:
                 e.startAngle = curr.value * Math.PI / 180;
@@ -180,12 +202,20 @@ function ParseBoundaryLoop(curr, scanner) {
                 e.endAngle = curr.value * Math.PI / 180;
                 break;
             case 73:
-                e.isCcw = curr.value;
+                if (isSpline) {
+                    e.rational = curr.value;
+                } else {
+                    e.isCcw = curr.value;
+                }
                 break;
-            //XXX ignore some groups for now, mostly spline
-            case 94:
-            case 73:
             case 74:
+                e.periodic = curr.value;
+                break;
+            case 94:
+                e.degreeOfSplineCurve = curr.value;
+                break;
+
+            //XXX ignore some groups for now, mostly spline
             case 95:
             case 96:
             case 40:

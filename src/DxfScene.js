@@ -1247,7 +1247,15 @@ export class DxfScene {
                     }
                     case 4:
                         /* Spline. */
-                        //XXX
+                        const controlPoints = edge.controlPoints.map(p => [p.x, p.y])
+                        const subdivisions = controlPoints.length * SPLINE_SUBDIVISION
+                        const step = 1 / subdivisions
+                        for (let i = 0; i <= subdivisions; i++) {
+                            const pt = this._InterpolateSpline(i * step, edge.degreeOfSplineCurve,
+                                                               controlPoints,
+                                                               edge.knotValues)
+                            vertices.push(new Vector2(pt[0],pt[1]))
+                        }
                         break;
                     default:
                         console.warn("Unhandled hatch boundary loop edge type: " + edge.type)
