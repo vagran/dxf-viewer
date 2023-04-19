@@ -300,7 +300,6 @@ export class DxfScene {
             this._ProcessEntity(renderEntity, blockCtx)
         }
     }
-
     /**
      * @param entity {Entity}
      * @param blockCtx {?BlockContext}
@@ -366,7 +365,7 @@ export class DxfScene {
         const a = 4 * Math.atan(bulge)
         const aAbs = Math.abs(a)
         if (aAbs < this.options.arcTessellationAngle) {
-            vertices.push(endVtx)
+            vertices.push(new Vector2(endVtx.x, endVtx.y))
             return
         }
         const ha = a / 2
@@ -399,14 +398,14 @@ export class DxfScene {
             }
             for (let i = 1; i < numSegments; i++) {
                 const a = startAngle + i * step
-                const v = {
-                    x: center.x + R * Math.cos(a),
-                    y: center.y + R * Math.sin(a)
-                }
+                const v = new Vector2(
+                    center.x + R * Math.cos(a),
+                    center.y + R * Math.sin(a)
+                )
                 vertices.push(v)
             }
         }
-        vertices.push(endVtx)
+        vertices.push(new Vector2(endVtx.x, endVtx.y))
     }
 
     /** Generate vertices for arc segment.
@@ -546,7 +545,7 @@ export class DxfScene {
                 v.y = tx * sin + ty * cos + entity.center.y
             }
         }
-        
+
         yield new Entity({
             type: Entity.Type.POLYLINE,
             vertices, layer, color, lineType,
@@ -1181,7 +1180,16 @@ export class DxfScene {
 
             if (loop.type & 2) {
                 /* Polyline. */
-                //XXX not implemented
+                for (let vtxIdx = 0; vtxIdx < loop.polyline.vertices.length; vtxIdx++) {
+                    const vtx = loop.polyline.vertices[vtxIdx]
+                    if ((vtx.bulge ?? 0) == 0) {
+                        vertices.push(new Vector2(vtx.x, vtx.y))
+                    } else {
+                        const prevVtx = loop.polyline.vertices[vtxIdx == 0 ?
+                            loop.polyline.vertices.length - 1 : vtxIdx - 1]
+                        this._GenerateBulgeVertices(vertices, prevVtx, vtx, vtx.bulge)
+                    }
+                }
 
             } else if (loop.edges && loop.edges.length > 0) {
                 for (const edge of loop.edges) {

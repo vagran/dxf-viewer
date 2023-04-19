@@ -215,6 +215,7 @@ function ParseBoundaryLoop(curr, scanner) {
 
         if ((entity.type & 2) && !polylineParsed) {
             entity.polyline = ParsePolyline()
+            polylineParsed = true
         }
 
         while (numEdges) {
