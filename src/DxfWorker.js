@@ -77,7 +77,7 @@ export class DxfWorker {
     async _ProcessRequestMessage(type, data, transfers, seq) {
         switch (type) {
         case DxfWorker.WorkerMsg.LOAD: {
-            const scene = await this._Load(
+            const {scene, dxf} = await this._Load(
                 data.url,
                 data.fonts,
                 data.options,
@@ -85,7 +85,7 @@ export class DxfWorker {
             transfers.push(scene.vertices)
             transfers.push(scene.indices)
             transfers.push(scene.transforms)
-            return scene
+            return {scene, dxf}
         }
         case DxfWorker.WorkerMsg.DESTROY:
             return null
@@ -157,7 +157,7 @@ export class DxfWorker {
         }
         const dxfScene = new DxfScene(options)
         await dxfScene.Build(dxf, fontFetchers)
-        return dxfScene.scene
+        return {scene: dxfScene.scene, dxf: options.retainParsedDxf === true ? dxf : undefined }
     }
 
     _CreateFontFetchers(urls, progressCbk) {

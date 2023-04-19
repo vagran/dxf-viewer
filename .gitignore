@@ -3,3 +3,4 @@ test-data/
 /build/
 .history/
 *.tgz
+scratch/
