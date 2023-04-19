@@ -1187,7 +1187,13 @@ export class DxfScene {
                     } else {
                         const prevVtx = loop.polyline.vertices[vtxIdx == 0 ?
                             loop.polyline.vertices.length - 1 : vtxIdx - 1]
-                        this._GenerateBulgeVertices(vertices, prevVtx, vtx, vtx.bulge)
+                        if ((prevVtx.bulge ?? 0) == 0) {
+                            /* Start vertex is not produced by _GenerateBulgeVertices(). */
+                            vertices.push(new Vector2(vtx.x, vtx.y))
+                        }
+                        const nextVtx = loop.polyline.vertices[
+                            vtxIdx == loop.polyline.vertices.length - 1 ? 0 : vtxIdx + 1]
+                        this._GenerateBulgeVertices(vertices, vtx, nextVtx, vtx.bulge)
                     }
                 }
 
