@@ -286,7 +286,7 @@ export class DxfScene {
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
         case 'ATTRIB':
-            renderEntities = this._DecomposeATTRIB(entity, blockCtx);
+            renderEntities = this._DecomposeAttribute(entity, blockCtx);
             break;
         default:
             console.log("Unhandled entity type: " + entity.type)
@@ -580,7 +580,7 @@ export class DxfScene {
             lineType: null
         })
     }
-    *_DecomposeATTRIB(entity, blockCtx) {
+    *_DecomposeAttribute(entity, blockCtx) {
         if (!this.textRenderer.canRender) {
             return;
         }
