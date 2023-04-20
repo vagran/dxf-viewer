@@ -437,9 +437,11 @@ export class DxfScene {
      *  from scene options.
      * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
      * @param transform {?Matrix3} Optional transform matrix for the arc. Applied as last operation.
+     * @param cwAngleDir {?boolean} Angles counted in clockwise direction from X positive direction.
      */
     _GenerateArcVertices({vertices, center, radius, startAngle = null, endAngle = null,
-                          tessellationAngle = null, yRadius = null, transform = null}) {
+                          tessellationAngle = null, yRadius = null, transform = null,
+                          ccwAngleDir = true}) {
         if (!center || !radius) {
             return
         }
@@ -465,12 +467,12 @@ export class DxfScene {
             endAngle += this.angBase
         }
 
-        //XXX not clear, seem in practice it does not alter arcs rendering.
-        // if (this.angDir) {
-        //     const tmp = startAngle
-        //     startAngle = endAngle
-        //     endAngle = tmp
-        // }
+        //XXX this.angDir - not clear, seem in practice it does not alter arcs rendering.
+        if (!ccwAngleDir) {
+            const tmp = startAngle
+            startAngle = -endAngle
+            endAngle = -tmp
+        }
 
         while (endAngle <= startAngle) {
             endAngle += Math.PI * 2
@@ -487,7 +489,12 @@ export class DxfScene {
             if (i === numSegments && isClosed) {
                 break
             }
-            const a = startAngle + i * step
+            let a
+            if (ccwAngleDir) {
+                a = startAngle + i * step
+            } else {
+                a = startAngle + (numSegments - i) * step
+            }
             const v = new Vector2(radius * Math.cos(a), yRadius * Math.sin(a))
             if (transform) {
                 v.applyMatrix3(transform)
@@ -1251,7 +1258,8 @@ export class DxfScene {
                             center: edge.start,
                             radius: edge.radius,
                             startAngle: edge.startAngle,
-                            endAngle: edge.endAngle
+                            endAngle: edge.endAngle,
+                            ccwAngleDir: edge.isCcw
                         })
                         AddPoints(vertices, arcVertices)
                         break
@@ -1272,7 +1280,8 @@ export class DxfScene {
                             radius: xR,
                             startAngle: edge.startAngle,
                             endAngle: edge.endAngle,
-                            yRadius: yR
+                            yRadius: yR,
+                            ccwAngleDir: edge.isCcw
                         })
                         if (rotation !== 0) {
                             //XXX should account angDir?
