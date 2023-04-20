@@ -175,9 +175,15 @@ export class DxfScene {
 
     async _FetchFonts(dxf) {
 
+        function IsTextEntity(entity) {
+            return entity.type === "TEXT" || entity.type === "MTEXT" ||
+                   entity.type === "DIMENSION" || entity.type === "ATTDEF" ||
+                   entity.type === "ATTRIB"
+        }
+
         const ProcessEntity = async (entity) => {
             let ret
-            if (entity.type === "TEXT") {
+            if (entity.type === "TEXT" || entity.type === "ATTRIB" || entity.type === "ATTDEF") {
                 ret = await this.textRenderer.FetchFonts(ParseSpecialChars(entity.text))
 
             } else if (entity.type === "MTEXT") {
@@ -214,7 +220,7 @@ export class DxfScene {
         }
 
         for (const entity of dxf.entities) {
-            if (entity.type === "TEXT" || entity.type === "MTEXT" || entity.type === "DIMENSION") {
+            if (IsTextEntity(entity)) {
                 if (!await ProcessEntity(entity)) {
                     /* Failing to resolve some character means that all fonts have been loaded and
                      * checked. No mean to check the rest strings. However until it is encountered,
@@ -229,9 +235,7 @@ export class DxfScene {
         for (const block of this.blocks.values()) {
             if (block.data.hasOwnProperty("entities")) {
                 for (const entity of block.data.entities) {
-                    if (entity.type === "TEXT" || entity.type === "MTEXT" ||
-                        entity.type === "DIMENSION") {
-
+                    if (IsTextEntity(entity)) {
                         if (!await ProcessEntity(entity)) {
                             return
                         }
@@ -285,7 +289,7 @@ export class DxfScene {
         case "DIMENSION":
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
-        case 'ATTRIB':
+        case "ATTRIB":
             renderEntities = this._DecomposeAttribute(entity, blockCtx);
             break;
         default:
@@ -580,6 +584,7 @@ export class DxfScene {
             lineType: null
         })
     }
+
     *_DecomposeAttribute(entity, blockCtx) {
         if (!this.textRenderer.canRender) {
             return;
@@ -597,7 +602,7 @@ export class DxfScene {
             rotation: entity.rotation,
             hAlign: entity.horizontalJustification,
             vAlign: entity.verticalJustification,
-            widthFactor: font.widthFactor,
+            widthFactor: font?.widthFactor,
             color,
             layer,
         });
