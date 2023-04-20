@@ -34,7 +34,7 @@ npm install dxf-viewer
 ## Incomplete features
 
 There are still many incomplete features. I will try to implement some of them when I have some
-time. Anything useful implemented in the corporate repository will be merged here as well.
+time. Most significant reason for missing implementation is lack of corresponding sample files.
 
  * Stream parsing for input file. Currently, mostly relying on dxf-parser package which is not
    stream parser and thus buffers whole the file before parsing. This prevents from supporting big
@@ -50,7 +50,8 @@ time. Anything useful implemented in the corporate repository will be merged her
  * Wide lines. Currently, all lines are rendered as thin lines. Physical width is not implemented.
  * Variable width lines (i.e. with start and end width specified).
  * Smoothed polyline (curve-fit/spline-fit addition vertices).
- * Hatching
+ * Some features in hatching implementation: outer hatching style, solid/gradient infill, MPolygon
+   support, double lines, boundaries defined by external entities.
  * Block instancing in a grid. Grid attributes are ignored now.
  * Dimensions-specific features and styles (various pre-defined arrowhead blocks, text positioning
    tuning, limits and tolerances). Dimensions types other than linear ones.

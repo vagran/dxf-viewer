@@ -6,6 +6,9 @@ import { RBTree } from "./RBTree"
 import { MTextFormatParser } from "./MTextFormatParser"
 import dimStyleCodes from './parser/DimStyleCodes'
 import { LinearDimension } from "./LinearDimension"
+import { HatchCalculator, HatchStyle } from "./HatchCalculator"
+import { LookupPattern, Pattern } from "./Pattern"
+import "./patterns"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -17,6 +20,14 @@ const POINT_SHAPE_BLOCK_NAME = "__point_shape"
 const BLOCK_FLATTENING_VERTICES_THRESHOLD = 1024
 /** Number of subdivisions per spline point. */
 const SPLINE_SUBDIVISION = 4
+/** Limit hatch lines number to some reasonable value to mitigate hanging and out-of-memory issues
+ * on bad files.
+ */
+const MAX_HATCH_LINES = 20000
+/** Limit hatch segments number per line to some reasonable value to mitigate hanging and
+ * out-of-memory issues on bad files.
+ */
+const MAX_HATCH_SEGMENTS = 20000
 
 
 /** Default values for system variables. Entry may be either value or function to call for obtaining
@@ -93,17 +104,19 @@ export class DxfScene {
      */
     async Build(dxf, fontFetchers) {
         const header = dxf.header || {}
-        /* 0 - CCW, 1 - CW */
-        this.angBase = header["$ANGBASE"] || 0
-        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
-        this.angDir = header["$ANGDIR"] || 0
-        this.pdSize = header["$PDSIZE"] || 0
 
         for (const [name, value] of Object.entries(header)) {
             if (name.startsWith("$")) {
                 this.vars.set(name.slice(1), value)
             }
         }
+
+        /* 0 - CCW, 1 - CW */
+        this.angBase = this.vars.get("ANGBASE") ?? 0
+        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
+        this.angDir = this.vars.get("ANGDIR") ?? 0
+        this.pdSize = this.vars.get("PDSIZE") ?? 0
+        this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
@@ -290,8 +303,11 @@ export class DxfScene {
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
         case "ATTRIB":
-            renderEntities = this._DecomposeAttribute(entity, blockCtx);
-            break;
+            renderEntities = this._DecomposeAttribute(entity, blockCtx)
+            break
+        case "HATCH":
+            renderEntities = this._DecomposeHatch(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -300,7 +316,6 @@ export class DxfScene {
             this._ProcessEntity(renderEntity, blockCtx)
         }
     }
-
     /**
      * @param entity {Entity}
      * @param blockCtx {?BlockContext}
@@ -366,7 +381,7 @@ export class DxfScene {
         const a = 4 * Math.atan(bulge)
         const aAbs = Math.abs(a)
         if (aAbs < this.options.arcTessellationAngle) {
-            vertices.push(endVtx)
+            vertices.push(new Vector2(endVtx.x, endVtx.y))
             return
         }
         const ha = a / 2
@@ -399,14 +414,14 @@ export class DxfScene {
             }
             for (let i = 1; i < numSegments; i++) {
                 const a = startAngle + i * step
-                const v = {
-                    x: center.x + R * Math.cos(a),
-                    y: center.y + R * Math.sin(a)
-                }
+                const v = new Vector2(
+                    center.x + R * Math.cos(a),
+                    center.y + R * Math.sin(a)
+                )
                 vertices.push(v)
             }
         }
-        vertices.push(endVtx)
+        vertices.push(new Vector2(endVtx.x, endVtx.y))
     }
 
     /** Generate vertices for arc segment.
@@ -462,6 +477,7 @@ export class DxfScene {
         }
 
         const arcAngle = endAngle - startAngle
+
         let numSegments = Math.floor(arcAngle / tessellationAngle)
         if (numSegments === 0) {
             numSegments = 1
@@ -519,8 +535,18 @@ export class DxfScene {
                                  entity.majorAxisEndPoint.y * entity.majorAxisEndPoint.y)
         const yR = xR * entity.axisRatio
         const rotation = Math.atan2(entity.majorAxisEndPoint.y, entity.majorAxisEndPoint.x)
+
+        const startAngle = entity.startAngle ?? 0
+        let endAngle = entity.endAngle ?? startAngle + 2 * Math.PI
+        while (endAngle <= startAngle) {
+            endAngle += Math.PI * 2
+        }
+        const isClosed = (entity.endAngle ?? null) === null ||
+            Math.abs(endAngle - startAngle - 2 * Math.PI) < 1e-6
+
         this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
-                                   startAngle: entity.startAngle, endAngle: entity.endAngle,
+                                   startAngle: entity.startAngle,
+                                   endAngle: isClosed ? null : entity.endAngle,
                                    yRadius: yR,
                                    transform: this._GetEntityExtrusionTransform(entity)})
         if (rotation !== 0) {
@@ -535,10 +561,11 @@ export class DxfScene {
                 v.y = tx * sin + ty * cos + entity.center.y
             }
         }
+
         yield new Entity({
             type: Entity.Type.POLYLINE,
             vertices, layer, color, lineType,
-            shape: entity.endAngle === undefined
+            shape: isClosed
         })
     }
 
@@ -953,6 +980,348 @@ export class DxfScene {
                 })
             }
         }
+    }
+
+    *_DecomposeHatch(entity, blockCtx) {
+        if (entity.isSolid) {
+            //XXX solid hatch not yet supported
+            return
+        }
+
+        const style = entity.hatchStyle ?? 0
+
+        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
+            //XXX other styles not yet supported
+            return
+        }
+
+        const boundaryLoops = this._GetHatchBoundaryLoops(entity)
+        if (boundaryLoops.length == 0) {
+            console.warn("HATCH entity with empty boundary loops array " +
+                "(perhaps some loop types are not implemented yet)")
+            return
+        }
+
+        const calc = new HatchCalculator(boundaryLoops, style)
+
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const transform = this._GetEntityExtrusionTransform(entity)
+
+        let pattern = null
+        if (entity.patternName) {
+            pattern = LookupPattern(entity.patternName, this.isMetric)
+            if (!pattern) {
+                console.log(`Hatch pattern with name ${entity.patternName} not found ` +
+                            `(metric: ${this.isMetric})`)
+            }
+        }
+        if (pattern == null && entity.definitionLines) {
+            pattern = new Pattern(entity.definitionLines)
+        }
+        if (pattern == null) {
+            pattern = LookupPattern("ANSI31")
+        }
+        if (!pattern) {
+            return
+        }
+
+        const seedPoints = entity.seedPoints ? entity.seedPoints : [{x: 0, y: 0}]
+
+        for (const seedPoint of seedPoints) {
+
+            const patTransform = calc.GetPatternTransform({
+                seedPoint,
+                angle: entity.patternAngle,
+                scale: entity.patternScale
+            })
+
+            for (const line of pattern.lines) {
+
+                let offsetX = line.offset.x
+                let offsetY = line.offset.y
+
+                /* Normalize offset so that Y is always non-negative. Inverting offset vector
+                 * direction does not change lines positions.
+                 */
+                if (offsetY < 0) {
+                    offsetY = -offsetY
+                    offsetX = -offsetX
+                }
+
+                const lineTransform = calc.GetLineTransform({
+                    patTransform,
+                    basePoint: line.base,
+                    angle: line.angle ?? 0
+                })
+
+                const bbox = calc.GetBoundingBox(lineTransform)
+                const margin = (bbox.max.x - bbox.min.x) * 0.05
+
+                /* First determine range of line indices. Line with index 0 goes through base point
+                 * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
+                 * offset vectors added to the base point.
+                 */
+                let minLineIdx, maxLineIdx
+                if (offsetY == 0) {
+                    /* Degenerated to single line. */
+                    minLineIdx = 0
+                    maxLineIdx = 0
+                } else {
+                    minLineIdx = Math.ceil(bbox.min.y / offsetY)
+                    maxLineIdx = Math.floor(bbox.max.y / offsetY)
+                }
+
+                if (maxLineIdx - minLineIdx > MAX_HATCH_LINES) {
+                    console.warn("Too many lines produced by hatching pattern")
+                    continue
+                }
+
+                let dashPatLength
+                if (line.dashes && line.dashes.length > 1) {
+                    dashPatLength = 0
+                    for (const dash of line.dashes) {
+                        if (dash < 0) {
+                            dashPatLength -= dash
+                        } else {
+                            dashPatLength += dash
+                        }
+                    }
+                } else {
+                    dashPatLength = null
+                }
+
+                const ocsTransform = lineTransform.clone().invert()
+
+                for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
+                    const y = lineIdx * offsetY
+                    const xBase = lineIdx * offsetX
+
+                    const xStart = bbox.min.x - margin
+                    const xEnd = bbox.max.x + margin
+                    const lineLength = xEnd - xStart
+                    const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
+                    const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
+                    const lineVec = end.clone().sub(start)
+                    const clippedSegments = calc.ClipLine([start, end])
+
+                    function GetParam(x) {
+                        return (x - xStart) / lineLength
+                    }
+
+                    function RenderSegment(seg) {
+                        const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
+                        const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
+                        if (transform) {
+                            p1.applyMatrix3(transform)
+                            p2.applyMatrix3(transform)
+                        }
+                        if (seg[1] - seg[0] <= Number.EPSILON) {
+                            return new Entity({
+                                type: Entity.Type.POINTS,
+                                vertices: [p1],
+                                layer, color
+                            })
+                        }
+                        return new Entity({
+                            type: Entity.Type.LINE_SEGMENTS,
+                            vertices: [p1, p2],
+                            layer, color
+                        })
+                    }
+
+                    /** Clip segment against `clippedSegments`. */
+                    function *ClipSegment(segStart, segEnd) {
+                        for (const seg of clippedSegments) {
+                            if (seg[0] >= segEnd) {
+                                return
+                            }
+                            if (seg[1] <= segStart) {
+                                continue
+                            }
+                            const _start = Math.max(segStart, seg[0])
+                            const _end = Math.min(segEnd, seg[1])
+                            yield [_start, _end]
+                            segStart = _end
+                        }
+                    }
+
+                    /* Determine range for segment indices. One segment is one full sequence of
+                     * dashes. In case there is no dashes (solid line), just use hatch bounds.
+                     */
+                    if (dashPatLength !== null) {
+                        let minSegIdx = Math.floor((xStart - xBase) / dashPatLength)
+                        let maxSegIdx = Math.floor((xEnd - xBase) / dashPatLength)
+                        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
+                            console.warn("Too many segments produced by hatching pattern line")
+                            continue
+                        }
+
+                        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
+                            let segStartParam = GetParam(xBase + segIdx * dashPatLength)
+
+                            for (let dashLength of line.dashes) {
+                                const isSpace = dashLength < 0
+                                if (isSpace) {
+                                    dashLength = - dashLength
+                                }
+                                const dashLengthParam = dashLength / lineLength
+                                if (!isSpace) {
+                                    for (const seg of ClipSegment(segStartParam,
+                                                                  segStartParam + dashLengthParam)) {
+                                        yield RenderSegment(seg)
+                                    }
+                                }
+                                segStartParam += dashLengthParam
+                            }
+                        }
+
+                    } else {
+                        /* Single solid line. */
+                        for (const seg of clippedSegments) {
+                            yield RenderSegment(seg)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** @return {Vector2[][]} Each loop is a list of points in OCS coordinates. */
+    _GetHatchBoundaryLoops(entity) {
+        if (!entity.boundaryLoops) {
+            return []
+        }
+
+        const result = []
+
+        const AddPoints = (vertices, points) => {
+            const n = points.length
+            if (n == 0) {
+                return
+            }
+            if (vertices.length == 0) {
+                vertices.push(points[0])
+            } else {
+                const lastPt = vertices[vertices.length - 1]
+                if (lastPt.x != points[0].x || lastPt.y != points[0].y) {
+                    vertices.push(points[0])
+                }
+            }
+            for (let i = 1; i < n; i++) {
+                vertices.push(points[i])
+            }
+        }
+
+        for (const loop of entity.boundaryLoops) {
+            const vertices = []
+
+            //XXX handle external references
+
+            if (loop.type & 2) {
+                /* Polyline. */
+                for (let vtxIdx = 0; vtxIdx < loop.polyline.vertices.length; vtxIdx++) {
+                    const vtx = loop.polyline.vertices[vtxIdx]
+                    if ((vtx.bulge ?? 0) == 0) {
+                        vertices.push(new Vector2(vtx.x, vtx.y))
+                    } else {
+                        const prevVtx = loop.polyline.vertices[vtxIdx == 0 ?
+                            loop.polyline.vertices.length - 1 : vtxIdx - 1]
+                        if ((prevVtx.bulge ?? 0) == 0) {
+                            /* Start vertex is not produced by _GenerateBulgeVertices(). */
+                            vertices.push(new Vector2(vtx.x, vtx.y))
+                        }
+                        const nextVtx = loop.polyline.vertices[
+                            vtxIdx == loop.polyline.vertices.length - 1 ? 0 : vtxIdx + 1]
+                        this._GenerateBulgeVertices(vertices, vtx, nextVtx, vtx.bulge)
+                    }
+                }
+
+            } else if (loop.edges && loop.edges.length > 0) {
+                for (const edge of loop.edges) {
+                    switch (edge.type) {
+                    case 1:
+                        /* Line segment. */
+                        AddPoints(vertices, [new Vector2(edge.start.x, edge.start.y),
+                                             new Vector2(edge.end.x, edge.end.y)])
+                        break
+                    case 2: {
+                        /* Circular arc. */
+                        const arcVertices = []
+                        this._GenerateArcVertices({
+                            vertices: arcVertices,
+                            center: edge.start,
+                            radius: edge.radius,
+                            startAngle: edge.startAngle,
+                            endAngle: edge.endAngle
+                        })
+                        AddPoints(vertices, arcVertices)
+                        break
+                    }
+                    case 3: {
+                        /* Elliptic arc. */
+                        const center = edge.start
+                        const majorAxisEndPoint = edge.end
+                        const xR = Math.sqrt(majorAxisEndPoint.x * majorAxisEndPoint.x +
+                                             majorAxisEndPoint.y * majorAxisEndPoint.y)
+                        const axisRatio = edge.radius
+                        const yR = xR * axisRatio
+                        const rotation = Math.atan2(majorAxisEndPoint.y, majorAxisEndPoint.x)
+                        const arcVertices = []
+                        this._GenerateArcVertices({
+                            vertices: arcVertices,
+                            center,
+                            radius: xR,
+                            startAngle: edge.startAngle,
+                            endAngle: edge.endAngle,
+                            yRadius: yR
+                        })
+                        if (rotation !== 0) {
+                            //XXX should account angDir?
+                            const cos = Math.cos(rotation)
+                            const sin = Math.sin(rotation)
+                            for (const v of arcVertices) {
+                                const tx = v.x - center.x
+                                const ty = v.y - center.y
+                                /* Rotate the vertex around the ellipse center point. */
+                                v.x = tx * cos - ty * sin + center.x
+                                v.y = tx * sin + ty * cos + center.y
+                            }
+                        }
+                        AddPoints(vertices, arcVertices)
+                        break;
+                    }
+                    case 4:
+                        /* Spline. */
+                        const controlPoints = edge.controlPoints.map(p => [p.x, p.y])
+                        const subdivisions = controlPoints.length * SPLINE_SUBDIVISION
+                        const step = 1 / subdivisions
+                        for (let i = 0; i <= subdivisions; i++) {
+                            const pt = this._InterpolateSpline(i * step, edge.degreeOfSplineCurve,
+                                                               controlPoints,
+                                                               edge.knotValues)
+                            vertices.push(new Vector2(pt[0],pt[1]))
+                        }
+                        break;
+                    default:
+                        console.warn("Unhandled hatch boundary loop edge type: " + edge.type)
+                    }
+                }
+            }
+
+            if (vertices.length > 2) {
+                const first = vertices[0]
+                const last = vertices[vertices.length - 1]
+                if (last.x == first.x && last.y == first.y) {
+                    vertices.length = vertices.length - 1
+                }
+            }
+            if (vertices.length > 2) {
+                result.push(vertices)
+            }
+        }
+
+        return result
     }
 
     _GetDimStyleValue(valueName, entity, style) {
