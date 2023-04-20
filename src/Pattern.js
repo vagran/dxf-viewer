@@ -25,7 +25,8 @@ export class Pattern {
         }
         let name = null
         const lineDefs = []
-        for (const line of lines) {
+        for (let line of lines) {
+            line = line.trim()
             if (line == "") {
                 continue
             }
@@ -40,7 +41,16 @@ export class Pattern {
                 name = m[1]
                 continue
             }
-            const params = line.split(/\s*,\s*/).map(s => {
+            const commentPos = line.indexOf(";")
+            if (commentPos != -1) {
+                line = line.substring(0, commentPos).trim()
+            }
+            let params = line.split(/\s*,\s*/)
+            /* Tolerate trailing comma. */
+            if (params[params.length - 1] == "") {
+                params.length = params.length - 1
+            }
+            params = params.map(s => {
                 const x = parseFloat(s)
                 if (isNaN(x)) {
                     throw new Error("Failed to parse number in .pat file: " + s)
@@ -61,22 +71,24 @@ export class Pattern {
     }
 }
 
-const patternsRegistry = new Map()
+const patternsRegistryMetric = new Map()
+const patternsRegistryImperial = new Map()
 
 /** @param {Pattern} pattern */
-export function RegisterPattern(pattern) {
+export function RegisterPattern(pattern, isMetric = true) {
     if (!pattern.name) {
         throw new Error("Anonymous pattern cannot be registered")
     }
     const name = pattern.name.toUpperCase()
-    if (patternsRegistry.has(name)) {
+    const registry = isMetric ? patternsRegistryMetric : patternsRegistryImperial
+    if (registry.has(name)) {
         console.warn(`Pattern with name ${name} is already registered`)
         return
     }
-    patternsRegistry.set(name, pattern)
+    registry.set(name, pattern)
 }
 
 /** @return {?Pattern} */
-export function LookupPattern(name) {
-    return patternsRegistry.get(name.toUpperCase())
+export function LookupPattern(name, isMetric = true) {
+    return (isMetric ? patternsRegistryMetric : patternsRegistryImperial).get(name.toUpperCase())
 }

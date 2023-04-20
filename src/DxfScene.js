@@ -103,17 +103,19 @@ export class DxfScene {
      */
     async Build(dxf, fontFetchers) {
         const header = dxf.header || {}
-        /* 0 - CCW, 1 - CW */
-        this.angBase = header["$ANGBASE"] || 0
-        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
-        this.angDir = header["$ANGDIR"] || 0
-        this.pdSize = header["$PDSIZE"] || 0
 
         for (const [name, value] of Object.entries(header)) {
             if (name.startsWith("$")) {
                 this.vars.set(name.slice(1), value)
             }
         }
+
+        /* 0 - CCW, 1 - CW */
+        this.angBase = this.vars.get("ANGBASE") ?? 0
+        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
+        this.angDir = this.vars.get("ANGDIR") ?? 0
+        this.pdSize = this.vars.get("PDSIZE") ?? 0
+        this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
         if(dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
@@ -971,9 +973,10 @@ export class DxfScene {
 
         let pattern = null
         if (entity.patternName) {
-            pattern = LookupPattern(entity.patternName)
+            pattern = LookupPattern(entity.patternName, this.isMetric)
             if (!pattern) {
-                console.log(`Hatch pattern with name ${entity.patternName} not found`)
+                console.log(`Hatch pattern with name ${entity.patternName} not found ` +
+                            `(metric: ${this.isMetric})`)
             }
         }
         if (pattern == null && entity.definitionLines) {
