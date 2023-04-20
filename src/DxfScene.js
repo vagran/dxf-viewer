@@ -278,6 +278,9 @@ export class DxfScene {
         case "DIMENSION":
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
+        case 'ATTRIB':
+            renderEntities = this._DecomposeATTRIB(entity, blockCtx);
+            break;
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -570,6 +573,29 @@ export class DxfScene {
             lineType: null
         })
     }
+    *_DecomposeATTRIB(entity, blockCtx) {
+        if (!this.textRenderer.canRender) {
+            return;
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx);
+        const color = this._GetEntityColor(entity, blockCtx);
+
+        const font = this.fontStyles.get(entity.textStyle);
+
+        yield* this.textRenderer.Render({
+            text: ParseSpecialChars(entity.text),
+            fontSize: entity.textHeight * entity.scale,
+            startPos: entity.startPoint,
+            endPos: entity.endPoint,
+            rotation: entity.rotation,
+            hAlign: entity.horizontalJustification,
+            vAlign: entity.verticalJustification,
+            widthFactor: font.widthFactor,
+            color,
+            layer,
+        });
+    }
+
 
     /** Create line segments for point marker.
      * @param vertices
