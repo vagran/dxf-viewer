@@ -4,6 +4,7 @@ import AUTO_CAD_COLOR_INDEX from './AutoCadColorIndex';
 import Face from './entities/3dface';
 import Arc from './entities/arc';
 import AttDef from './entities/attdef';
+import Attribute from './entities/attribute'
 import Circle from './entities/circle';
 import Dimension from './entities/dimension';
 import Ellipse from './entities/ellipse';
@@ -33,6 +34,7 @@ function registerDefaultEntityHandlers(dxfParser) {
     dxfParser.registerEntityHandler(Face);
     dxfParser.registerEntityHandler(Arc);
     dxfParser.registerEntityHandler(AttDef);
+    dxfParser.registerEntityHandler(Attribute);
     dxfParser.registerEntityHandler(Circle);
     dxfParser.registerEntityHandler(Dimension);
     dxfParser.registerEntityHandler(Ellipse);
@@ -681,6 +683,81 @@ DxfParser.prototype._parse = function(dxfString) {
         return dimStyles;
     };
 
+    var parseStyles = function () {
+        var styles = {};
+        var style = {};
+        var styleName;
+
+        log.debug('Style {');
+        curr = scanner.next();
+        while (!groupIs(0, END_OF_TABLE_VALUE)) {
+            switch (curr.code) {
+                case 100:
+                    style.subClassMarker = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 2:
+                    style.styleName = curr.value;
+                    styleName = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 70:
+                    style.standardFlag = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 40:
+                    style.fixedTextHeight = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 41:
+                    style.widthFactor = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 50:
+                    style.obliqueAngle = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 71:
+                    style.textGenerationFlag = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 42:
+                    style.lastHeight = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 3:
+                    style.font = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 4:
+                    style.bigFont = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 1071:
+                    style.extendedFont = curr.value;
+                    curr = scanner.next();
+                    break;
+                case 0:
+                    if (curr.value === 'STYLE') {
+                        log.debug('}');
+                        styles[styleName] = style;
+                        log.debug('Style {');
+                        style = {};
+                        styleName = undefined;
+                        curr = scanner.next();
+                    }
+                    break;
+                default:
+                    logUnhandledGroup(curr);
+                    curr = scanner.next();
+                    break;
+            }
+        }
+        log.debug('}');
+        styles[styleName] = style;
+        return styles;
+    };
+
     var tableDefinitions = {
         VPORT: {
             tableRecordsProperty: 'viewPorts',
@@ -705,7 +782,13 @@ DxfParser.prototype._parse = function(dxfString) {
             tableName: 'dimstyle',
             dxfSymbolName: 'DIMSTYLE',
             parseTableRecords: parseDimStyles
-        }
+        },
+        STYLE: {
+            tableRecordsProperty: 'styles',
+            tableName: 'style',
+            dxfSymbolName: 'STYLE',
+            parseTableRecords: parseStyles,
+        },
     };
 
     /**

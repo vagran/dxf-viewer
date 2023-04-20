@@ -79,6 +79,7 @@ export class DxfScene {
         this.dimStyles = new Map()
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
+        this.fontStyles = new Map();
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -114,6 +115,12 @@ export class DxfScene {
         if(dxf.tables && dxf.tables.dimstyle) {
             for (const [, style] of Object.entries(dxf.tables.dimstyle.dimStyles)) {
                 this.dimStyles.set(style.name, style)
+            }
+        }
+
+        if (dxf.tables && dxf.tables.style) {
+            for (const [, style] of Object.entries(dxf.tables.style.styles)) {
+                this.fontStyles.set(style.styleName, style);
             }
         }
 
@@ -278,6 +285,9 @@ export class DxfScene {
         case "DIMENSION":
             renderEntities = this._DecomposeDimension(entity, blockCtx)
             break
+        case 'ATTRIB':
+            renderEntities = this._DecomposeAttribute(entity, blockCtx);
+            break;
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -570,6 +580,29 @@ export class DxfScene {
             lineType: null
         })
     }
+    *_DecomposeAttribute(entity, blockCtx) {
+        if (!this.textRenderer.canRender) {
+            return;
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx);
+        const color = this._GetEntityColor(entity, blockCtx);
+
+        const font = this.fontStyles.get(entity.textStyle);
+
+        yield* this.textRenderer.Render({
+            text: ParseSpecialChars(entity.text),
+            fontSize: entity.textHeight * entity.scale,
+            startPos: entity.startPoint,
+            endPos: entity.endPoint,
+            rotation: entity.rotation,
+            hAlign: entity.horizontalJustification,
+            vAlign: entity.verticalJustification,
+            widthFactor: font.widthFactor,
+            color,
+            layer,
+        });
+    }
+
 
     /** Create line segments for point marker.
      * @param vertices
