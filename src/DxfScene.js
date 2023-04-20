@@ -945,7 +945,6 @@ export class DxfScene {
     }
 
     *_DecomposeHatch(entity, blockCtx) {
-        console.log(JSON.stringify(entity))//XXX
         if (entity.isSolid) {
             //XXX solid hatch not yet supported
             return
