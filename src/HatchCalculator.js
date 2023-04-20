@@ -86,7 +86,7 @@ class ClipCalculator {
         this.nodes = []
         for (const loop of this.loops) {
             for (let edge of loop) {
-                if (edge.isZero || edge.isParallel || edge.isProcessed) {
+                if (edge.isZero || edge.isParallel || edge.isProcessed || !edge.intersection) {
                     continue
                 }
 
