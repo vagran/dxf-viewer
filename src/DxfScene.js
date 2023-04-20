@@ -79,6 +79,7 @@ export class DxfScene {
         this.dimStyles = new Map()
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
+        this.fontStyles = new Map();
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -114,6 +115,12 @@ export class DxfScene {
         if(dxf.tables && dxf.tables.dimstyle) {
             for (const [, style] of Object.entries(dxf.tables.dimstyle.dimStyles)) {
                 this.dimStyles.set(style.name, style)
+            }
+        }
+
+        if (dxf.tables && dxf.tables.style) {
+            for (const [, style] of Object.entries(dxf.tables.style.styles)) {
+                this.fontStyles.set(style.styleName, style);
             }
         }
 
