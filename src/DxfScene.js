@@ -489,10 +489,10 @@ export class DxfScene {
             }
             const a = startAngle + i * step
             const v = new Vector2(radius * Math.cos(a), yRadius * Math.sin(a))
-            v.add(center)
             if (transform) {
                 v.applyMatrix3(transform)
             }
+            v.add(center)
             vertices.push(v)
         }
     }
@@ -544,23 +544,21 @@ export class DxfScene {
         const isClosed = (entity.endAngle ?? null) === null ||
             Math.abs(endAngle - startAngle - 2 * Math.PI) < 1e-6
 
+
+        const transform = new Matrix3()
+        if (rotation !== 0) {
+            transform.rotate(-rotation)
+        }
+        const extrusionTransform = this._GetEntityExtrusionTransform(entity)
+        if (extrusionTransform) {
+            transform.premultiply(extrusionTransform)
+        }
+
         this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
                                    startAngle: entity.startAngle,
                                    endAngle: isClosed ? null : entity.endAngle,
                                    yRadius: yR,
-                                   transform: this._GetEntityExtrusionTransform(entity)})
-        if (rotation !== 0) {
-            //XXX should account angDir?
-            const cos = Math.cos(rotation)
-            const sin = Math.sin(rotation)
-            for (const v of vertices) {
-                const tx = v.x - entity.center.x
-                const ty = v.y - entity.center.y
-                /* Rotate the vertex around the ellipse center point. */
-                v.x = tx * cos - ty * sin + entity.center.x
-                v.y = tx * sin + ty * cos + entity.center.y
-            }
-        }
+                                   transform})
 
         yield new Entity({
             type: Entity.Type.POLYLINE,
