@@ -778,7 +778,7 @@ export class DxfScene {
             const _vertices = []
             if (hasFirstTriangle && !hasSecondTriangle) {
                 _vertices.push(v0, v1, v2)
-            } if (!hasFirstTriangle && hasSecondTriangle) {
+            } else if (!hasFirstTriangle && hasSecondTriangle) {
                 _vertices.push(v1, v3, v2)
             } else {
                 _vertices.push(v0, v1, v3, v2)
