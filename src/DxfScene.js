@@ -111,9 +111,9 @@ export class DxfScene {
             }
         }
 
-        /* 0 - CCW, 1 - CW */
+        /* Zero angle direction, 0 is +X. */
         this.angBase = this.vars.get("ANGBASE") ?? 0
-        /* Zero angle direction, 0 is +X CCW, 1 is CW*/
+        /* 0 - CCW, 1 - CW */
         this.angDir = this.vars.get("ANGDIR") ?? 0
         this.pdSize = this.vars.get("PDSIZE") ?? 0
         this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
@@ -427,21 +427,23 @@ export class DxfScene {
     /** Generate vertices for arc segment.
      *
      * @param vertices Generated vertices pushed here.
-     * @param center {{x, y}} Center vector.
-     * @param radius {number}
-     * @param startAngle {?number} Start angle in radians. Zero if not specified. Arc is drawn in
+     * @param {{x, y}} center  Center vector.
+     * @param {number} radius
+     * @param {?number} startAngle Start angle in radians. Zero if not specified. Arc is drawn in
      *  CCW direction from start angle towards end angle.
-     * @param endAngle {?number} Optional end angle in radians. Full circle is drawn if not
+     * @param {?number} endAngle Optional end angle in radians. Full circle is drawn if not
      *  specified.
-     * @param tessellationAngle {?number} Arc tessellation angle in radians, default value is taken
+     * @param {?number} tessellationAngle Arc tessellation angle in radians, default value is taken
      *  from scene options.
-     * @param yRadius {?number} Specify to get ellipse arc. `radius` parameter used as X radius.
-     * @param transform {?Matrix3} Optional transform matrix for the arc. Applied as last operation.
-     * @param cwAngleDir {?boolean} Angles counted in clockwise direction from X positive direction.
+     * @param {?number} yRadius Specify to get ellipse arc. `radius` parameter used as X radius.
+     * @param {?Matrix3} transform Optional transform matrix for the arc. Applied as last operation.
+     * @param {?number} rotation Optional rotation angle for generated arc. Mostly for ellipses.
+     * @param {?boolean} cwAngleDir Angles counted in clockwise direction from X positive direction.
+     * @return {Vector2[]} List of generated vertices.
      */
     _GenerateArcVertices({vertices, center, radius, startAngle = null, endAngle = null,
                           tessellationAngle = null, yRadius = null, transform = null,
-                          ccwAngleDir = true}) {
+                          rotation = null, ccwAngleDir = true}) {
         if (!center || !radius) {
             return
         }
@@ -485,6 +487,12 @@ export class DxfScene {
             numSegments = 1
         }
         const step = arcAngle / numSegments
+
+        let rotationTransform = null
+        if (rotation) {
+            rotationTransform = new Matrix3().makeRotation(rotation)
+        }
+
         for (let i = 0; i <= numSegments; i++) {
             if (i === numSegments && isClosed) {
                 break
@@ -496,10 +504,14 @@ export class DxfScene {
                 a = startAngle + (numSegments - i) * step
             }
             const v = new Vector2(radius * Math.cos(a), yRadius * Math.sin(a))
+
+            if (rotationTransform) {
+                v.applyMatrix3(rotationTransform)
+            }
+            v.add(center)
             if (transform) {
                 v.applyMatrix3(transform)
             }
-            v.add(center)
             vertices.push(v)
         }
     }
@@ -551,21 +563,15 @@ export class DxfScene {
         const isClosed = (entity.endAngle ?? null) === null ||
             Math.abs(endAngle - startAngle - 2 * Math.PI) < 1e-6
 
-
-        const transform = new Matrix3()
-        if (rotation !== 0) {
-            transform.rotate(-rotation)
-        }
-        const extrusionTransform = this._GetEntityExtrusionTransform(entity)
-        if (extrusionTransform) {
-            transform.premultiply(extrusionTransform)
-        }
-
         this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
                                    startAngle: entity.startAngle,
                                    endAngle: isClosed ? null : entity.endAngle,
                                    yRadius: yR,
-                                   transform})
+                                   rotation,
+                                   /* Assuming mirror transform if present, for ellipse it just
+                                    * reverses angle direction.
+                                    */
+                                   ccwAngleDir: !this._GetEntityExtrusionTransform(entity)})
 
         yield new Entity({
             type: Entity.Type.POLYLINE,
