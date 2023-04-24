@@ -919,7 +919,10 @@ export class DxfScene {
              */
             const insert = {
                 name: entity.block,
-                position: {x: 0, y: 0}
+                position: {x: 0, y: 0},
+                layer: entity.layer,
+                color: entity.color,
+                colorIndex: entity.colorIndex
             }
             this._ProcessInsert(insert, blockCtx)
             return
