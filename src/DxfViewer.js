@@ -685,7 +685,7 @@ DxfViewer.DefaultOptions = {
     /** Scene generation options. */
     sceneOptions: DxfScene.DefaultOptions,
     /** Retain the simple object representing the parsed DXF - will consume a lot of additional memory */
-    retainParsedDxf: false,
+    retainParsedDxf: false
 }
 
 DxfViewer.SetupWorker = function () {

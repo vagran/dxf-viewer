@@ -3,4 +3,5 @@ test-data/
 /build/
 .history/
 *.tgz
+*.orig
 scratch/

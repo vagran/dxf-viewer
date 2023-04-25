@@ -9,6 +9,7 @@ export type DxfSceneOptions = {
     arcTessellationAngle: number,
     minArcTessellationSubdivisions: number,
     wireframeMesh: boolean,
+    suppressPaperSpace: boolean,
     textOptions: TextRendererOptions,
 }
 
@@ -26,6 +27,7 @@ export type DxfViewerOptions = {
     blackWhiteInversion: boolean,
     pointSize: number,
     sceneOptions: DxfSceneOptions,
+    retainParsedDxf: boolean
 }
 
 export type DxfViewerLoadParams = {

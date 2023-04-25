@@ -94,6 +94,7 @@ export class DxfScene {
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
+        this.numEntitiesFiltered = 0
     }
 
     /** Build the scene from the provided parsed DXF.
@@ -149,6 +150,9 @@ export class DxfScene {
 
         /* Scan all entities to analyze block usage statistics. */
         for (const entity of dxf.entities) {
+            if (!this._FilterEntity(entity)) {
+                continue
+            }
             if (entity.type === "INSERT") {
                 const block = this.blocks.get(entity.name)
                 block?.RegisterInsert(entity)
@@ -165,6 +169,9 @@ export class DxfScene {
             if (block.data.hasOwnProperty("entities")) {
                 const blockCtx = block.DefinitionContext()
                 for (const entity of block.data.entities) {
+                    if (!this._FilterEntity(entity)) {
+                        continue
+                    }
                     this._ProcessDxfEntity(entity, blockCtx)
                 }
             }
@@ -175,8 +182,13 @@ export class DxfScene {
         console.log(`${this.numBlocksFlattened} blocks flattened`)
 
         for (const entity of dxf.entities) {
+            if (!this._FilterEntity(entity)) {
+                this.numEntitiesFiltered++
+                continue
+            }
             this._ProcessDxfEntity(entity)
         }
+        console.log(`${this.numEntitiesFiltered} entities filtered`)
 
         this.scene = this._BuildScene()
 
@@ -184,6 +196,11 @@ export class DxfScene {
         delete this.layers
         delete this.blocks
         delete this.textRenderer
+    }
+
+    /** @return False to suppress the specified entity, true to permit rendering. */
+    _FilterEntity(entity) {
+        return !this.options.suppressPaperSpace || !entity.inPaperSpace
     }
 
     async _FetchFonts(dxf) {
@@ -195,6 +212,9 @@ export class DxfScene {
         }
 
         const ProcessEntity = async (entity) => {
+            if (!this._FilterEntity(entity)) {
+                return
+            }
             let ret
             if (entity.type === "TEXT" || entity.type === "ATTRIB" || entity.type === "ATTDEF") {
                 ret = await this.textRenderer.FetchFonts(ParseSpecialChars(entity.text))
@@ -2664,6 +2684,8 @@ DxfScene.DefaultOptions = {
     minArcTessellationSubdivisions: 8,
     /** Render meshes (3DFACE group, POLYLINE polyface mesh) as wireframe instead of solid. */
     wireframeMesh: false,
+    /** Suppress paper-space entities when true (only model-space is rendered). */
+    suppressPaperSpace: false,
     /** Text rendering options. */
     textOptions: TextRenderer.DefaultOptions,
 }
