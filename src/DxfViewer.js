@@ -832,17 +832,46 @@ class Batch {
         }
 
         function CreateObject(vertices, indices) {
-            const geometry = instanceBatch ?
-                new three.InstancedBufferGeometry() : new three.BufferGeometry()
-            geometry.setAttribute("position", vertices)
-            instanceBatch?._SetInstanceTransformAttribute(geometry)
+            const geometry = instanceBatch
+                ? new three.InstancedBufferGeometry()
+                : new three.BufferGeometry();
+            geometry.setAttribute('position', vertices);
+            instanceBatch?._SetInstanceTransformAttribute(geometry);
+
             if (indices) {
-                geometry.setIndex(indices)
+                geometry.setIndex(indices);
             }
-            const obj = new objConstructor(geometry, material)
-            obj.frustumCulled = false
-            obj.matrixAutoUpdate = false
-            return obj
+
+            const tmpVertices = geometry.attributes.position.array;
+            const tmpPositions = new Float32Array(
+                tmpVertices.length + tmpVertices.length / 2,
+            );
+            const tmpGeometry = instanceBatch
+                ? new three.InstancedBufferGeometry()
+                : new three.BufferGeometry();
+            tmpGeometry.setAttribute(
+                'position',
+                new three.BufferAttribute(tmpPositions, 3),
+            );
+
+            let verticesIndex = 0;
+            for (let posIdx = 0; posIdx < tmpVertices.length; posIdx += 2) {
+                tmpGeometry.attributes.position.setXYZ(
+                    verticesIndex,
+                    tmpVertices[posIdx],
+                    tmpVertices[posIdx + 1],
+                    0,
+                );
+
+                verticesIndex++;
+            }
+
+            geometry.setAttribute('position', tmpGeometry.attributes.position);
+
+            const obj = new objConstructor(geometry, material);
+            obj.frustumCulled = false;
+            obj.matrixAutoUpdate = false;
+            return obj;
         }
 
         if (this.chunks) {
