@@ -10,12 +10,13 @@ export class BatchingKey {
      * @param lineType {?number} Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */
-    constructor(layerName, blockName, geometryType, color, lineType) {
+    constructor(layerName, blockName, geometryType, color, lineType, vertices) {
         this.layerName = layerName ?? null
         this.blockName = blockName ?? null
         this.geometryType = geometryType ?? null
         this.color = color
         this.lineType = lineType ?? null
+        this.vertices = vertices
     }
 
     /** Comparator function. Fields lexical order corresponds to the constructor arguments order.

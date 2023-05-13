@@ -95,6 +95,7 @@ export class DxfScene {
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
         this.numEntitiesFiltered = 0
+        this.entityVertices = []
     }
 
     /** Build the scene from the provided parsed DXF.
@@ -277,8 +278,16 @@ export class DxfScene {
             }
         }
     }
+    
+    checkTangentLayer (layer) {
+        const bendKeywords = ['tangent', 'bend_extent'];
+        return bendKeywords.some(substr=>layer.toLowerCase().indexOf(substr) >= 0);
+    }
 
     _ProcessDxfEntity(entity, blockCtx = null) {
+        if (this.checkTangentLayer(entity.layer)) {
+            return;
+        }
         let renderEntities
         switch (entity.type) {
         case "LINE":
@@ -341,6 +350,7 @@ export class DxfScene {
      * @param blockCtx {?BlockContext}
      */
     _ProcessEntity(entity, blockCtx = null) {
+        this.entityVertices.push(entity);
         switch (entity.type) {
         case Entity.Type.POINTS:
             this._ProcessPoints(entity, blockCtx)
@@ -617,7 +627,7 @@ export class DxfScene {
         if (isShaped) {
             /* Shaped mark should be instanced. */
             const key = new BatchingKey(layer, POINT_SHAPE_BLOCK_NAME,
-                                        BatchingKey.GeometryType.POINT_INSTANCE, color, 0)
+                                        BatchingKey.GeometryType.POINT_INSTANCE, color, 0, entity?.vertices ? entity?.vertices : [])
             const batch = this._GetBatch(key)
             batch.PushVertex(this._TransformVertex(entity.position))
             this._CreatePointShapeBlock()
@@ -1452,7 +1462,7 @@ export class DxfScene {
             }
         } else {
             const key = new BatchingKey(layer, entity.name, BatchingKey.GeometryType.BLOCK_INSTANCE,
-                                        color, lineType)
+                                        color, lineType, entity?.vertices ? entity?.vertices : [])
             const batch = this._GetBatch(key)
             batch.PushInstanceTransform(transform)
         }
@@ -1470,7 +1480,7 @@ export class DxfScene {
             color = blockBatch.key.color
         }
         //XXX line type
-        const key = new BatchingKey(layerName, null, blockBatch.key.geometryType, color, lineType)
+        const key = new BatchingKey(layerName, null, blockBatch.key.geometryType, color, lineType, [])
         const batch = this._GetBatch(key)
         batch.Merge(blockBatch, transform)
     }
@@ -1852,7 +1862,7 @@ export class DxfScene {
      */
     _ProcessPoints(entity, blockCtx = null) {
         const key = new BatchingKey(entity.layer, blockCtx?.name,
-                                    BatchingKey.GeometryType.POINTS, entity.color, 0)
+                                    BatchingKey.GeometryType.POINTS, entity.color, 0, entity?.vertices ? entity?.vertices : [])
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
             batch.PushVertex(this._TransformVertex(v, blockCtx))
@@ -1868,7 +1878,7 @@ export class DxfScene {
             throw Error("Even number of vertices expected")
         }
         const key = new BatchingKey(entity.layer, blockCtx?.name,
-                                    BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
+                                    BatchingKey.GeometryType.LINES, entity.color, entity.lineType, entity?.vertices ? entity?.vertices : [])
         const batch = this._GetBatch(key)
         for (const v of entity.vertices) {
             batch.PushVertex(this._TransformVertex(v, blockCtx))
@@ -1890,7 +1900,7 @@ export class DxfScene {
         if (verticesCount <= 3) {
             const key = new BatchingKey(entity.layer, blockCtx?.name,
                                         BatchingKey.GeometryType.LINES, entity.color,
-                                        entity.lineType)
+                                        entity.lineType, entity?.vertices ? entity?.vertices : [])
             const batch = this._GetBatch(key)
             let prev = null
             for (const v of entity.vertices) {
@@ -1909,7 +1919,7 @@ export class DxfScene {
 
         const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.INDEXED_LINES,
-                                    entity.color, entity.lineType)
+                                    entity.color, entity.lineType, entity?.vertices ? entity?.vertices : [])
         const batch = this._GetBatch(key)
         /* Line may be split if exceeds chunk limit. */
         for (const lineChunk of entity._IterateLineChunks()) {
@@ -1938,7 +1948,7 @@ export class DxfScene {
         }
         const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.INDEXED_TRIANGLES,
-                                    entity.color, 0)
+                                    entity.color, 0, entity?.vertices ? entity?.vertices : [])
         const batch = this._GetBatch(key)
         //XXX splitting into chunks is not yet implemented. Currently used only for text glyphs so
         // should fit into one chunk
@@ -2087,7 +2097,8 @@ export class DxfScene {
             layers: [],
             origin: this.origin,
             bounds: this.bounds,
-            hasMissingChars: this.hasMissingChars
+            hasMissingChars: this.hasMissingChars,
+            entityVertices: this.entityVertices
         }
 
         const buffers = {
