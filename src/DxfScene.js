@@ -91,6 +91,7 @@ export class DxfScene {
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
         this.fontStyles = new Map();
+        this.insert = [];
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -164,6 +165,18 @@ export class DxfScene {
                 }
             }
         }
+
+        const tmpInserts = [];
+        for (const entity of dxf.entities) {
+            if (entity.type === 'INSERT') {
+                tmpInserts.push(entity);
+            }
+        }
+        this.insert = tmpInserts.reduce((x, y) => {
+            (x[y.name] = x[y.name] || []).push(y);
+            return x;
+        }, {});
+
 
         for (const block of this.blocks.values()) {
             if (block.data.hasOwnProperty("entities")) {
@@ -647,10 +660,24 @@ export class DxfScene {
         if (!this.textRenderer.canRender) {
             return;
         }
-        const layer = this._GetEntityLayer(entity, blockCtx);
-        const color = this._GetEntityColor(entity, blockCtx);
+        let insertEntity = undefined;
+        const insertLayerKeys = Object.keys(this.insert);
+        for (const insert of insertLayerKeys) {
+            const targetInsert = this.insert[insert].find(
+                (insertEntity) => insertEntity.handle === entity.ownerHandle,
+            );
+            if (targetInsert) {
+                insertEntity = targetInsert;
+                break;
+            }
+        }
 
-        const font = this.fontStyles.get(entity.textStyle);
+        const layer = insertEntity
+            ? this._GetEntityLayer(insertEntity, blockCtx)
+            : this._GetEntityLayer(entity, blockCtx);
+        const color = insertEntity
+            ? this._GetEntityColor(insertEntity, blockCtx)
+            : this._GetEntityColor(entity, blockCtx);
 
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
