@@ -37,7 +37,8 @@ export class DxfViewer {
                 alpha: options.canvasAlpha,
                 premultipliedAlpha: options.canvasPremultipliedAlpha,
                 antialias: options.antialias,
-                depth: false
+                depth: false,
+				preserveDrawingBuffer: options.preserveDrawingBuffer
             })
         } catch (e) {
             console.log("Failed to create renderer: " + e)
@@ -685,7 +686,9 @@ DxfViewer.DefaultOptions = {
     /** Scene generation options. */
     sceneOptions: DxfScene.DefaultOptions,
     /** Retain the simple object representing the parsed DXF - will consume a lot of additional memory */
-    retainParsedDxf: false
+    retainParsedDxf: false,
+	/** Whether to preserve the buffers until manually cleared or overwritten */
+    preserveDrawingBuffer: false
 }
 
 DxfViewer.SetupWorker = function () {
