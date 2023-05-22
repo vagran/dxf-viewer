@@ -28,7 +28,6 @@ EntityParser.prototype.parseEntity = function (scanner, curr) {
             case 7:
                 entity.textStyle = curr.value;
                 break;
-                break;
             case 10: // X coordinate of 'first alignment point'
                 entity.startPoint = helpers.parsePoint(scanner);
                 break;
