@@ -1,7 +1,9 @@
 node_modules/
 test-data/
 /build/
+/dist/
 .history/
 *.tgz
 *.orig
 scratch/
+/package-lock.json

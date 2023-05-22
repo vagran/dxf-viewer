@@ -1,0 +1,40 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "build"],
+            "options": {
+                "env": {
+                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "Build debug",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "build-debug"],
+            "options": {
+                "env": {
+                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+                }
+            }
+        },
+        {
+            "label": "npm install",
+            "type": "process",
+            "command": "npm",
+            "args": ["install"],
+            "options": {
+                "env": {
+                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+                }
+            }
+        }
+    ]
+}

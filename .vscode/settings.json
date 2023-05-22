@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
         "XDATA"
-    ]
+    ],
+    "env": {
+        "nodeDir": "/opt/node-v18"
+    }
 }

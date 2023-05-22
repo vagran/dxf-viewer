@@ -5,7 +5,12 @@
     "main": "src/index.js",
     "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
     "license": "MPL-2.0",
+    "private": true,
     "repository": "https://github.com/vagran/dxf-viewer",
+    "bugs": {
+        "url": "https://github.com/vagran/dxf-viewer/issues"
+    },
+    "homepage": "https://github.com/vagrandxf-viewer#readme",
     "keywords": [
         "dxf",
         "viewer",
@@ -14,6 +19,10 @@
         "html5",
         "cad"
     ],
+    "scripts": {
+        "build": "tsc",
+        "build-debug": "tsc --project tsconfig.debug.json"
+    },
     "files": [
         "src",
         "README.md",
@@ -21,9 +30,12 @@
         "CONTRIBUTORS"
     ],
     "dependencies": {
-        "@types/three": "^0.149.0",
-        "three": "^0.150.1",
+        "@types/three": "^0.152.0",
+        "three": "^0.152.2",
         "loglevel": "^1.8.1",
         "opentype.js": "^1.3.4"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.4"
     }
 }
