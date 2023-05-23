@@ -27,7 +27,8 @@ export type DxfViewerOptions = {
     blackWhiteInversion: boolean,
     pointSize: number,
     sceneOptions: DxfSceneOptions,
-    retainParsedDxf: boolean
+    retainParsedDxf: boolean,
+    preserveDrawingBuffer: boolean
 }
 
 export type DxfViewerLoadParams = {
