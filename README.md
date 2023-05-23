@@ -19,8 +19,8 @@ npm install dxf-viewer
 ## Features
 
  * File fetching, parsing and preparation for rendering is separated in such a way that it can be
-   easily off-loaded to web-worker using provided helpers. So the most heavy-weight processing part
-   does not affect UI responsiveness. The example above demonstrates this technique.
+   easily off-loaded to a web-worker using provided helpers. So the most heavy-weight processing
+   part does not affect UI responsiveness. The example above demonstrates this technique.
  * Geometry batching - minimal number of rendering batches is created during file processing, thus
    minimizing total required number of draw calls.
  * Instanced rendering - features which are rendered multiple times with different transforms (e.g.
@@ -30,6 +30,8 @@ npm install dxf-viewer
    through already loaded fonts, next font is fetched and checked for the necessary glyph.
  * Layers - layers are taken into account when creating rendering batches so that they can be easily
    hidden/shown.
+
+![samples](https://user-images.githubusercontent.com/6065976/143092164-cced2f5f-1af3-42a4-9a71-5dba68df06e7.png)
 
 ## Incomplete features
 
@@ -59,12 +61,10 @@ time. Most significant reason for missing implementation is lack of correspondin
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored.
  * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z
-   (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
+   (which is commonly used for features mirroring in CAD). Arbitrary directions are not properly
    processed.
  * Paper space, layouts (sheets), viewports.
  * Many less commonly used DXF features.
-
-![samples](https://user-images.githubusercontent.com/6065976/143092164-cced2f5f-1af3-42a4-9a71-5dba68df06e7.png)
 
 ## Contributing
 
