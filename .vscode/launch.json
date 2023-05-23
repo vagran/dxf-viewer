@@ -9,7 +9,9 @@
             "request": "launch",
             "name": "Browser debug",
             "url": "http://localhost:3344",
-            "webRoot": "${workspaceFolder}/src"
+            "pathMapping": {
+                "/@fs": "/"
+            }
         }
     ]
 }

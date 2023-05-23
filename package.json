@@ -20,8 +20,8 @@
         "cad"
     ],
     "scripts": {
-        "build": "tsc",
-        "build-debug": "tsc --project tsconfig.debug.json"
+        "build": "tsc && tsc-alias",
+        "build-debug": "tsc --project tsconfig.debug.json && tsc-alias --project tsconfig.debug.json"
     },
     "files": [
         "src",
@@ -30,12 +30,13 @@
         "CONTRIBUTORS"
     ],
     "dependencies": {
-        "@types/three": "^0.152.0",
         "three": "^0.152.2",
-        "loglevel": "^1.8.1",
+        "bole": "^5.0.4",
         "opentype.js": "^1.3.4"
     },
     "devDependencies": {
-        "typescript": "^5.0.4"
+        "@types/three": "^0.152.0",
+        "typescript": "^5.0.4",
+        "tsc-alias": "^1.8.6"
     }
 }
