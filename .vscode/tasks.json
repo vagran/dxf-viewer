@@ -7,7 +7,10 @@
             "label": "Build",
             "type": "process",
             "command": "npm",
-            "args": ["run", "build"],
+            "args": [
+                "run",
+                "build"
+            ],
             "options": {
                 "env": {
                     "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
@@ -18,18 +21,24 @@
             "label": "Build debug",
             "type": "process",
             "command": "npm",
-            "args": ["run", "build-debug"],
+            "args": [
+                "run",
+                "build-debug"
+            ],
             "options": {
                 "env": {
                     "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
                 }
-            }
+            },
+            "problemMatcher": []
         },
         {
             "label": "npm install",
             "type": "process",
             "command": "npm",
-            "args": ["install"],
+            "args": [
+                "install"
+            ],
             "options": {
                 "env": {
                     "PATH": "${config:env.nodeDir}/bin:${env:PATH}"

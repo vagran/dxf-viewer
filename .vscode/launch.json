@@ -11,7 +11,8 @@
             "url": "http://localhost:3344",
             "pathMapping": {
                 "/@fs": "/"
-            }
+            },
+            "preLaunchTask": "Build debug"
         }
     ]
 }
