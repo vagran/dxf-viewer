@@ -81,12 +81,12 @@ export type PatternLineDef = {
 }
 
 export class Pattern {
-    constructor(lines: PatternLineDef[], name: string | null = null)
+    constructor(lines: PatternLineDef[], name: string | null)
 
     static ParsePatFile(content: String): Pattern
 }
 
-export function RegisterPattern(pattern: Pattern, isMetric: boolean = true): void
+export function RegisterPattern(pattern: Pattern, isMetric: boolean): void
 
 /** @return {?Pattern} */
-export function LookupPattern(name: string, isMetric: boolean = true): Pattern | null
+export function LookupPattern(name: string, isMetric: boolean): Pattern | null
