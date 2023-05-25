@@ -90,8 +90,9 @@ export class DxfScene {
         this.dimStyles = new Map()
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
-        this.fontStyles = new Map();
-        this.insert = new Map();
+        this.fontStyles = new Map()
+        /* Indexed by entity handle. */
+        this.inserts = new Map()
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -155,6 +156,7 @@ export class DxfScene {
                 continue
             }
             if (entity.type === "INSERT") {
+                this.inserts.set(entity.handle, entity)
                 const block = this.blocks.get(entity.name)
                 block?.RegisterInsert(entity)
 
@@ -163,13 +165,6 @@ export class DxfScene {
                     const block = this.blocks.get(entity.block)
                     block?.RegisterInsert(entity)
                 }
-            }
-        }
-
-        const tmpInserts = [];
-        for (const entity of dxf.entities) {
-            if (entity.type === 'INSERT') {
-                this.insert.set(entity.handle,entity);
             }
         }
 
@@ -655,14 +650,10 @@ export class DxfScene {
         if (!this.textRenderer.canRender) {
             return;
         }
-        
-        const insertEntity = this.insert.get(entity.ownerHandle)
-        const layer = insertEntity
-            ? this._GetEntityLayer(insertEntity, blockCtx)
-            : this._GetEntityLayer(entity, blockCtx);
-        const color = insertEntity
-            ? this._GetEntityColor(insertEntity, blockCtx)
-            : this._GetEntityColor(entity, blockCtx);
+
+        const insertEntity = this.inserts.get(entity.ownerHandle)
+        const layer = this._GetEntityLayer(insertEntity ?? entity, blockCtx)
+        const color = this._GetEntityColor(insertEntity ?? entity, blockCtx)
 
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
@@ -674,8 +665,8 @@ export class DxfScene {
             vAlign: entity.verticalJustification,
             widthFactor: font?.widthFactor,
             color,
-            layer,
-        });
+            layer
+        })
     }
 
 
