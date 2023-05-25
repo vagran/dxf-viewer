@@ -663,7 +663,7 @@ export class DxfScene {
             rotation: entity.rotation,
             hAlign: entity.horizontalJustification,
             vAlign: entity.verticalJustification,
-            widthFactor: font?.widthFactor,
+            widthFactor: font?.widthFactor,//TODO fix `font` usage
             color,
             layer
         })
