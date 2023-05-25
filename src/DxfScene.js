@@ -91,6 +91,7 @@ export class DxfScene {
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
         this.fontStyles = new Map();
+        this.insert = new Map();
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -162,6 +163,13 @@ export class DxfScene {
                     const block = this.blocks.get(entity.block)
                     block?.RegisterInsert(entity)
                 }
+            }
+        }
+
+        const tmpInserts = [];
+        for (const entity of dxf.entities) {
+            if (entity.type === 'INSERT') {
+                this.insert.set(entity.handle,entity);
             }
         }
 
@@ -647,10 +655,14 @@ export class DxfScene {
         if (!this.textRenderer.canRender) {
             return;
         }
-        const layer = this._GetEntityLayer(entity, blockCtx);
-        const color = this._GetEntityColor(entity, blockCtx);
-
-        const font = this.fontStyles.get(entity.textStyle);
+        
+        const insertEntity = this.insert.get(entity.ownerHandle)
+        const layer = insertEntity
+            ? this._GetEntityLayer(insertEntity, blockCtx)
+            : this._GetEntityLayer(entity, blockCtx);
+        const color = insertEntity
+            ? this._GetEntityColor(insertEntity, blockCtx)
+            : this._GetEntityColor(entity, blockCtx);
 
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
