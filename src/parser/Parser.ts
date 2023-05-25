@@ -1,4 +1,4 @@
-import Group from "./Group"
+import Token from "./Token"
 import { GetLogger } from "@/Log"
 
 const log = GetLogger("Parser")
@@ -124,12 +124,12 @@ export class DxfParser extends EventTarget {
             this._curGroupCode = parseInt(line.trim())
             return
         }
-        const group = new Group(this._curGroupCode, line)
+        const group = new Token(this._curGroupCode, line)
         this._curGroupCode = null
         this._ProcessGroup(group)
     }
 
-    _ProcessGroup(group: Group): void {
+    _ProcessGroup(group: Token): void {
         // console.log(group)
     }
 }

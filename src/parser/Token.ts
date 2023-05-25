@@ -2,13 +2,15 @@ import { GetLogger } from "@/Log"
 
 const log = GetLogger("Parser")
 
-export default class Group {
+export type TokenValue = number | string | boolean
+
+export default class Token {
     readonly code: number
     readonly value: string | number | boolean
 
     constructor(code: number, valueStr: string) {
         this.code = code
-        this.value = Group.GetTypedValue(code, valueStr)
+        this.value = Token.GetTypedValue(code, valueStr)
     }
 
     static ParseBoolean(s: string): boolean {
@@ -21,7 +23,7 @@ export default class Group {
         throw TypeError(`String "${s}" cannot be cast to Boolean type`)
     }
 
-    static GetTypedValue(code: number, valueStr: string): number | string | boolean {
+    static GetTypedValue(code: number, valueStr: string): TokenValue {
         if (code <= 9) {
             return valueStr;
         }
@@ -47,7 +49,7 @@ export default class Group {
             return parseInt(valueStr.trim());
         }
         if (code >= 290 && code <= 299) {
-            return Group.ParseBoolean(valueStr.trim());
+            return Token.ParseBoolean(valueStr.trim());
         }
         if (code >= 300 && code <= 369) {
             return valueStr;
