@@ -1054,7 +1054,7 @@ export class DxfScene {
             }
         }
         if (pattern == null && entity.definitionLines) {
-            pattern = new Pattern(entity.definitionLines)
+            pattern = new Pattern(entity.definitionLines, null, false)
         }
         if (pattern == null) {
             pattern = LookupPattern("ANSI31")
@@ -1075,8 +1075,17 @@ export class DxfScene {
 
             for (const line of pattern.lines) {
 
-                let offsetX = line.offset.x
-                let offsetY = line.offset.y
+                let offsetX
+                let offsetY
+                if (pattern.offsetInLineSpace) {
+                    offsetX = line.offset.x
+                    offsetY = line.offset.y
+                } else {
+                    const sin = Math.sin(-(line.angle ?? 0))
+                    const cos = Math.cos(-(line.angle ?? 0))
+                    offsetX = line.offset.x * cos - line.offset.y * sin
+                    offsetY = line.offset.x * sin + line.offset.y * cos
+                }
 
                 /* Normalize offset so that Y is always non-negative. Inverting offset vector
                  * direction does not change lines positions.
@@ -1200,7 +1209,7 @@ export class DxfScene {
                             for (let dashLength of line.dashes) {
                                 const isSpace = dashLength < 0
                                 if (isSpace) {
-                                    dashLength = - dashLength
+                                    dashLength = -dashLength
                                 }
                                 const dashLengthParam = dashLength / lineLength
                                 if (!isSpace) {
