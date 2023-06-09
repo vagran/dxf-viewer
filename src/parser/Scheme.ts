@@ -12,7 +12,9 @@ export type NodeBaseParams = {
     /** First candidate node which matches current token, discards all the rest candidates if any,
      * when this parameter is set.
      */
-    exclusiveMatch?: boolean
+    exclusiveMatch?: boolean,
+    /** This node is discarded if any of other candidates matches. */
+    fallbackMatch?: boolean
 }
 
 export type NodeParams<TParams> = NodeBaseParams & TParams
@@ -26,7 +28,7 @@ export type NodeDesc = {
     [key: string]: any
 } & NodeBaseParams
 
-export type NodeDescFactory<TParams> = (params: NodeParams<TParams>) => NodeDesc
+export type NodeDescFactory<TParams> = (params?: NodeParams<TParams>) => NodeDesc
 
 //XXX
 export type NodeFactoryParams<T> = T extends NodeFactory<infer TParams> ? TParams : never
@@ -37,7 +39,7 @@ export interface SchemeNodeImpl<TParams> {
 }
 
 export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDescFactory<TParams> {
-    return (params: NodeParams<TParams>) => {
+    return (params?: NodeParams<TParams>) => {
         return {
             factory(parent: SchemeNode | null, nodeDesc: NodeParams<TParams>): SchemeNode {
                 return new cls(parent, nodeDesc)
@@ -46,9 +48,6 @@ export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDesc
         }
     }
 }
-
-//XXX
-// export type ValueTransformer = (value: TokenValue) => any
 
 /* ************************************************************************************************/
 /* Scheme implementation. */
@@ -151,19 +150,11 @@ export abstract class SchemeTerminalNode<TParams, TToken> extends SchemeNode {
 
     /** Evaluate the node to provide value for corresponding AST node. */
     Evaluate(token: TToken): any {}
-
-    /** Apply any custom transform for the token value. Default implementation just returns
-     * unchanged value.
-     */
-    //XXX
-    // TransformValue(value: TokenValue): any {
-    //     return value
-    // }
 }
 
 /** Represents next match candidate. */
 export abstract class NodeMatchCandidate {
-    abstract node: SchemeNode
+    abstract readonly node: SchemeNode
 
     /** Advance match position to next sibling node(s).
      *
@@ -221,8 +212,82 @@ export abstract class SchemeInterimNode<TParams> extends SchemeNode {
  * @param rootNodeDesc - Descriptor for scheme root node.
  * @return Scheme root node.
  */
-export function BuildScheme(rootNodeDesc: NodeDesc, parent: SchemeNode | null = null): SchemeNode {
-    return rootNodeDesc.factory(parent, rootNodeDesc)
+export function BuildScheme(rootNodeDesc: NodeDesc, parent: SchemeNode | null = null,
+                            overrideProps?: NodeBaseParams): SchemeNode {
+    let desc
+    if (overrideProps) {
+        desc = Object.assign({}, rootNodeDesc)
+        Object.assign(desc, overrideProps)
+    } else {
+        desc = rootNodeDesc
+    }
+    return desc.factory(parent, desc)
+}
+
+/** Helper for iterator which iterates single node. */
+class SingleNodeIterator extends NodeIterator {
+    constructor(private node: SchemeNode) {
+        super()
+        const iterator = this
+        this.candidate = new class SingleNodeCandidate extends NodeMatchCandidate {
+            override readonly node: SchemeNode
+
+            constructor() {
+                super(iterator)
+                this.node = iterator.node
+            }
+
+            override Next(_forkIterator: boolean): NodeIterator | null {
+                this.ValidateNext()
+                return null
+            }
+        }
+    }
+
+    override *GetCandidates(): Generator<NodeMatchCandidate> {
+        if (this.sequence == 0) {
+            yield this.candidate
+        }
+    }
+
+    private readonly candidate: NodeMatchCandidate
+}
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+class OrderedGroupIterator extends NodeIterator {
+    constructor(private readonly content: SchemeNode[], sequence: number = 0) {
+        super()
+        this.sequence = sequence
+    }
+
+    *GetCandidates(): Generator<NodeMatchCandidate> {
+        if (this.sequence >= this.content.length) {
+            throw new Error("Iteration out of range")
+        }
+        const iterator = this
+        yield new class extends NodeMatchCandidate {
+            override node: SchemeNode
+
+            override Next(forkIterator: boolean): NodeIterator | null {
+                this.ValidateNext()
+                if (iterator.sequence == iterator.content.length - 1) {
+                    return null
+                }
+                if (forkIterator) {
+                    return new OrderedGroupIterator(iterator.content, iterator.sequence + 1)
+                }
+                iterator.sequence++
+                return iterator
+            }
+
+            constructor() {
+                super(iterator)
+                this.node = iterator.content[iterator.sequence]
+            }
+        }
+    }
 }
 
 export type OrderedGroupParams = {
@@ -234,30 +299,166 @@ export const OrderedGroup = MakeNodeFactory(class extends SchemeInterimNode<Orde
 
     constructor(parent: SchemeNode | null, nodeDesc: NodeParams<OrderedGroupParams>) {
         super(parent, nodeDesc)
+        if (nodeDesc.content.length == 0) {
+            throw new Error("Empty group content")
+        }
         this.content = nodeDesc.content.map(desc => BuildScheme(desc, this))
     }
 
     override GetIterator(): NodeIterator {
-        throw new Error("Method not implemented.")
+        return new OrderedGroupIterator(this.content)
     }
 })
 
-//XXX helpers for typical iterators (e.g. single item)
+
+class UnorderedGroupIterator extends NodeIterator {
+    constructor(private readonly content: SchemeNode[],
+                private readonly fallback: SchemeNode | null,
+                sequence: number = 0) {
+        super()
+        this.sequence = sequence
+    }
+
+    *GetCandidates(): Generator<NodeMatchCandidate> {
+        const iterator = this
+        for (let idx = 0; idx < this.content.length; idx++) {
+            yield new class extends NodeMatchCandidate {
+                override node: SchemeNode
+
+                override Next(forkIterator: boolean): NodeIterator | null {
+                    this.ValidateNext()
+                    if (iterator.content.length <= 1) {
+                        return null
+                    }
+                    if (forkIterator) {
+                        return new UnorderedGroupIterator(
+                            iterator.content.slice().splice(this.idx, 1),
+                            iterator.fallback,
+                            iterator.sequence + 1)
+                    }
+                    iterator.content.splice(this.idx, 1)
+                    iterator.sequence++
+                    return iterator
+                }
+
+                constructor(idx: number) {
+                    super(iterator)
+                    this.idx = idx
+                    this.node = iterator.content[idx]
+                }
+
+                private readonly idx: number
+            }(idx)
+
+            if (this.fallback) {
+                yield new class extends NodeMatchCandidate {
+                    override node: SchemeNode
+
+                    override Next(forkIterator: boolean): NodeIterator | null {
+                        this.ValidateNext()
+                        if (forkIterator) {
+                            return new UnorderedGroupIterator(
+                                iterator.content.slice(),
+                                iterator.fallback,
+                                iterator.sequence + 1)
+                        }
+                        iterator.sequence++
+                        return iterator
+                    }
+
+                    constructor() {
+                        super(iterator)
+                        this.node = iterator.fallback!
+                    }
+                }
+            }
+        }
+    }
+}
+
+export type UnorderedGroupParams = {
+    content: NodeDesc[],
+    /** Try to match to this node if neither of the candidates from content matches. */
+    fallback?: NodeDesc
+}
+
+export const UnorderedGroup = MakeNodeFactory(class extends SchemeInterimNode<UnorderedGroupParams> {
+    private content: SchemeNode[]
+    private fallback: SchemeNode | null
+
+    constructor(parent: SchemeNode | null, nodeDesc: NodeParams<UnorderedGroupParams>) {
+        super(parent, nodeDesc)
+        if (nodeDesc.content.length == 0) {
+            throw new Error("Empty group content")
+        }
+        this.content = nodeDesc.content.map(desc => BuildScheme(desc, this))
+        this.fallback = nodeDesc.fallback ?
+            BuildScheme(nodeDesc.fallback, this, {fallbackMatch: true}) : null
+    }
+
+    override GetIterator(): NodeIterator {
+        return new UnorderedGroupIterator(this.content, this.fallback)
+    }
+})
+
+
+class OneOfGroupIterator extends NodeIterator {
+    constructor(private readonly content: SchemeNode[]) {
+        super()
+    }
+
+    *GetCandidates(): Generator<NodeMatchCandidate> {
+        const iterator = this
+        for (const node of this.content) {
+            yield new class extends NodeMatchCandidate {
+                override Next(_forkIterator: boolean): NodeIterator | null {
+                    this.ValidateNext()
+                    return null
+                }
+
+                constructor(override node: SchemeNode) {
+                    super(iterator)
+                }
+            }(node)
+        }
+    }
+}
+
+export type OneOfGroupParams = {
+    content: NodeDesc[]
+}
+
+export const OneOfGroup = MakeNodeFactory(class extends SchemeInterimNode<OneOfGroupParams> {
+    private content: SchemeNode[]
+
+    constructor(parent: SchemeNode | null, nodeDesc: NodeParams<UnorderedGroupParams>) {
+        super(parent, nodeDesc)
+        if (nodeDesc.content.length == 0) {
+            throw new Error("Empty group content")
+        }
+        this.content = nodeDesc.content.map(desc => BuildScheme(desc, this))
+    }
+
+    override GetIterator(): NodeIterator {
+        return new OneOfGroupIterator(this.content)
+    }
+})
+
 
 export type NodeRefParams = {
     refId: any
 }
 
 export const NodeRef = MakeNodeFactory(class NodeRef extends SchemeInterimNode<NodeRefParams> {
-    private ref: SchemeNode
 
     constructor(parent: SchemeNode | null, nodeDesc: NodeParams<NodeRefParams>) {
         super(parent, nodeDesc)
-        this.ref = this.GetGrammar().LookupSymbol(nodeDesc.refId)
+        this.iterator = new SingleNodeIterator(this.GetGrammar().LookupSymbol(nodeDesc.refId))
     }
 
     override GetIterator(): NodeIterator {
-        //XXX
-        throw new Error("Method not implemented.")
+        return this.iterator
     }
+
+    private readonly iterator: SingleNodeIterator
 })
