@@ -1,5 +1,7 @@
 import Token from "./Token"
 import { GetLogger } from "@/Log"
+import dxfScheme from "./DxfScheme"
+import { SchemedParser } from "./SchemedParser"
 
 const log = GetLogger("Parser")
 
@@ -15,6 +17,16 @@ export class DxfParserOptions {
     encodingFailureFatal: boolean = false
 }
 
+
+export class DxfParsingError extends Error {
+    readonly line: number
+
+    constructor(msg: string, line: number, options?: ErrorOptions) {
+        super(`[Line ${line}]: ${msg}`, options)
+        this.line = line
+    }
+}
+
 /**
  * DXF file stream parser. It can accept stream of input data and outputs stream of parsed entities.
  * The output stream consumer is free to build some hierarchical parsed file structure or process
@@ -27,11 +39,12 @@ export class DxfParser extends EventTarget {
         this._decoder = new TextDecoder(options.encoding, {
             fatal: options.encodingFailureFatal
         })
+        this._schemedParser = new SchemedParser(dxfScheme)
     }
 
     /** Feed next chunk to the parser.
-     * @param input Next chunk of data. Can be null for final call.
-     * @param isFinalChunk Set to true when final chunk is fed. `input` can be null in such case.
+     * @param input - Next chunk of data. Can be null for final call.
+     * @param isFinalChunk - Set to true when final chunk is fed. `input` can be null in such case.
      */
     Feed(input: BufferSource | null, isFinalChunk = false): void {
         const s = this._decoder.decode(input ?? undefined, {stream: !isFinalChunk})
@@ -54,7 +67,7 @@ export class DxfParser extends EventTarget {
     }
 
     /** Feed entire `File` object to the parser.
-     * @param abortSignal Optional abort signal which can interrupt the file feeding.
+     * @param abortSignal - Optional abort signal which can interrupt the file feeding.
      */
     async FeedFile(file: File, abortSignal?: AbortSignal): Promise<void> {
         const size = file.size
@@ -71,16 +84,18 @@ export class DxfParser extends EventTarget {
 
     // /////////////////////////////////////////////////////////////////////////////////////////////
 
-    _decoder: TextDecoder
-    _finalChunkSeen: boolean = false
-    _curChunk: string = ""
-    _curGroupCode: number | null = null
-
+    private readonly _decoder: TextDecoder
+    private _finalChunkSeen: boolean = false
+    private _curChunk: string = ""
+    private _curGroupCode: number | null = null
+    private _curLineNum = 1
+    private readonly _schemedParser: SchemedParser<Token>
 
 
     _ProcessCurChunk(): void {
         for (const s of this._ConsumeCurChunkLines()) {
             this._ProcessLine(s)
+            this._curLineNum++
         }
     }
 
@@ -105,7 +120,7 @@ export class DxfParser extends EventTarget {
                 }
             }
             if (sepPos < 0) {
-                return
+                break
             }
             yield this._curChunk.substring(pos, sepPos)
             pos = nextPos
@@ -121,15 +136,27 @@ export class DxfParser extends EventTarget {
 
     _ProcessLine(line: string): void {
         if (this._curGroupCode === null) {
-            this._curGroupCode = parseInt(line.trim())
+            const codeStr = line.trim()
+            this._curGroupCode = parseInt(codeStr)
+            if (isNaN(this._curGroupCode)) {
+                this._Error("Bad group code: " + codeStr)
+            }
             return
         }
-        const group = new Token(this._curGroupCode, line)
+        const token = new Token(this._curGroupCode, line)
         this._curGroupCode = null
-        this._ProcessGroup(group)
+        this._ProcessToken(token)
     }
 
-    _ProcessGroup(group: Token): void {
-        // console.log(group)
+    _ProcessToken(token: Token): void {
+        this._schemedParser.Feed(token)
+    }
+
+    _Error(msg: string, cause: Error | null = null) {
+        let options = undefined
+        if (cause) {
+            options = {cause}
+        }
+        throw new DxfParsingError(msg, this._curLineNum, options)
     }
 }

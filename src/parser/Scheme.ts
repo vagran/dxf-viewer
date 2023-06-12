@@ -44,6 +44,7 @@ export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDesc
             factory(parent: SchemeNode | null, nodeDesc: NodeParams<TParams>): SchemeNode {
                 return new cls(parent, nodeDesc)
             },
+            factoryCls: cls,
             ...params
         }
     }
