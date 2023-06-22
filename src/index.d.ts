@@ -53,7 +53,7 @@ export declare class DxfViewer {
     Clear(): void
     Destroy(): void
     FitView(minX: number, maxX: number, minY: number, maxY: number, padding: number): void
-    GetCamera(): THREE.Camera
+    GetCamera(): THREE.OrthographicCamera
     GetCanvas(): HTMLCanvasElement
     GetLayers(): Iterable<LayerInfo>
     GetOrigin(): THREE.Vector2

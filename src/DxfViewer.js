@@ -345,7 +345,7 @@ export class DxfViewer {
         return this.scene
     }
 
-    /** @return {Camera} three.js camera for the viewer. */
+    /** @return {OrthographicCamera} three.js camera for the viewer. */
     GetCamera() {
         return this.camera
     }
