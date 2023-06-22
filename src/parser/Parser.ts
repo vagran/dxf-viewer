@@ -149,10 +149,14 @@ export class DxfParser extends EventTarget {
     }
 
     _ProcessToken(token: Token): void {
-        this._schemedParser.Feed(token)
+        try {
+            this._schemedParser.Feed(token)
+        } catch (error) {
+            this._Error("Parsing failed", error)
+        }
     }
 
-    _Error(msg: string, cause: Error | null = null) {
+    _Error(msg: string, cause: any | null = null) {
         let options = undefined
         if (cause) {
             options = {cause}

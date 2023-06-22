@@ -138,7 +138,7 @@ export abstract class SchemeNode {
 }
 
 export abstract class SchemeTerminalNode<TParams, TToken> extends SchemeNode {
-    readonly isTerminal: boolean = true
+    override readonly isTerminal: boolean = true
 
     protected constructor(parent: SchemeNode | null, nodeDesc: NodeParams<TParams>) {
         super(parent, nodeDesc)
@@ -194,7 +194,7 @@ export abstract class NodeIterator {
 }
 
 export abstract class SchemeInterimNode<TParams> extends SchemeNode {
-    readonly isTerminal: boolean = false
+    override readonly isTerminal: boolean = false
 
     protected constructor(parent: SchemeNode | null, nodeDesc: NodeParams<TParams>) {
         super(parent, nodeDesc)
