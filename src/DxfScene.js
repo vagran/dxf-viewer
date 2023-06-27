@@ -655,6 +655,8 @@ export class DxfScene {
         const layer = this._GetEntityLayer(insertEntity ?? entity, blockCtx)
         const color = this._GetEntityColor(insertEntity ?? entity, blockCtx)
 
+        //XXX lookup font style attributes
+
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
             fontSize: entity.textHeight * entity.scale,
@@ -663,7 +665,6 @@ export class DxfScene {
             rotation: entity.rotation,
             hAlign: entity.horizontalJustification,
             vAlign: entity.verticalJustification,
-            widthFactor: font?.widthFactor,//TODO fix `font` usage
             color,
             layer
         })
@@ -1424,6 +1425,7 @@ export class DxfScene {
             const block = this.blocks.get(entity.name)
             if (!block) {
                 console.warn("Unresolved nested block reference: " + entity.name)
+                return
             }
             const nestedCtx = blockCtx.NestedBlockContext(block, entity)
             if (block.data.entities) {
@@ -1435,7 +1437,7 @@ export class DxfScene {
         }
 
         const block = this.blocks.get(entity.name)
-        if (block === null) {
+        if (!block) {
             console.warn("Unresolved block reference in INSERT: " + entity.name)
             return
         }
@@ -1748,6 +1750,10 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
+        if (!entity.controlPoints) {
+            //XXX knots or fit points not supported yet
+            return
+        }
         const controlPoints = entity.controlPoints.map(p => [p.x, p.y])
         const vertices = []
         const subdivisions = controlPoints.length * SPLINE_SUBDIVISION
