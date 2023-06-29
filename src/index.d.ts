@@ -67,6 +67,7 @@ export declare class DxfViewer {
     ShowLayer(name: string, show: boolean): void
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
+    bounds?: { maxX: number, maxY: number, minX: number, minY: number }
 }
 
 export declare namespace DxfViewer {
