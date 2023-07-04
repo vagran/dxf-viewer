@@ -2,8 +2,9 @@ import DxfParser from "./parser/DxfParser"
 
 /** Fetches and parses DXF file. */
 export class DxfFetcher {
-    constructor(url) {
+    constructor(url, encoding = "utf-8") {
         this.url = url
+        this.encoding = encoding
     }
 
     /** @param progressCbk {Function} (phase, receivedSize, totalSize) */
@@ -16,7 +17,7 @@ export class DxfFetcher {
         //XXX streaming parsing is not supported in dxf-parser for now (its parseStream() method
         // just accumulates chunks in a string buffer before parsing. Fix it later.
         let buffer = ""
-        let decoder = new TextDecoder("utf-8")
+        let decoder = new TextDecoder(this.encoding)
         while(true) {
             const {done, value} = await reader.read()
             if (done) {

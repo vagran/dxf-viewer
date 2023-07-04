@@ -666,9 +666,9 @@ DxfViewer.MessageLevel = MessageLevel
 DxfViewer.DefaultOptions = {
     canvasWidth: 400,
     canvasHeight: 300,
-    /** Automatically resize canvas when the container is resized. This options
-     *  utilizes ResizeObserver API which is still not fully standardized. The specified canvas size
-     *  is ignored if the option is enabled.
+    /** Automatically resize canvas when the container is resized. This options utilizes
+     *  ResizeObserver API which is still not fully standardized. The specified canvas size is
+     *  ignored if the option is enabled.
      */
     autoResize: false,
     /** Frame buffer clear color. */
@@ -693,10 +693,20 @@ DxfViewer.DefaultOptions = {
     pointSize: 2,
     /** Scene generation options. */
     sceneOptions: DxfScene.DefaultOptions,
-    /** Retain the simple object representing the parsed DXF - will consume a lot of additional memory */
+    /** Retain the simple object representing the parsed DXF - will consume a lot of additional
+     * memory.
+     */
     retainParsedDxf: false,
-    /** Whether to preserve the buffers until manually cleared or overwritten */
-    preserveDrawingBuffer: false
+    /** Whether to preserve the buffers until manually cleared or overwritten. */
+    preserveDrawingBuffer: false,
+    /** Encoding to use for decoding DXF file text content. DXF files newer than DXF R2004 (AC1018)
+     * use UTF-8 encoding. Older files use some code page which is specified in $DWGCODEPAGE header
+     * variable. Currently parser is implemented in such a way that encoding must be specified
+     * before the content is parsed so there is no chance to use this variable dynamically. This may
+     * be a subject for future changes. The specified value should be suitable for passing as
+     * `TextDecoder` constructor `label` parameter.
+     */
+    fileEncoding: "utf-8"
 }
 
 DxfViewer.SetupWorker = function () {

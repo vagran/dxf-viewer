@@ -28,7 +28,8 @@ export type DxfViewerOptions = {
     pointSize: number,
     sceneOptions: DxfSceneOptions,
     retainParsedDxf: boolean,
-    preserveDrawingBuffer: boolean
+    preserveDrawingBuffer: boolean,
+    fileEncoding: string
 }
 
 export type DxfViewerLoadParams = {
