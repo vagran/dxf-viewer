@@ -355,6 +355,14 @@ export class DxfViewer {
         return this.origin
     }
 
+    /**
+     * @return {?{maxX: number, maxY: number, minX: number, minY: number}} Scene bounds in model
+     *      space coordinates. Null if empty scene.
+     */
+    GetBounds() {
+        return this.bounds
+    }
+
     /** Subscribe to the specified event. The following events are defined:
      *  * "loaded" - new scene loaded.
      *  * "cleared" - current scene cleared.
