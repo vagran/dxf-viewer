@@ -151,7 +151,7 @@ export class DxfWorker {
         } else {
             fontFetchers = []
         }
-        const dxf = await new DxfFetcher(url).Fetch(progressCbk)
+        const dxf = await new DxfFetcher(url, options.fileEncoding).Fetch(progressCbk)
         if (progressCbk) {
             progressCbk("prepare", 0, null)
         }

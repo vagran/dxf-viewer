@@ -12,10 +12,14 @@ import { Vector2 } from "three"
 export class Pattern {
     /**
      * @param {PatternLineDef[]} lines
+     * @param {boolean} offsetInLineSpace Line offset is defined in line space when true, in pattern
+     *  space when false. Pattern space offset is the observed behavior of AutoDesk viewer for
+     *  patterns defined in hatch entity itself.
      */
-    constructor(lines, name = null) {
+    constructor(lines, name = null, offsetInLineSpace = true) {
         this.lines = lines
         this.name = name
+        this.offsetInLineSpace = offsetInLineSpace
     }
 
     static ParsePatFile(content) {

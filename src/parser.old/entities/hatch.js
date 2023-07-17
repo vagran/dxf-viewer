@@ -327,6 +327,7 @@ function ParseDefinitionLine(curr, scanner) {
             if (curr.value) {
                 entity.dashes = []
             }
+            break;
         default:
             scanner.rewind();
             return entity;

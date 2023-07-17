@@ -90,7 +90,9 @@ export class DxfScene {
         this.dimStyles = new Map()
         /** Indexed by variable name (without leading '$'). */
         this.vars = new Map()
-        this.fontStyles = new Map();
+        this.fontStyles = new Map()
+        /* Indexed by entity handle. */
+        this.inserts = new Map()
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -154,6 +156,7 @@ export class DxfScene {
                 continue
             }
             if (entity.type === "INSERT") {
+                this.inserts.set(entity.handle, entity)
                 const block = this.blocks.get(entity.name)
                 block?.RegisterInsert(entity)
 
@@ -647,10 +650,12 @@ export class DxfScene {
         if (!this.textRenderer.canRender) {
             return;
         }
-        const layer = this._GetEntityLayer(entity, blockCtx);
-        const color = this._GetEntityColor(entity, blockCtx);
 
-        const font = this.fontStyles.get(entity.textStyle);
+        const insertEntity = this.inserts.get(entity.ownerHandle)
+        const layer = this._GetEntityLayer(insertEntity ?? entity, blockCtx)
+        const color = this._GetEntityColor(insertEntity ?? entity, blockCtx)
+
+        //XXX lookup font style attributes
 
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
@@ -660,10 +665,9 @@ export class DxfScene {
             rotation: entity.rotation,
             hAlign: entity.horizontalJustification,
             vAlign: entity.verticalJustification,
-            widthFactor: font?.widthFactor,
             color,
-            layer,
-        });
+            layer
+        })
     }
 
 
@@ -1051,7 +1055,7 @@ export class DxfScene {
             }
         }
         if (pattern == null && entity.definitionLines) {
-            pattern = new Pattern(entity.definitionLines)
+            pattern = new Pattern(entity.definitionLines, null, false)
         }
         if (pattern == null) {
             pattern = LookupPattern("ANSI31")
@@ -1072,8 +1076,17 @@ export class DxfScene {
 
             for (const line of pattern.lines) {
 
-                let offsetX = line.offset.x
-                let offsetY = line.offset.y
+                let offsetX
+                let offsetY
+                if (pattern.offsetInLineSpace) {
+                    offsetX = line.offset.x
+                    offsetY = line.offset.y
+                } else {
+                    const sin = Math.sin(-(line.angle ?? 0))
+                    const cos = Math.cos(-(line.angle ?? 0))
+                    offsetX = line.offset.x * cos - line.offset.y * sin
+                    offsetY = line.offset.x * sin + line.offset.y * cos
+                }
 
                 /* Normalize offset so that Y is always non-negative. Inverting offset vector
                  * direction does not change lines positions.
@@ -1197,7 +1210,7 @@ export class DxfScene {
                             for (let dashLength of line.dashes) {
                                 const isSpace = dashLength < 0
                                 if (isSpace) {
-                                    dashLength = - dashLength
+                                    dashLength = -dashLength
                                 }
                                 const dashLengthParam = dashLength / lineLength
                                 if (!isSpace) {
@@ -1412,6 +1425,7 @@ export class DxfScene {
             const block = this.blocks.get(entity.name)
             if (!block) {
                 console.warn("Unresolved nested block reference: " + entity.name)
+                return
             }
             const nestedCtx = blockCtx.NestedBlockContext(block, entity)
             if (block.data.entities) {
@@ -1423,7 +1437,7 @@ export class DxfScene {
         }
 
         const block = this.blocks.get(entity.name)
-        if (block === null) {
+        if (!block) {
             console.warn("Unresolved block reference in INSERT: " + entity.name)
             return
         }
@@ -1736,6 +1750,10 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
+        if (!entity.controlPoints) {
+            //XXX knots or fit points not supported yet
+            return
+        }
         const controlPoints = entity.controlPoints.map(p => [p.x, p.y])
         const vertices = []
         const subdivisions = controlPoints.length * SPLINE_SUBDIVISION

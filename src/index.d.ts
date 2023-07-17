@@ -27,7 +27,9 @@ export type DxfViewerOptions = {
     blackWhiteInversion: boolean,
     pointSize: number,
     sceneOptions: DxfSceneOptions,
-    retainParsedDxf: boolean
+    retainParsedDxf: boolean,
+    preserveDrawingBuffer: boolean,
+    fileEncoding: string
 }
 
 export type DxfViewerLoadParams = {
@@ -52,10 +54,11 @@ export declare class DxfViewer {
     Clear(): void
     Destroy(): void
     FitView(minX: number, maxX: number, minY: number, maxY: number, padding: number): void
-    GetCamera(): THREE.Camera
+    GetCamera(): THREE.OrthographicCamera
     GetCanvas(): HTMLCanvasElement
     GetLayers(): Iterable<LayerInfo>
     GetOrigin(): THREE.Vector2
+    GetBounds(): {maxX: number, maxY: number, minX: number, minY: number} | null
     GetRenderer(): THREE.WebGLRenderer | null
     GetScene(): THREE.Scene
     HasRenderer(): boolean
@@ -80,12 +83,12 @@ export type PatternLineDef = {
 }
 
 export class Pattern {
-    constructor(lines: PatternLineDef[], name: string | null = null)
+    constructor(lines: PatternLineDef[], name: string | null)
 
     static ParsePatFile(content: String): Pattern
 }
 
-export function RegisterPattern(pattern: Pattern, isMetric: boolean = true): void
+export function RegisterPattern(pattern: Pattern, isMetric: boolean): void
 
 /** @return {?Pattern} */
-export function LookupPattern(name: string, isMetric: boolean = true): Pattern | null
+export function LookupPattern(name: string, isMetric: boolean): Pattern | null
