@@ -75,6 +75,7 @@ type SectionNodeParams = {
 /** Matches section with the specified name. */
 function Section(params: Scheme.NodeParams<SectionNodeParams>): Scheme.NodeDesc {
     return OrderedGroup({
+        nodeName: "Section",
         ...params,
         content: [
             Entity({name: "SECTION"}),
@@ -88,6 +89,7 @@ function Section(params: Scheme.NodeParams<SectionNodeParams>): Scheme.NodeDesc 
 
 function AnySection(params?: Scheme.NodeParams<{}>): Scheme.NodeDesc {
     return Section({
+        nodeName: "AnySection",
         ...params,
         content: AnyTag({q: "*"})
     })
@@ -102,6 +104,7 @@ type VectorNodeParams = {
 function Vector(params?: Scheme.NodeParams<VectorNodeParams>): Scheme.NodeDesc {
     const startCode = params?.startCode ?? 10
     return OrderedGroup({
+        nodeName: "Vector",
         ...params,
         content: [
             Tag({code: startCode, id: "x"}),

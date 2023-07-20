@@ -22,7 +22,11 @@ export class DxfParsingError extends Error {
     readonly line: number
 
     constructor(msg: string, line: number, options?: ErrorOptions) {
-        super(`[Line ${line}]: ${msg}`, options)
+        let _msg = `[Line ${line}]: ${msg}`
+        if (options?.cause) {
+            _msg += `\nCaused by ${options.cause.toString()}\n${(options.cause as Error).stack}`
+        }
+        super(_msg, options)
         this.line = line
     }
 }

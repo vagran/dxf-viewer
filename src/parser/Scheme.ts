@@ -3,16 +3,18 @@
 /* Scheme declaration stuff. */
 
 export type NodeBaseParams = {
+    /** Grammar node name, mostly for debugging. */
+    nodeName?: string
     /** Node quantifier. */
     q?: Quantifier | string | Array<number>
     /** Corresponding AST node is created if ID is specified. */
-    id?: string,
+    id?: string
     /** Grammar symbol ID to refer by {@link NodeRef}. */
-    symbolId?: any,
+    symbolId?: any
     /** First candidate node which matches current token, discards all the rest candidates if any,
      * when this parameter is set.
      */
-    exclusiveMatch?: boolean,
+    exclusiveMatch?: boolean
     /** This node is discarded if any of other candidates matches. */
     fallbackMatch?: boolean
 }
@@ -41,6 +43,7 @@ export interface SchemeNodeImpl<TParams> {
 export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDescFactory<TParams> {
     return (params?: NodeParams<TParams>) => {
         return {
+            nodeName: cls.name,
             factory(parent: SchemeNode | null, nodeDesc: NodeParams<TParams>): SchemeNode {
                 return new cls(parent, nodeDesc)
             },
@@ -54,7 +57,14 @@ export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDesc
 /* Scheme implementation. */
 
 export class Quantifier {
-    constructor(public readonly min: number, public readonly max: number) {}
+    constructor(public readonly min: number, public readonly max: number) {
+        if (max < min) {
+            throw new Error(`Bad quantifier: max < min (${max} < ${min})`)
+        }
+        if (max < 1) {
+            throw new Error(`Bad quantifier: max < 1 (${max})`)
+        }
+    }
 
     static FromChar(c: string): Quantifier {
         switch (c) {
@@ -95,10 +105,15 @@ export abstract class SchemeNode {
      * its `GetNextChild()` method.
      */
     abstract readonly isTerminal: boolean
+    /** End of file marker node. */
+    readonly isEof: boolean = false //XXX is needed?
 
     readonly quantifier: Quantifier
 
     readonly id: string | null
+
+    /** Grammar node name, mostly for debugging. */
+    readonly nodeName: string | null
 
     /** Defined in root node only. */
     readonly grammar?: Grammar
@@ -122,6 +137,7 @@ export abstract class SchemeNode {
         if (nodeDesc.symbolId !== undefined) {
             this.GetGrammar().RegisterSymbol(nodeDesc.symbolId, this)
         }
+        this.nodeName = nodeDesc?.nodeName ?? null
     }
 
     GetRoot(): SchemeNode {
@@ -135,6 +151,8 @@ export abstract class SchemeNode {
     GetGrammar(): Grammar {
         return this.GetRoot().grammar!
     }
+
+    //XXX Evaluate()?
 }
 
 export abstract class SchemeTerminalNode<TParams, TToken> extends SchemeNode {
@@ -295,7 +313,9 @@ export type OrderedGroupParams = {
     content: NodeDesc[]
 }
 
-export const OrderedGroup = MakeNodeFactory(class extends SchemeInterimNode<OrderedGroupParams> {
+export const OrderedGroup = MakeNodeFactory(class OrderedGroup
+    extends SchemeInterimNode<OrderedGroupParams> {
+
     private content: SchemeNode[]
 
     constructor(parent: SchemeNode | null, nodeDesc: NodeParams<OrderedGroupParams>) {
@@ -350,27 +370,26 @@ class UnorderedGroupIterator extends NodeIterator {
 
                 private readonly idx: number
             }(idx)
+        }
+        if (this.fallback) {
+            yield new class extends NodeMatchCandidate {
+                override node: SchemeNode
 
-            if (this.fallback) {
-                yield new class extends NodeMatchCandidate {
-                    override node: SchemeNode
-
-                    override Next(forkIterator: boolean): NodeIterator | null {
-                        this.ValidateNext()
-                        if (forkIterator) {
-                            return new UnorderedGroupIterator(
-                                iterator.content.slice(),
-                                iterator.fallback,
-                                iterator.sequence + 1)
-                        }
-                        iterator.sequence++
-                        return iterator
+                override Next(forkIterator: boolean): NodeIterator | null {
+                    this.ValidateNext()
+                    if (forkIterator) {
+                        return new UnorderedGroupIterator(
+                            iterator.content.slice(),
+                            iterator.fallback,
+                            iterator.sequence + 1)
                     }
+                    iterator.sequence++
+                    return iterator
+                }
 
-                    constructor() {
-                        super(iterator)
-                        this.node = iterator.fallback!
-                    }
+                constructor() {
+                    super(iterator)
+                    this.node = iterator.fallback!
                 }
             }
         }
@@ -383,7 +402,9 @@ export type UnorderedGroupParams = {
     fallback?: NodeDesc
 }
 
-export const UnorderedGroup = MakeNodeFactory(class extends SchemeInterimNode<UnorderedGroupParams> {
+export const UnorderedGroup = MakeNodeFactory(class UnorderedGroup
+    extends SchemeInterimNode<UnorderedGroupParams> {
+
     private content: SchemeNode[]
     private fallback: SchemeNode | null
 
@@ -429,7 +450,9 @@ export type OneOfGroupParams = {
     content: NodeDesc[]
 }
 
-export const OneOfGroup = MakeNodeFactory(class extends SchemeInterimNode<OneOfGroupParams> {
+export const OneOfGroup = MakeNodeFactory(class OneOfGroup
+    extends SchemeInterimNode<OneOfGroupParams> {
+
     private content: SchemeNode[]
 
     constructor(parent: SchemeNode | null, nodeDesc: NodeParams<UnorderedGroupParams>) {
