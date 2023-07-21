@@ -8,8 +8,6 @@
         "esModuleInterop": true,
         "resolveJsonModule": true,
         "declaration": true,
-        "sourceMap": false,
-        "declarationMap": false,
         "baseUrl": "./",
         "strict": true,
         "allowSyntheticDefaultImports": true,
@@ -20,9 +18,6 @@
             "@/*": [
                 "src/*"
             ]
-        },
-    },
-    "include": [
-        "src"
-    ],
+        }
+    }
 }

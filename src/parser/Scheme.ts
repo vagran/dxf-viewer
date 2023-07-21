@@ -11,6 +11,7 @@ export type NodeBaseParams = {
     id?: string
     /** Grammar symbol ID to refer by {@link NodeRef}. */
     symbolId?: any
+    //XXX make priority param instead
     /** First candidate node which matches current token, discards all the rest candidates if any,
      * when this parameter is set.
      */
@@ -19,7 +20,7 @@ export type NodeBaseParams = {
     fallbackMatch?: boolean
 }
 
-export type NodeParams<TParams> = NodeBaseParams & TParams
+export type NodeParams<TParams = NodeBaseParams> = NodeBaseParams & TParams
 
 export type NodeFactory<TParams> = (parent: SchemeNode | null, nodeDesc: NodeParams<TParams>) =>
     SchemeNode
@@ -51,6 +52,11 @@ export function MakeNodeFactory<TParams>(cls: SchemeNodeImpl<TParams>): NodeDesc
             ...params
         }
     }
+}
+
+export class SchemeDesc {
+    root?: NodeDesc
+
 }
 
 /* ************************************************************************************************/
@@ -478,6 +484,26 @@ export const NodeRef = MakeNodeFactory(class NodeRef extends SchemeInterimNode<N
     constructor(parent: SchemeNode | null, nodeDesc: NodeParams<NodeRefParams>) {
         super(parent, nodeDesc)
         this.iterator = new SingleNodeIterator(this.GetGrammar().LookupSymbol(nodeDesc.refId))
+    }
+
+    override GetIterator(): NodeIterator {
+        return this.iterator
+    }
+
+    private readonly iterator: SingleNodeIterator
+})
+
+
+export type WrapNodeParams = {
+    content: NodeDesc
+}
+
+/** Helper for wrapping other single node. */
+export const WrapNode = MakeNodeFactory(class NodeRef extends SchemeInterimNode<NodeParams> {
+
+    constructor(parent: SchemeNode | null, nodeDesc: NodeParams<WrapNodeParams>) {
+        super(parent, nodeDesc)
+        this.iterator = new SingleNodeIterator(BuildScheme(nodeDesc.content, this))
     }
 
     override GetIterator(): NodeIterator {

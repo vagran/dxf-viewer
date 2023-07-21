@@ -13,6 +13,19 @@
                 "/@fs": "/"
             },
             "preLaunchTask": "Build debug"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Unit test debug",
+            "cwd": "${workspaceRoot}",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": [
+                "run", "test"
+            ],
+            "env": {
+                "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+            }
         }
     ]
 }

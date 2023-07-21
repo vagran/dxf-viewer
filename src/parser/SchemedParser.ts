@@ -48,8 +48,9 @@ export class SchemedParser<TToken> {
                 throw new Error("Failed to match initial token")
             }
         } else {
-
+            //XXX
         }
+        this._FinalizeMatching()
     }
 
     /** Match end-of-file. */
@@ -63,6 +64,9 @@ export class SchemedParser<TToken> {
         } else {
             //XXX
         }
+        this._FinalizeMatching()
+        //XXX ensure single eof node matched
+        //XXX commit everything
     }
 
     // /////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +120,6 @@ export class SchemedParser<TToken> {
             if (childParsingNode !== null) {
                 SetLastCandidate(nextNodeCandidate, childParsingNode)
             }
-            //XXX exclusiveMatch fallbackMatch
         }
 
         //XXX handle zero minimal match quantifier
@@ -166,5 +169,14 @@ export class SchemedParser<TToken> {
 
         //XXX
         return null
+    }
+
+    _FinalizeMatching() {
+        const n = this._curTips.length
+        if (n > 1) {
+            
+        }
+        //XXX exclusiveMatch fallbackMatch
+        //XXX commit single chain
     }
 }

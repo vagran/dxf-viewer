@@ -33,6 +33,21 @@
             "problemMatcher": []
         },
         {
+            "label": "Run unit tests",
+            "type": "process",
+            "command": "npm",
+            "args": [
+                "run",
+                "test"
+            ],
+            "options": {
+                "env": {
+                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "npm install",
             "type": "process",
             "command": "npm",
