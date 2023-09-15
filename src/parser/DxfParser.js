@@ -382,7 +382,7 @@ DxfParser.prototype._parse = function(dxfString) {
             }
         }
         var tableRecords = table[tableDefinition.tableRecordsProperty];
-        if(tableRecords) {
+        if (tableRecords) {
             if(tableRecords.constructor === Array){
                 actualCount = tableRecords.length;
             } else if(typeof(tableRecords) === 'object') {
@@ -391,6 +391,8 @@ DxfParser.prototype._parse = function(dxfString) {
             if(expectedCount !== actualCount) {
                 log.warn(`Parsed ${actualCount} ${tableDefinition.dxfSymbolName}'s but expected ${expectedCount}`);
             }
+        } else {
+            table[tableDefinition.tableRecordsProperty] = []
         }
         curr = scanner.next();
         return table;
