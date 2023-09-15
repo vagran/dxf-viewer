@@ -3,9 +3,6 @@ import {OrderedGroup, UnorderedGroup, OneOfGroup} from "@/parser/Scheme"
 import { SchemedParser } from "@/parser/SchemedParser"
 
 
-
-
-
 describe("Simple name-value format", () => {
 
     /* Implements parsing of name:number_value strings.
@@ -65,6 +62,7 @@ describe("Simple name-value format", () => {
     function Symbol(params: Scheme.NodeParams = {}): Scheme.NodeDesc {
         return OrderedGroup({
             ...params,
+            nodeName: "Symbol",
             content: [
                 SymbolStartChar(),
                 SymbolChar({q: "*"})
@@ -75,7 +73,7 @@ describe("Simple name-value format", () => {
     function NumberChar(params: Scheme.NodeParams): Scheme.NodeDesc {
         return Char({
             ...params,
-            nodeName: "SymbolStartChar",
+            nodeName: "NumberChar",
             value(c: string) {
                 return  c >= "0" && c <= "9"
             }
@@ -85,17 +83,34 @@ describe("Simple name-value format", () => {
     function Number(params: Scheme.NodeParams = {}): Scheme.NodeDesc {
         return Scheme.WrapNode({
             ...params,
+            nodeName: "Number",
             content: NumberChar({q: "+"})
         })
     }
 
+    function NameValue(params: Scheme.NodeParams = {}): Scheme.NodeDesc {
+        return OrderedGroup({
+            ...params,
+            nodeName: "NameValue",
+            content: [
+                Symbol(),
+                Char({value: ":"}),
+                Number(),
+            ]
+        })
+    }
+
     const scheme = OrderedGroup({
-        q: "*",
+        q: "?",
         content: [
-            Symbol(),
-            Char({value: ":"}),
-            Number(),
-            Char({value: "\n"})
+            NameValue(),
+            OrderedGroup({
+                q: "*",
+                content: [
+                    Char({value: "\n"}),
+                    NameValue()
+                ]
+            })
         ]
     })
 
