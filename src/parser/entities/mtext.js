@@ -50,7 +50,6 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         }
         curr = scanner.next();
     }
-    delete entity.columns;
     return entity;
 };
 
@@ -69,13 +68,13 @@ function parseMTextColumns(scanner, curr, parent) {
         switch (curr.code) {
             case 10:
                 if (!parent.direction) {
-                    // parent.direction = helpers.parsePoint(scanner);
-                    // delete parent.rotation;
+                    parent.direction = helpers.parsePoint(scanner);
+                    delete parent.rotation;
                 }
                 break;
             case 11:
                 if (!parent.position) {
-                    // parent.position = helpers.parsePoint(scanner);
+                    parent.position = helpers.parsePoint(scanner);
                 }
                 break;
             case 40:

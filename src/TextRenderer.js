@@ -188,12 +188,17 @@ export class TextRenderer {
      * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
-    *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
-                 attachment, lineSpacing = 1, color, layer = null}) {
+    *RenderMText({
+         formattedText, position, fontSize, width = null,
+         rotation = 0, direction = null, attachment, lineSpacing = 1,
+         color, layer = null, columns = null
+    }) {
+        width = columns?.total_width ?? width
+
         const box = new TextBox(fontSize, this._GetCharShape.bind(this))
         box.FeedText(formattedText)
         yield* box.Render(position, width, rotation, direction, attachment, lineSpacing, color,
-                          layer)
+                          layer, columns)
     }
 
     /** @return {CharShape} Shape for the specified character.
@@ -499,9 +504,13 @@ class TextBox {
         }
     }
 
-    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer) {
+    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer, columns) {
+        let column_width = columns?.column_width ?? width
+        const column_count = columns?.count ?? 1
+        const lineHeight = lineSpacing * 5 * this.fontSize / 3
+
         for (const p of this.paragraphs) {
-            p.BuildLines(width)
+            p.BuildLines(column_width)
         }
         if (width === null || width === 0) {
             /* Find maximal paragraph width which will define overall box width. */
@@ -514,22 +523,12 @@ class TextBox {
             }
         }
 
-        let defaultAlignment = TextBox.Paragraph.Alignment.LEFT
-        switch (attachment) {
-        case MTextAttachment.TOP_CENTER:
-        case MTextAttachment.MIDDLE_CENTER:
-        case MTextAttachment.BOTTOM_CENTER:
-            defaultAlignment = TextBox.Paragraph.Alignment.CENTER
-            break
-        case MTextAttachment.TOP_RIGHT:
-        case MTextAttachment.MIDDLE_RIGHT:
-        case MTextAttachment.BOTTOM_RIGHT:
-            defaultAlignment = TextBox.Paragraph.Alignment.RIGHT
-            break
-        }
+        // `width` might have changed
+        column_width = columns?.column_width ?? width
 
+        let textLineAlignment = TextBox.calculateTextLineAlignment(attachment);
         for (const p of this.paragraphs) {
-            p.ApplyAlignment(width, defaultAlignment)
+            p.ApplyAlignment(column_width, textLineAlignment)
         }
 
         /* Box local coordinates have top-left corner origin, so Y values are negative. The
@@ -542,71 +541,47 @@ class TextBox {
             rotation = Math.atan2(direction.y, direction.x) * 180 / Math.PI
         }
 
-        const lineHeight = lineSpacing * 5 * this.fontSize / 3
-
-        let height = 0
+        const baseColumnHeight = columns?.defined_height ?? columns?.total_height
+        const linesByColumn = [{height: 0, lines: []}]
         for (const p of this.paragraphs) {
-            if (p.lines === null) {
-                /* Paragraph always occupies at least one line. */
-                height++
-            } else {
-                height += p.lines.length
+            let currentColumn = linesByColumn[linesByColumn.length - 1]
+            const lines = p.lines ?? [undefined]
+
+            for (const line of lines) {
+                const column_height = columns?.heights?.[linesByColumn.length - 1] ?? baseColumnHeight
+                // Commit column
+                if (column_height && // Assume infinite height for column if not present
+                    linesByColumn.length < column_count &&  // Last column gets all remaining lines
+                    currentColumn.lines.length > 0 && // XXX Temp fix for \H scaling -- Don't commit empty column
+                    currentColumn.height + this.fontSize > column_height
+                ) {
+                    linesByColumn.push((currentColumn = {height: 0, lines: []}));
+                }
+
+                if (line) currentColumn.lines.push(line)
+                currentColumn.height += lineHeight
             }
         }
-        height *= lineHeight
+        // Remove line spacing from last line
+        linesByColumn.forEach(c => {
+            c.height = (c.height - lineHeight + this.fontSize)
+        })
 
-        let origin = new Vector2()
-        switch (attachment) {
-        case MTextAttachment.TOP_LEFT:
-            break
-        case MTextAttachment.TOP_CENTER:
-            origin.x = width / 2
-            break
-        case MTextAttachment.TOP_RIGHT:
-            origin.x = width
-            break
-        case MTextAttachment.MIDDLE_LEFT:
-            origin.y = -height / 2
-            break
-        case MTextAttachment.MIDDLE_CENTER:
-            origin.x = width / 2
-            origin.y = -height / 2
-            break
-        case MTextAttachment.MIDDLE_RIGHT:
-            origin.x = width
-            origin.y = -height / 2
-            break
-        case MTextAttachment.BOTTOM_LEFT:
-            origin.y = -height
-            break
-        case MTextAttachment.BOTTOM_CENTER:
-            origin.x = width / 2
-            origin.y = -height
-            break
-        case MTextAttachment.BOTTOM_RIGHT:
-            origin.x = width
-            origin.y = -height
-            break
-        default:
-            throw new Error("Unhandled alignment")
-        }
+        const gutter_width = columns?.gutter_width ?? 0
+        for (let i = 0; i < linesByColumn.length; i++){
+            let y = -this.fontSize
+            const column = linesByColumn[i];
+            const transform = TextBox.calculateTransformMatrix(
+                {...position, x: position.x + (column_width + gutter_width) * i},
+                rotation, width, column.height, attachment
+            )
 
-        /* Transform for each chunk insertion point. */
-        const transform = new Matrix3().translate(-origin.x, -origin.y)
-            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
-
-        let y = -this.fontSize
-        for (const p of this.paragraphs) {
-            if (p.lines === null) {
-                y -= lineHeight
-                continue
-            }
-            for (const line of p.lines) {
+            for (const line of column.lines) {
                 for (let chunkIdx = line.startChunkIdx;
                      chunkIdx < line.startChunkIdx + line.numChunks;
                      chunkIdx++) {
 
-                    const chunk = p.chunks[chunkIdx]
+                    const chunk = line.paragraph.chunks[chunkIdx]
                     let x = chunk.position
                     /* First chunk of continuation line never prepended by whitespace. */
                     if (chunkIdx === 0 || chunkIdx !== line.startChunkIdx) {
@@ -623,6 +598,70 @@ class TextBox {
                 y -= lineHeight
             }
         }
+    }
+
+    static calculateTextLineAlignment(attachment) {
+        let defaultAlignment = TextBox.Paragraph.Alignment.LEFT
+        switch (attachment) {
+            case MTextAttachment.TOP_CENTER:
+            case MTextAttachment.MIDDLE_CENTER:
+            case MTextAttachment.BOTTOM_CENTER:
+                defaultAlignment = TextBox.Paragraph.Alignment.CENTER
+                break
+            case MTextAttachment.TOP_RIGHT:
+            case MTextAttachment.MIDDLE_RIGHT:
+            case MTextAttachment.BOTTOM_RIGHT:
+                defaultAlignment = TextBox.Paragraph.Alignment.RIGHT
+                break
+        }
+
+        return defaultAlignment;
+    }
+
+    static calculateOriginOffset(attachment, width, height) {
+        let originOffset = new Vector2()
+        switch (attachment) {
+        case MTextAttachment.TOP_LEFT:
+            break
+        case MTextAttachment.TOP_CENTER:
+            originOffset.x = width / 2
+            break
+        case MTextAttachment.TOP_RIGHT:
+            originOffset.x = width
+            break
+        case MTextAttachment.MIDDLE_LEFT:
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_CENTER:
+            originOffset.x = width / 2
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_RIGHT:
+            originOffset.x = width
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.BOTTOM_LEFT:
+            originOffset.y = -height
+            break
+        case MTextAttachment.BOTTOM_CENTER:
+            originOffset.x = width / 2
+            originOffset.y = -height
+            break
+        case MTextAttachment.BOTTOM_RIGHT:
+            originOffset.x = width
+            originOffset.y = -height
+            break
+        default:
+            throw new Error("Unhandled alignment")
+        }
+
+        return originOffset
+    }
+
+    static calculateTransformMatrix(position, rotation, width, height, attachment) {
+        const originOffset = TextBox.calculateOriginOffset(attachment, width, height)
+        return new Matrix3().translate(-originOffset.x, -originOffset.y)
+            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
     }
 }
 

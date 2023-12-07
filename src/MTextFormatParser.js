@@ -6,12 +6,13 @@
 const State = Object.freeze({
     TEXT: 0,
     ESCAPE: 1,
+    CARET: 2,
     /* Skip currently unsupported format codes till ';' */
-    SKIP_FORMAT: 2,
+    SKIP_FORMAT: 3,
     /* For \pxq* paragraph formatting. Not found documentation yet, so temporal naming for now. */
-    PARAGRAPH1: 3,
-    PARAGRAPH2: 4,
-    PARAGRAPH3: 5
+    PARAGRAPH1: 4,
+    PARAGRAPH2: 5,
+    PARAGRAPH3: 6
 })
 
 const EntityType = Object.freeze({
@@ -29,7 +30,7 @@ const EntityType = Object.freeze({
 
 /** Single letter format codes which are not terminated by ";". */
 const shortFormats = new Set([
-    "L", "l", "O", "o", "K", "k", "P", "X", "~"
+    "L", "l", "O", "o", "K", "k", "P", "J", "X", "~"
 ])
 
 const longFormats = new Set([
@@ -116,6 +117,11 @@ export class MTextFormatParser {
                     state = State.ESCAPE
                     continue
                 }
+                if (c === "^") {
+                    EmitText()
+                    state = State.CARET
+                    continue
+                }
                 continue
 
             case State.ESCAPE:
@@ -150,6 +156,23 @@ export class MTextFormatParser {
                     textStart = curPos - 1
                 }
                 state = State.TEXT
+                continue
+
+            case State.CARET:
+                switch (c) {
+                    case "I": // XXX Handle Tab
+                        break
+                    case "J":
+                        EmitEntity(EntityType.PARAGRAPH)
+                        break
+                    case "M": // CR - ignored
+                        break
+                    default: // XXX Render as empty square
+                        break
+                }
+
+                state = State.TEXT
+                textStart = curPos + 1
                 continue
 
             case State.PARAGRAPH1:
