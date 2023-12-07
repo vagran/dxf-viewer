@@ -559,7 +559,7 @@ class TextBox {
                 }
 
                 if (line) currentColumn.lines.push(line)
-                currentColumn.height += lineHeight
+                currentColumn.height += lineHeight // XXX This is incorrect, the height of a line can be more than fontSize
             }
         }
         // Remove line spacing from last line
@@ -567,13 +567,16 @@ class TextBox {
             c.height = (c.height - lineHeight + this.fontSize)
         })
 
+        // NOTE: We can't use columns.total_width here because that seems to be the width of the entire content, but
+        //       not the width of the box.
+        const total_width = columns ? (column_count * column_width + (column_count - 1) * columns.gutter_width) : width;
         const gutter_width = columns?.gutter_width ?? 0
         for (let i = 0; i < linesByColumn.length; i++){
             let y = -this.fontSize
             const column = linesByColumn[i];
             const transform = TextBox.calculateTransformMatrix(
                 {...position, x: position.x + (column_width + gutter_width) * i},
-                rotation, width, column.height, attachment
+                rotation, total_width, column.height, attachment
             )
 
             for (const line of column.lines) {
@@ -723,11 +726,13 @@ TextBox.Paragraph = class {
 
         for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
             const chunk = this.chunks[curChunkIdx]
-            const chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
+            let chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
             if (boxWidth !== null && boxWidth !== 0 && curWidth !== 0 &&
                 curWidth + chunkWidth > boxWidth) {
 
                 CommitLine()
+                // We're at the start of the line again, so the chunk width should ignore leading spaces
+                chunkWidth = chunk.GetWidth(false)
             }
             chunk.position = curWidth
             curWidth += chunkWidth
