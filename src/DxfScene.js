@@ -1985,7 +1985,7 @@ export class DxfScene {
             color = ColorCode.BY_BLOCK
         } else if (entity.colorIndex === 256) {
             color = ColorCode.BY_LAYER
-        } else if (entity.hasOwnProperty("color")) {
+        } else if (entity.color) {
             color = entity.color
         }
 
