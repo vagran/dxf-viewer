@@ -468,6 +468,10 @@ class TextBox {
                 }
                 break
 
+            case MTextFormatParser.EntityType.TAB:
+                this.curParagraph.FeedTab()
+                break
+
             case MTextFormatParser.EntityType.PARAGRAPH:
                 this.curParagraph = new TextBox.Paragraph(this)
                 this.curParagraph.SetAlignment(curAlignment)
@@ -685,7 +689,7 @@ TextBox.Paragraph = class {
         if (shape === null) {
             return
         }
-        if (this.curChunk === null) {
+        if (this.curChunk === null || this.curChunk.isTab) {
             this._AddChunk()
         }
         this.curChunk.PushChar(c, shape)
@@ -696,6 +700,11 @@ TextBox.Paragraph = class {
             this._AddChunk()
         }
         this.curChunk.PushSpace()
+    }
+
+    FeedTab() {
+        this._AddChunk()
+        this.curChunk.PushTab()
     }
 
     SetAlignment(alignment) {
@@ -726,13 +735,13 @@ TextBox.Paragraph = class {
 
         for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
             const chunk = this.chunks[curChunkIdx]
-            let chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
+            let chunkWidth = chunk.GetWidth(curWidth,startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
             if (boxWidth !== null && boxWidth !== 0 && curWidth !== 0 &&
                 curWidth + chunkWidth > boxWidth) {
 
                 CommitLine()
                 // We're at the start of the line again, so the chunk width should ignore leading spaces
-                chunkWidth = chunk.GetWidth(false)
+                chunkWidth = chunk.GetWidth(0, false)
             }
             chunk.position = curWidth
             curWidth += chunkWidth
@@ -793,13 +802,21 @@ TextBox.Paragraph.Chunk = class {
         this.spaceEndKerning = null
         this.block = null
         this.position = null
+        this.isTab = false
     }
 
     PushSpace() {
-        if (this.block) {
+        if (this.block || this.isTab) {
             throw new Error("Illegal operation")
         }
         this.leadingSpaces++
+    }
+
+    PushTab() {
+        if (this.block) {
+            throw new Error("Illegal operation")
+        }
+        this.isTab = true
     }
 
     /**
@@ -807,6 +824,10 @@ TextBox.Paragraph.Chunk = class {
      * @param shape {CharShape}
      */
     PushChar(char, shape) {
+        if (this.isTab) {
+            throw new Error("Illegal operation")
+        }
+
         if (this.spaceStartKerning === null) {
             if (this.leadingSpaces === 0) {
                 this.spaceStartKerning = 0
@@ -843,7 +864,12 @@ TextBox.Paragraph.Chunk = class {
             this.spaceStartKerning + this.spaceEndKerning) * this.fontSize
     }
 
-    GetWidth(withSpacing) {
+    GetWidth(xPos, withSpacing) {
+        if (this.isTab) {
+            // XXX: Does not support custom tab stops nor left/center/right tab stops
+            const defaultTabStopWidth = 4 * this.fontSize;
+            return (Math.floor(xPos / defaultTabStopWidth) + 1) * defaultTabStopWidth - xPos
+        }
         if (this.block === null) {
             return 0
         }

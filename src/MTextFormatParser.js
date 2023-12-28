@@ -23,7 +23,8 @@ const EntityType = Object.freeze({
     /** "alignment" property is either "r", "c", "l", "j", "d" for right, center, left, justify
      * (seems to be the same as left), distribute (justify) alignment.
      */
-    PARAGRAPH_ALIGNMENT: 4
+    PARAGRAPH_ALIGNMENT: 4,
+    TAB: 5,
 
     /* Many others are not yet implemented. */
 })
@@ -65,6 +66,13 @@ export class MTextFormatParser {
                 content: text.slice(textStart, curPos)
             })
             textStart = curPos
+        }
+
+        function EmitTab() {
+            curEntities.push({
+                type: EntityType.TAB,
+                content: ""
+            })
         }
 
         function EmitEntity(type) {
@@ -160,7 +168,8 @@ export class MTextFormatParser {
 
             case State.CARET:
                 switch (c) {
-                    case "I": // XXX Handle Tab
+                    case "I": // TODO: Parse custom tab stops
+                        EmitTab();
                         break
                     case "J":
                         EmitEntity(EntityType.PARAGRAPH)
