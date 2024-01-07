@@ -498,7 +498,6 @@ class TextBox {
     *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer, columns) {
         let column_width = columns?.column_width ?? width
         const column_count = columns?.count ?? 1
-        const lineHeight = lineSpacing * 5 * this.fontSize / 3
 
         for (const p of this.paragraphs) {
             p.BuildLines(column_width)
@@ -520,6 +519,7 @@ class TextBox {
         let textLineAlignment = TextBox.calculateTextLineAlignment(attachment);
         for (const p of this.paragraphs) {
             p.ApplyAlignment(column_width, textLineAlignment)
+            p.ComputeLineHeight(lineSpacing, this.fontSize)
         }
 
         /* Box local coordinates have top-left corner origin, so Y values are negative. The
@@ -550,12 +550,13 @@ class TextBox {
                 }
 
                 if (line) currentColumn.lines.push(line)
-                currentColumn.height += lineHeight // XXX This is incorrect, the height of a line can be more than fontSize
+                currentColumn.height += p.lineHeight
             }
         }
         // Remove line spacing from last line
         linesByColumn.forEach(c => {
-            c.height = (c.height - lineHeight + this.fontSize)
+            const lastLineLineSpacing = c.lines[c.lines.length - 1]?.paragraph?.lineHeight ?? 0
+            c.height = (c.height - lastLineLineSpacing + this.fontSize)
         })
 
         // NOTE: We can't use columns.total_width here because that seems to be the width of the entire content, but
@@ -589,7 +590,7 @@ class TextBox {
                                                   color, layer)
                     }
                 }
-                y -= lineHeight
+                y -= line.paragraph.lineHeight
             }
         }
     }
@@ -666,8 +667,9 @@ TextBox.Paragraph = class {
         this.curChunk = null
         this.alignment = baseParagraph?.alignment ?? null
         this.lineSpacingFactor = baseParagraph?.lineSpacingFactor ?? 1.0
-        this.lineSpacingType = baseParagraph?.lineSpacingType ?? TextBox.Paragraph.LineSpacingType.AT_LEAST
+        this.lineSpacingType = baseParagraph?.lineSpacingType ?? TextBox.Paragraph.LineSpacingType.AT_LEAST // XXX - Ignored when rendering
         this.lines = null
+        this.lineHeight = null
     }
 
     /** Feed character for current chunk. Spaces should be fed by FeedSpace() method. If space
@@ -764,6 +766,11 @@ TextBox.Paragraph = class {
                 line.ApplyAlignment(boxWidth, defaultAlignment)
             }
         }
+    }
+
+    ComputeLineHeight(baseLineSpacing, fontSize) {
+        // XXX - Ignores per paragraph font size
+        this.lineHeight = (baseLineSpacing * this.lineSpacingFactor) * 5 * fontSize / 3
     }
 
     _AddChunk() {
