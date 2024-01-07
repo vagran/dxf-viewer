@@ -432,7 +432,7 @@ class TextBox {
     constructor(fontSize, charShapeProvider) {
         this.fontSize = fontSize
         this.charShapeProvider = charShapeProvider
-        this.curParagraph = new TextBox.Paragraph(this)
+        this.curParagraph = new TextBox.Paragraph(null, this)
         this.paragraphs = [this.curParagraph]
         this.spaceShape = charShapeProvider(" ")
     }
@@ -456,54 +456,41 @@ class TextBox {
         let curAlignment = null
 
         for (const item of FlattenItems(formattedText)) {
-            switch(item.type) {
-
-            case MTextFormatParser.EntityType.TEXT:
-                for (const c of item.content) {
-                    if (c === " ") {
-                        this.curParagraph.FeedSpace()
-                    } else {
-                        this.curParagraph.FeedChar(c)
+            switch (item.type) {
+                case MTextFormatParser.EntityType.TEXT:
+                    for (const c of item.content) {
+                        if (c === " ") {
+                            this.curParagraph.FeedSpace()
+                        } else {
+                            this.curParagraph.FeedChar(c)
+                        }
                     }
-                }
-                break
+                    break
 
-            case MTextFormatParser.EntityType.TAB:
-                this.curParagraph.FeedTab()
-                break
+                case MTextFormatParser.EntityType.TAB:
+                    this.curParagraph.FeedTab()
+                    break
 
-            case MTextFormatParser.EntityType.PARAGRAPH:
-                this.curParagraph = new TextBox.Paragraph(this)
-                this.curParagraph.SetAlignment(curAlignment)
-                this.paragraphs.push(this.curParagraph)
-                break
+                case MTextFormatParser.EntityType.PARAGRAPH:
+                    this.curParagraph = new TextBox.Paragraph(this.curParagraph, this)
+                    this.curParagraph.SetAlignment(curAlignment)
+                    this.paragraphs.push(this.curParagraph)
+                    break
 
-            case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
-                this.curParagraph.FeedChar(" ")
-                break
+                case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
+                    this.curParagraph.FeedChar(" ")
+                    break
 
-            case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
-                let a = null
-                switch (item.alignment) {
-                case "l":
-                    a = TextBox.Paragraph.Alignment.LEFT
+                case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
+                    const a = TextBox.Paragraph.Alignment.fromTextId(item.alignment)
+                    this.curParagraph.SetAlignment(a)
+                    curAlignment = a
                     break
-                case "c":
-                    a = TextBox.Paragraph.Alignment.CENTER
+
+                case MTextFormatParser.EntityType.PARAGRAPH_LINE_SPACING:
+                    const lineSpacingType = TextBox.Paragraph.LineSpacingType.fromTextId(item.lineSpacingType)
+                    this.curParagraph.SetLineSpacing(lineSpacingType, item.lineSpacingFactor)
                     break
-                case "r":
-                    a = TextBox.Paragraph.Alignment.RIGHT
-                    break
-                case "d":
-                    a = TextBox.Paragraph.Alignment.JUSTIFY
-                    break
-                case "j":
-                    a = null
-                    break
-                }
-                this.curParagraph.SetAlignment(a)
-                curAlignment = a
-                break
             }
         }
     }
@@ -673,11 +660,13 @@ class TextBox {
 }
 
 TextBox.Paragraph = class {
-    constructor(textBox) {
+    constructor(baseParagraph, textBox) {
         this.textBox = textBox
         this.chunks = []
         this.curChunk = null
-        this.alignment = null
+        this.alignment = baseParagraph?.alignment ?? null
+        this.lineSpacingFactor = baseParagraph?.lineSpacingFactor ?? 1.0
+        this.lineSpacingType = baseParagraph?.lineSpacingType ?? TextBox.Paragraph.LineSpacingType.AT_LEAST
         this.lines = null
     }
 
@@ -709,6 +698,11 @@ TextBox.Paragraph = class {
 
     SetAlignment(alignment) {
         this.alignment = alignment
+    }
+
+    SetLineSpacing(lineSpacingType, lineSpacing) {
+        this.lineSpacingType = lineSpacingType
+        this.lineSpacingFactor = lineSpacing
     }
 
     /** Group chunks into lines.
@@ -782,7 +776,39 @@ TextBox.Paragraph.Alignment = Object.freeze({
     LEFT: 0,
     CENTER: 1,
     RIGHT: 2,
-    JUSTIFY: 3
+    JUSTIFY: 3,
+    fromTextId: (id) => {
+        switch (id) {
+            case "l":
+                return TextBox.Paragraph.Alignment.LEFT
+            case "c":
+                return TextBox.Paragraph.Alignment.CENTER
+            case "r":
+                return TextBox.Paragraph.Alignment.RIGHT
+            case "d":
+                return TextBox.Paragraph.Alignment.JUSTIFY
+            case "j":
+                return null
+        }
+    }
+})
+
+TextBox.Paragraph.LineSpacingType = Object.freeze({
+    AT_LEAST: 0,
+    EXACTLY: 1,
+    MULTIPLE: 2,
+    fromTextId: (id) => {
+        switch (id) {
+            case "a":
+                return TextBox.Paragraph.LineSpacingType.AT_LEAST
+            case "e":
+                return TextBox.Paragraph.LineSpacingType.EXACTLY
+            case "m":
+                return TextBox.Paragraph.LineSpacingType.MULTIPLE
+            case "*": // XXX - Should reset to default
+                return null
+        }
+    }
 })
 
 TextBox.Paragraph.Chunk = class {
