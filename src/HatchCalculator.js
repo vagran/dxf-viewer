@@ -49,7 +49,10 @@ class ClipCalculator {
         this._CreateNodes()
         /* Sort from line start towards end. */
         this.nodes.sort((e1, e2) => e1.intersection[0] - e2.intersection[0])
-        if (this.style == HatchStyle.ODD_PARITY) {
+        if (this.style === HatchStyle.OUTERMOST) {
+            return this._GenerateOutermostSegments()
+        }
+        if (this.style === HatchStyle.ODD_PARITY) {
             return this._GenerateOddParitySegments()
         }
         //XXX assume through all for all the reset style
@@ -200,11 +203,44 @@ class ClipCalculator {
             if (node.toggle) {
                 state = !state
             }
-            if (suppress == 0 && state && (node.unsuppress || node.toggle)) {
+            if (suppress === 0 && state && (node.unsuppress || node.toggle)) {
                 /* Just started new segment. */
                 prevNode = node
             } else if ((suppress || !state) && prevNode) {
                 if (node.intersection[0] - prevNode.intersection[0] > Number.EPSILON) {
+                    result.push([prevNode.intersection[0], node.intersection[0]])
+                }
+                prevNode = null
+            }
+        }
+
+        return result
+    }
+
+    _GenerateOutermostSegments() {
+        const result = []
+        let state = false
+        /* Incremented with each suppression, decremented with each un-suppression. */
+        let suppress = 0
+        /* Previous node when line was enabled. */
+        let prevNode = null
+
+        for (const node of this.nodes) {
+            if (node.suppress) {
+                suppress++
+            }
+            if (node.unsuppress) {
+                suppress--
+            }
+            if (node.toggle) {
+                state = !state
+            }
+            if (suppress === 0 && state && (node.unsuppress || node.toggle)) {
+                /* Just started new segment. */
+                prevNode = node
+            } else if ((suppress || !state) && prevNode) {
+                // Check if the segment is connected to loop 0 to get outer hatch style
+                if ((node.loopIdx === 0 || prevNode.loopIdx === 0) && node.intersection[0] - prevNode.intersection[0] > Number.EPSILON) {
                     result.push([prevNode.intersection[0], node.intersection[0]])
                 }
                 prevNode = null

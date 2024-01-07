@@ -1029,12 +1029,6 @@ export class DxfScene {
         }
 
         const style = entity.hatchStyle ?? 0
-
-        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
-            //XXX other styles not yet supported
-            return
-        }
-
         const boundaryLoops = this._GetHatchBoundaryLoops(entity)
         if (boundaryLoops.length == 0) {
             console.warn("HATCH entity with empty boundary loops array " +
