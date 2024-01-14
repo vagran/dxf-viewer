@@ -302,8 +302,8 @@ class ClipCalculator {
 }
 
 export class HatchCalculator {
-    boundaryLoops
-    style
+    boundaryLoops;
+    style;
 
     /**
      * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
