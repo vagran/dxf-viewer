@@ -47,7 +47,7 @@ export type LayerInfo = {
 }
 
 export type EventName = "loaded" | "cleared" | "destroyed" | "resized" | "pointerdown" |
-    "pointerup" | "viewChanged" | "message"
+    "pointerup" | "pointermove" | "viewChanged" | "message"
 
 export declare class DxfViewer {
     constructor(domContainer: HTMLElement, options: DxfViewerOptions | null)
