@@ -126,6 +126,8 @@ export class DxfViewer {
     }
 
     SetSize(width, height) {
+        if (width <= 0 || height <= 0) return;
+
         this._EnsureRenderer()
 
         const hScale = width / this.canvasWidth
