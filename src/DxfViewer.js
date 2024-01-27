@@ -84,7 +84,6 @@ export class DxfViewer {
             this.resizeObserver = new ResizeObserver(entries => this._OnResize(entries[0]))
             this.resizeObserver.observe(domContainer)
         }
-        domContainer.appendChild(this.canvas)
 
         this.canvas.addEventListener("pointerdown", this._OnPointerEvent.bind(this))
         this.canvas.addEventListener("pointerup", this._OnPointerEvent.bind(this))
@@ -221,6 +220,9 @@ export class DxfViewer {
         }
 
         this._Emit("loaded")
+        if (!this.canvas.parentNode) {
+            this.domContainer.appendChild(this.canvas)
+        }
 
         if (scene.bounds) {
             this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
@@ -312,6 +314,8 @@ export class DxfViewer {
         this.simpleColorMaterial = null
         this.renderer.dispose()
         this.renderer = null
+
+        this.canvas.remove();
     }
 
     SetView(center, width) {
