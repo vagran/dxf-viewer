@@ -448,16 +448,27 @@ export class DxfViewer {
         this._Emit(e.type, {
             domEvent: e,
             canvasCoord,
-            position: this._CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
+            position: this.CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
         })
     }
 
     /** @return {{x,y}} Scene coordinate corresponding to the specified canvas pixel coordinates. */
-    _CanvasToSceneCoord(x, y) {
+    CanvasToSceneCoord(x, y) {
+        if (x < 0 || this.canvasWidth <= x || y < 0 || this.canvasHeight <= y) return null;
+
         const v = new three.Vector3(x * 2 / this.canvasWidth - 1,
                                     -y * 2 / this.canvasHeight + 1,
                                     1).unproject(this.camera)
         return {x: v.x, y: v.y}
+    }
+
+    SceneToCanvasCoord(x, y) {
+        const v = new three.Vector3(x, y, 1).project(this.camera)
+        const cx = (v.x + 1) * this.canvasWidth / 2;
+        const cy = (-v.y + 1) * this.canvasHeight / 2;
+
+        if (cx < 0 || this.canvasWidth <= cx || cy < 0 || this.canvasHeight <= cy) return null;
+        return {x: cx, y: cy}
     }
 
     _OnResize(entry) {
