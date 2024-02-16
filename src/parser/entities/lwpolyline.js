@@ -27,7 +27,8 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             numberOfVertices = curr.value;
             break;
         case 10: // X coordinate of point
-            entity.vertices = parseLWPolylineVertices(numberOfVertices, scanner);
+            let vertices = parseLWPolylineVertices(numberOfVertices, scanner);
+            entity.vertices = entity.vertices ? entity.vertices.concat(vertices) : vertices;
             break;
         case 43:
             if(curr.value !== 0) entity.width = curr.value;
