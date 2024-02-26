@@ -45,7 +45,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
 };
 
 function parseLWPolylineVertices(n, scanner) {
-    if(!n || n <= 0) throw Error('n must be greater than 0 verticies');
+    if(!n || n <= 0) throw Error('n must be greater than 0 vertices');
     var vertices = [], i;
     var vertexIsStarted = false;
     var vertexIsFinished = false;
@@ -79,6 +79,9 @@ function parseLWPolylineVertices(n, scanner) {
                 break;
             case 42: // bulge
                 if(curr.value != 0) vertex.bulge = curr.value;
+                break;
+            case 91: // vertex identifier
+                vertex.id = curr.value;
                 break;
             default:
                 // if we do not hit known code return vertices.  Code might belong to entity
