@@ -1,6 +1,6 @@
 {
     "name": "dxf-viewer",
-    "version": "1.0.29",
+    "version": "1.0.31",
     "description": "JavaScript DXF file viewer",
     "main": "src/index.js",
     "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
@@ -21,9 +21,11 @@
         "CONTRIBUTORS"
     ],
     "dependencies": {
-        "@types/three": "^0.149.0",
-        "three": "^0.150.1",
-        "loglevel": "^1.8.1",
+        "three": "^0.161.0",
+        "loglevel": "^1.9.1",
         "opentype.js": "^1.3.4"
+    },
+    "devDependencies": {
+        "@types/three": "^0.161.2"
     }
 }
