@@ -169,7 +169,7 @@ export class MTextFormatParser {
             const numStart = cursor
             SkipWhile((c) => isNumberChar(c))
 
-            const number = parseFloat(text.substring(numStart, text.length));
+            const number = parseFloat(text.substring(numStart, cursor));
             if (isNaN(number)) return defaultValue
             return number
         }

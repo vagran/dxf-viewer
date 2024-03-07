@@ -2121,7 +2121,8 @@ export class DxfScene {
             scene.layers.push({
                 name: layer.name,
                 displayName: layer.displayName,
-                color: layer.color
+                color: layer.color,
+                visible: layer.visible
             })
         }
 
