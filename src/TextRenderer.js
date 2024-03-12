@@ -189,11 +189,12 @@ export class TextRenderer {
      *  glyph.
      */
     *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
-                 attachment, lineSpacing = 1, color, layer = null}) {
+                 attachment, lineSpacing = 1, color, layer = null, embeddedObject = false, boxHeight = 0,
+                 embeddedObjectWidth = 0, embeddedObjectGutterWidth = 0, embeddedObjectColumn = 1}) {
         const box = new TextBox(fontSize, this._GetCharShape.bind(this))
         box.FeedText(formattedText)
         yield* box.Render(position, width, rotation, direction, attachment, lineSpacing, color,
-                          layer)
+                          layer, boxHeight, embeddedObject, embeddedObjectWidth, embeddedObjectGutterWidth, embeddedObjectColumn)
     }
 
     /** @return {CharShape} Shape for the specified character.
@@ -499,7 +500,7 @@ class TextBox {
         }
     }
 
-    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer) {
+    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer, boxHeight = 0, embeddedObject = false, embeddedObjectWidth = 0, embeddedObjectGutterWidth = 0, embeddedObjectColumn = 1) {
         for (const p of this.paragraphs) {
             p.BuildLines(width)
         }
@@ -596,6 +597,7 @@ class TextBox {
             .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
 
         let y = -this.fontSize
+        let changeXCount = 0;
         for (const p of this.paragraphs) {
             if (p.lines === null) {
                 y -= lineHeight
@@ -611,6 +613,14 @@ class TextBox {
                     /* First chunk of continuation line never prepended by whitespace. */
                     if (chunkIdx === 0 || chunkIdx !== line.startChunkIdx) {
                         x += chunk.GetSpacingWidth()
+                    }
+                    // embeddedObject 
+                    if(embeddedObject){
+                        if(Math.abs(y) >= boxHeight){
+                            y = -this.fontSize
+                            changeXCount++;
+                        }
+                        x += changeXCount*embeddedObjectWidth
                     }
                     const v = new Vector2(x, y)
                     v.applyMatrix3(transform)
