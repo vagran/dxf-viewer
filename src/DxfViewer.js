@@ -6,12 +6,14 @@ import {ColorCode, DxfScene} from "./DxfScene.js"
 import {OrbitControls} from "./OrbitControls.js"
 import {RBTree} from "./RBTree.js"
 
+
 /** Level in "message" events. */
 const MessageLevel = Object.freeze({
     INFO: "info",
     WARN: "warn",
     ERROR: "error"
 })
+
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
 export class DxfViewer {

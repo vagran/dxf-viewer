@@ -3,5 +3,8 @@
         "unsuppress",
         "wireframe",
         "XDATA"
-    ]
+    ],
+    "env": {
+        "nodeDir": "/opt/node-v18"
+    }
 }
