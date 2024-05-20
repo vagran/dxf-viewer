@@ -1,4 +1,4 @@
-import DxfParser from "./parser/DxfParser"
+import DxfParser from "./parser/DxfParser.js"
 
 /** Fetches and parses DXF file. */
 export class DxfFetcher {

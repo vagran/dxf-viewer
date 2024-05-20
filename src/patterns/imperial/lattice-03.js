@@ -1,4 +1,4 @@
-import { Pattern, RegisterPattern } from "../../Pattern"
+import { Pattern, RegisterPattern } from "../../Pattern.js"
 
 RegisterPattern(Pattern.ParsePatFile(`
 *LATTICE-03,LATTICE-03 verbose

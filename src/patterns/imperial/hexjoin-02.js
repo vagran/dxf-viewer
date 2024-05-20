@@ -1,4 +1,4 @@
-import { Pattern, RegisterPattern } from "../../Pattern"
+import { Pattern, RegisterPattern } from "../../Pattern.js"
 
 RegisterPattern(Pattern.ParsePatFile(`
 *HEXJOIN-02,HEXJOIN-02 verbose

@@ -1,5 +1,5 @@
 import { Vector2, Matrix3, Box2 } from "three"
-import { IntersectSegmentsParametric } from "./math/utils"
+import { IntersectSegmentsParametric } from "./math/utils.js"
 
 export const HatchStyle = Object.freeze({
     ODD_PARITY: 0,

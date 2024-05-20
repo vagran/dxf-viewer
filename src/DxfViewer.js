@@ -1,10 +1,10 @@
 import * as three from "three"
-import {BatchingKey} from "./BatchingKey"
-import {DxfWorker} from "./DxfWorker"
-import {MaterialKey} from "./MaterialKey"
-import {ColorCode, DxfScene} from "./DxfScene"
-import {OrbitControls} from "./OrbitControls"
-import {RBTree} from "./RBTree"
+import {BatchingKey} from "./BatchingKey.js"
+import {DxfWorker} from "./DxfWorker.js"
+import {MaterialKey} from "./MaterialKey.js"
+import {ColorCode, DxfScene} from "./DxfScene.js"
+import {OrbitControls} from "./OrbitControls.js"
+import {RBTree} from "./RBTree.js"
 
 /** Level in "message" events. */
 const MessageLevel = Object.freeze({

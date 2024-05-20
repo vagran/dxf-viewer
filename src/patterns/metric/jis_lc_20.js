@@ -1,4 +1,4 @@
-import { Pattern, RegisterPattern } from "../../Pattern"
+import { Pattern, RegisterPattern } from "../../Pattern.js"
 
 RegisterPattern(Pattern.ParsePatFile(`
 *JIS_LC_20,JIS_LC_20

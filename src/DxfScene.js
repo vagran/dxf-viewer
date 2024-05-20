@@ -1,13 +1,13 @@
-import { DynamicBuffer, NativeType } from "./DynamicBuffer"
-import { BatchingKey } from "./BatchingKey"
+import { DynamicBuffer, NativeType } from "./DynamicBuffer.js"
+import { BatchingKey } from "./BatchingKey.js"
 import { Matrix3, Vector2 } from "three"
-import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer"
-import { RBTree } from "./RBTree"
-import { MTextFormatParser } from "./MTextFormatParser"
+import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer.js"
+import { RBTree } from "./RBTree.js"
+import { MTextFormatParser } from "./MTextFormatParser.js"
 import dimStyleCodes from './parser/DimStyleCodes'
-import { LinearDimension } from "./LinearDimension"
-import { HatchCalculator, HatchStyle } from "./HatchCalculator"
-import { LookupPattern, Pattern } from "./Pattern"
+import { LinearDimension } from "./LinearDimension.js"
+import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
+import { LookupPattern, Pattern } from "./Pattern.js"
 import "./patterns"
 
 
