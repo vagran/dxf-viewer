@@ -1,21 +1,5 @@
 /** Based on bintrees package (https://github.com/vadimg/js_bintrees). Fixed web-worker support. */
 
-export const RBTree = (function(window) {
-var global = window;
-var require = function(name) {
-    var fn = require.m[name];
-    if (fn.mod) {
-        return fn.mod.exports;
-    }
-
-    var mod = fn.mod = { exports: {} };
-    fn(mod, mod.exports);
-    return mod.exports;
-};
-
-require.m = {};
-require.m['./treebase'] = function(module, exports) {
-
 function TreeBase() {}
 
 // removes all nodes from the tree
@@ -244,12 +228,6 @@ Iterator.prototype._maxNode = function(start) {
     this._cursor = start;
 };
 
-module.exports = TreeBase;
-
-};
-require.m['__main__'] = function(module, exports) {
-
-var TreeBase = require('./treebase');
 
 function Node(data) {
     this.data = data;
@@ -271,7 +249,8 @@ Node.prototype.set_child = function(dir, val) {
     }
 };
 
-function RBTree(comparator) {
+
+export function RBTree(comparator) {
     this._root = null;
     this._comparator = comparator;
     this.size = 0;
@@ -464,8 +443,3 @@ function double_rotate(root, dir) {
     root.set_child(!dir, single_rotate(root.get_child(!dir), !dir));
     return single_rotate(root, dir);
 }
-
-module.exports = RBTree;
-};
-return require('__main__');
-})(self);
