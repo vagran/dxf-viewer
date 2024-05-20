@@ -8,7 +8,7 @@ import dimStyleCodes from "./parser/DimStyleCodes.js"
 import { LinearDimension } from "./LinearDimension.js"
 import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
 import { LookupPattern, Pattern } from "./Pattern.js"
-import "./patterns"
+import "./patterns/index.js"
 
 
 /** Use 16-bit indices for indexed geometry. */
