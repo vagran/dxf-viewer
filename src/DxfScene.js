@@ -4,7 +4,7 @@ import { Matrix3, Vector2 } from "three"
 import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer.js"
 import { RBTree } from "./RBTree.js"
 import { MTextFormatParser } from "./MTextFormatParser.js"
-import dimStyleCodes from './parser/DimStyleCodes'
+import dimStyleCodes from "./parser/DimStyleCodes.js"
 import { LinearDimension } from "./LinearDimension.js"
 import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
 import { LookupPattern, Pattern } from "./Pattern.js"

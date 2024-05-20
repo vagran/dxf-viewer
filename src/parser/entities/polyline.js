@@ -1,6 +1,6 @@
 
-import * as helpers from '../ParseHelpers'
-import VertexParser from './vertex';
+import * as helpers from "../ParseHelpers.js"
+import VertexParser from "./vertex.js";
 
 export default function EntityParser() {}
 

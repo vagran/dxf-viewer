@@ -1,5 +1,5 @@
-import AUTO_CAD_COLOR_INDEX from './AutoCadColorIndex';
-import ExtendedDataParser from './ExtendedDataParser';
+import AUTO_CAD_COLOR_INDEX from "./AutoCadColorIndex.js";
+import ExtendedDataParser from "./ExtendedDataParser.js";
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
