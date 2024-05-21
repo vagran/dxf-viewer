@@ -188,12 +188,17 @@ export class TextRenderer {
      * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
-    *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
-                 attachment, lineSpacing = 1, color, layer = null}) {
+    *RenderMText({
+         formattedText, position, fontSize, width = null,
+         rotation = 0, direction = null, attachment, lineSpacing = 1,
+         color, layer = null, columns = null
+    }) {
+        width = columns?.total_width ?? width
+
         const box = new TextBox(fontSize, this._GetCharShape.bind(this))
         box.FeedText(formattedText)
         yield* box.Render(position, width, rotation, direction, attachment, lineSpacing, color,
-                          layer)
+                          layer, columns)
     }
 
     /** @return {CharShape} Shape for the specified character.
@@ -427,7 +432,7 @@ class TextBox {
     constructor(fontSize, charShapeProvider) {
         this.fontSize = fontSize
         this.charShapeProvider = charShapeProvider
-        this.curParagraph = new TextBox.Paragraph(this)
+        this.curParagraph = new TextBox.Paragraph(null, this)
         this.paragraphs = [this.curParagraph]
         this.spaceShape = charShapeProvider(" ")
     }
@@ -451,57 +456,51 @@ class TextBox {
         let curAlignment = null
 
         for (const item of FlattenItems(formattedText)) {
-            switch(item.type) {
-
-            case MTextFormatParser.EntityType.TEXT:
-                for (const c of item.content) {
-                    if (c === " ") {
-                        this.curParagraph.FeedSpace()
-                    } else {
-                        this.curParagraph.FeedChar(c)
+            switch (item.type) {
+                case MTextFormatParser.EntityType.TEXT:
+                    for (const c of item.content) {
+                        if (c === " ") {
+                            this.curParagraph.FeedSpace()
+                        } else {
+                            this.curParagraph.FeedChar(c)
+                        }
                     }
-                }
-                break
+                    break
 
-            case MTextFormatParser.EntityType.PARAGRAPH:
-                this.curParagraph = new TextBox.Paragraph(this)
-                this.curParagraph.SetAlignment(curAlignment)
-                this.paragraphs.push(this.curParagraph)
-                break
+                case MTextFormatParser.EntityType.TAB:
+                    this.curParagraph.FeedTab()
+                    break
 
-            case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
-                this.curParagraph.FeedChar(" ")
-                break
+                case MTextFormatParser.EntityType.PARAGRAPH:
+                    this.curParagraph = new TextBox.Paragraph(this.curParagraph, this)
+                    this.curParagraph.SetAlignment(curAlignment)
+                    this.paragraphs.push(this.curParagraph)
+                    break
 
-            case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
-                let a = null
-                switch (item.alignment) {
-                case "l":
-                    a = TextBox.Paragraph.Alignment.LEFT
+                case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
+                    this.curParagraph.FeedChar(" ")
                     break
-                case "c":
-                    a = TextBox.Paragraph.Alignment.CENTER
+
+                case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
+                    const a = TextBox.Paragraph.Alignment.fromTextId(item.alignment)
+                    this.curParagraph.SetAlignment(a)
+                    curAlignment = a
                     break
-                case "r":
-                    a = TextBox.Paragraph.Alignment.RIGHT
+
+                case MTextFormatParser.EntityType.PARAGRAPH_LINE_SPACING:
+                    const lineSpacingType = TextBox.Paragraph.LineSpacingType.fromTextId(item.lineSpacingType)
+                    this.curParagraph.SetLineSpacing(lineSpacingType, item.lineSpacingFactor)
                     break
-                case "d":
-                    a = TextBox.Paragraph.Alignment.JUSTIFY
-                    break
-                case "j":
-                    a = null
-                    break
-                }
-                this.curParagraph.SetAlignment(a)
-                curAlignment = a
-                break
             }
         }
     }
 
-    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer) {
+    *Render(position, width, rotation, direction, attachment, lineSpacing, color, layer, columns) {
+        let column_width = columns?.column_width ?? width
+        const column_count = columns?.count ?? 1
+
         for (const p of this.paragraphs) {
-            p.BuildLines(width)
+            p.BuildLines(column_width)
         }
         if (width === null || width === 0) {
             /* Find maximal paragraph width which will define overall box width. */
@@ -514,22 +513,13 @@ class TextBox {
             }
         }
 
-        let defaultAlignment = TextBox.Paragraph.Alignment.LEFT
-        switch (attachment) {
-        case MTextAttachment.TOP_CENTER:
-        case MTextAttachment.MIDDLE_CENTER:
-        case MTextAttachment.BOTTOM_CENTER:
-            defaultAlignment = TextBox.Paragraph.Alignment.CENTER
-            break
-        case MTextAttachment.TOP_RIGHT:
-        case MTextAttachment.MIDDLE_RIGHT:
-        case MTextAttachment.BOTTOM_RIGHT:
-            defaultAlignment = TextBox.Paragraph.Alignment.RIGHT
-            break
-        }
+        // `width` might have changed
+        column_width = columns?.column_width ?? width
 
+        let textLineAlignment = TextBox.calculateTextLineAlignment(attachment);
         for (const p of this.paragraphs) {
-            p.ApplyAlignment(width, defaultAlignment)
+            p.ApplyAlignment(column_width, textLineAlignment)
+            p.ComputeLineHeight(lineSpacing, this.fontSize)
         }
 
         /* Box local coordinates have top-left corner origin, so Y values are negative. The
@@ -542,71 +532,51 @@ class TextBox {
             rotation = Math.atan2(direction.y, direction.x) * 180 / Math.PI
         }
 
-        const lineHeight = lineSpacing * 5 * this.fontSize / 3
-
-        let height = 0
+        const baseColumnHeight = columns?.defined_height ?? columns?.total_height
+        const linesByColumn = [{height: 0, lines: []}]
         for (const p of this.paragraphs) {
-            if (p.lines === null) {
-                /* Paragraph always occupies at least one line. */
-                height++
-            } else {
-                height += p.lines.length
+            let currentColumn = linesByColumn[linesByColumn.length - 1]
+            const lines = p.lines ?? [undefined]
+
+            for (const line of lines) {
+                const column_height = columns?.heights?.[linesByColumn.length - 1] ?? baseColumnHeight
+                // Commit column
+                if (column_height && // Assume infinite height for column if not present
+                    linesByColumn.length < column_count &&  // Last column gets all remaining lines
+                    currentColumn.lines.length > 0 && // XXX Temp fix for \H scaling -- Don't commit empty column
+                    currentColumn.height + this.fontSize > column_height
+                ) {
+                    linesByColumn.push((currentColumn = {height: 0, lines: []}));
+                }
+
+                if (line) currentColumn.lines.push(line)
+                currentColumn.height += p.lineHeight
             }
         }
-        height *= lineHeight
+        // Remove line spacing from last line
+        linesByColumn.forEach(c => {
+            const lastLineLineSpacing = c.lines[c.lines.length - 1]?.paragraph?.lineHeight ?? 0
+            c.height = (c.height - lastLineLineSpacing + this.fontSize)
+        })
 
-        let origin = new Vector2()
-        switch (attachment) {
-        case MTextAttachment.TOP_LEFT:
-            break
-        case MTextAttachment.TOP_CENTER:
-            origin.x = width / 2
-            break
-        case MTextAttachment.TOP_RIGHT:
-            origin.x = width
-            break
-        case MTextAttachment.MIDDLE_LEFT:
-            origin.y = -height / 2
-            break
-        case MTextAttachment.MIDDLE_CENTER:
-            origin.x = width / 2
-            origin.y = -height / 2
-            break
-        case MTextAttachment.MIDDLE_RIGHT:
-            origin.x = width
-            origin.y = -height / 2
-            break
-        case MTextAttachment.BOTTOM_LEFT:
-            origin.y = -height
-            break
-        case MTextAttachment.BOTTOM_CENTER:
-            origin.x = width / 2
-            origin.y = -height
-            break
-        case MTextAttachment.BOTTOM_RIGHT:
-            origin.x = width
-            origin.y = -height
-            break
-        default:
-            throw new Error("Unhandled alignment")
-        }
+        // NOTE: We can't use columns.total_width here because that seems to be the width of the entire content, but
+        //       not the width of the box.
+        const total_width = columns ? (column_count * column_width + (column_count - 1) * columns.gutter_width) : width;
+        const gutter_width = columns?.gutter_width ?? 0
+        for (let i = 0; i < linesByColumn.length; i++){
+            let y = -this.fontSize
+            const column = linesByColumn[i];
+            const transform = TextBox.calculateTransformMatrix(
+                {...position, x: position.x + (column_width + gutter_width) * i},
+                rotation, total_width, column.height, attachment
+            )
 
-        /* Transform for each chunk insertion point. */
-        const transform = new Matrix3().translate(-origin.x, -origin.y)
-            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
-
-        let y = -this.fontSize
-        for (const p of this.paragraphs) {
-            if (p.lines === null) {
-                y -= lineHeight
-                continue
-            }
-            for (const line of p.lines) {
+            for (const line of column.lines) {
                 for (let chunkIdx = line.startChunkIdx;
                      chunkIdx < line.startChunkIdx + line.numChunks;
                      chunkIdx++) {
 
-                    const chunk = p.chunks[chunkIdx]
+                    const chunk = line.paragraph.chunks[chunkIdx]
                     let x = chunk.position
                     /* First chunk of continuation line never prepended by whitespace. */
                     if (chunkIdx === 0 || chunkIdx !== line.startChunkIdx) {
@@ -620,19 +590,86 @@ class TextBox {
                                                   color, layer)
                     }
                 }
-                y -= lineHeight
+                y -= line.paragraph.lineHeight
             }
         }
+    }
+
+    static calculateTextLineAlignment(attachment) {
+        let defaultAlignment = TextBox.Paragraph.Alignment.LEFT
+        switch (attachment) {
+            case MTextAttachment.TOP_CENTER:
+            case MTextAttachment.MIDDLE_CENTER:
+            case MTextAttachment.BOTTOM_CENTER:
+                defaultAlignment = TextBox.Paragraph.Alignment.CENTER
+                break
+            case MTextAttachment.TOP_RIGHT:
+            case MTextAttachment.MIDDLE_RIGHT:
+            case MTextAttachment.BOTTOM_RIGHT:
+                defaultAlignment = TextBox.Paragraph.Alignment.RIGHT
+                break
+        }
+
+        return defaultAlignment;
+    }
+
+    static calculateOriginOffset(attachment, width, height) {
+        let originOffset = new Vector2()
+        switch (attachment) {
+        case MTextAttachment.TOP_LEFT:
+            break
+        case MTextAttachment.TOP_CENTER:
+            originOffset.x = width / 2
+            break
+        case MTextAttachment.TOP_RIGHT:
+            originOffset.x = width
+            break
+        case MTextAttachment.MIDDLE_LEFT:
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_CENTER:
+            originOffset.x = width / 2
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.MIDDLE_RIGHT:
+            originOffset.x = width
+            originOffset.y = -height / 2
+            break
+        case MTextAttachment.BOTTOM_LEFT:
+            originOffset.y = -height
+            break
+        case MTextAttachment.BOTTOM_CENTER:
+            originOffset.x = width / 2
+            originOffset.y = -height
+            break
+        case MTextAttachment.BOTTOM_RIGHT:
+            originOffset.x = width
+            originOffset.y = -height
+            break
+        default:
+            throw new Error("Unhandled alignment")
+        }
+
+        return originOffset
+    }
+
+    static calculateTransformMatrix(position, rotation, width, height, attachment) {
+        const originOffset = TextBox.calculateOriginOffset(attachment, width, height)
+        return new Matrix3().translate(-originOffset.x, -originOffset.y)
+            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
     }
 }
 
 TextBox.Paragraph = class {
-    constructor(textBox) {
+    constructor(baseParagraph, textBox) {
         this.textBox = textBox
         this.chunks = []
         this.curChunk = null
-        this.alignment = null
+        this.alignment = baseParagraph?.alignment ?? null
+        this.lineSpacingFactor = baseParagraph?.lineSpacingFactor ?? 1.0
+        this.lineSpacingType = baseParagraph?.lineSpacingType ?? TextBox.Paragraph.LineSpacingType.AT_LEAST // XXX - Ignored when rendering
         this.lines = null
+        this.lineHeight = null
     }
 
     /** Feed character for current chunk. Spaces should be fed by FeedSpace() method. If space
@@ -643,7 +680,7 @@ TextBox.Paragraph = class {
         if (shape === null) {
             return
         }
-        if (this.curChunk === null) {
+        if (this.curChunk === null || this.curChunk.isTab) {
             this._AddChunk()
         }
         this.curChunk.PushChar(c, shape)
@@ -656,8 +693,18 @@ TextBox.Paragraph = class {
         this.curChunk.PushSpace()
     }
 
+    FeedTab() {
+        this._AddChunk()
+        this.curChunk.PushTab()
+    }
+
     SetAlignment(alignment) {
         this.alignment = alignment
+    }
+
+    SetLineSpacing(lineSpacingType, lineSpacing) {
+        this.lineSpacingType = lineSpacingType
+        this.lineSpacingFactor = lineSpacing
     }
 
     /** Group chunks into lines.
@@ -684,11 +731,13 @@ TextBox.Paragraph = class {
 
         for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
             const chunk = this.chunks[curChunkIdx]
-            const chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
+            let chunkWidth = chunk.GetWidth(curWidth,startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
             if (boxWidth !== null && boxWidth !== 0 && curWidth !== 0 &&
                 curWidth + chunkWidth > boxWidth) {
 
                 CommitLine()
+                // We're at the start of the line again, so the chunk width should ignore leading spaces
+                chunkWidth = chunk.GetWidth(0, false)
             }
             chunk.position = curWidth
             curWidth += chunkWidth
@@ -719,6 +768,11 @@ TextBox.Paragraph = class {
         }
     }
 
+    ComputeLineHeight(baseLineSpacing, fontSize) {
+        // XXX - Ignores per paragraph font size
+        this.lineHeight = (baseLineSpacing * this.lineSpacingFactor) * 5 * fontSize / 3
+    }
+
     _AddChunk() {
         this.curChunk = new TextBox.Paragraph.Chunk(this, this.textBox.fontSize, this.curChunk)
         this.chunks.push(this.curChunk)
@@ -729,7 +783,39 @@ TextBox.Paragraph.Alignment = Object.freeze({
     LEFT: 0,
     CENTER: 1,
     RIGHT: 2,
-    JUSTIFY: 3
+    JUSTIFY: 3,
+    fromTextId: (id) => {
+        switch (id) {
+            case "l":
+                return TextBox.Paragraph.Alignment.LEFT
+            case "c":
+                return TextBox.Paragraph.Alignment.CENTER
+            case "r":
+                return TextBox.Paragraph.Alignment.RIGHT
+            case "d":
+                return TextBox.Paragraph.Alignment.JUSTIFY
+            case "j":
+                return null
+        }
+    }
+})
+
+TextBox.Paragraph.LineSpacingType = Object.freeze({
+    AT_LEAST: 0,
+    EXACTLY: 1,
+    MULTIPLE: 2,
+    fromTextId: (id) => {
+        switch (id) {
+            case "a":
+                return TextBox.Paragraph.LineSpacingType.AT_LEAST
+            case "e":
+                return TextBox.Paragraph.LineSpacingType.EXACTLY
+            case "m":
+                return TextBox.Paragraph.LineSpacingType.MULTIPLE
+            case "*": // XXX - Should reset to default
+                return null
+        }
+    }
 })
 
 TextBox.Paragraph.Chunk = class {
@@ -749,13 +835,21 @@ TextBox.Paragraph.Chunk = class {
         this.spaceEndKerning = null
         this.block = null
         this.position = null
+        this.isTab = false
     }
 
     PushSpace() {
-        if (this.block) {
+        if (this.block || this.isTab) {
             throw new Error("Illegal operation")
         }
         this.leadingSpaces++
+    }
+
+    PushTab() {
+        if (this.block) {
+            throw new Error("Illegal operation")
+        }
+        this.isTab = true
     }
 
     /**
@@ -763,6 +857,10 @@ TextBox.Paragraph.Chunk = class {
      * @param shape {CharShape}
      */
     PushChar(char, shape) {
+        if (this.isTab) {
+            throw new Error("Illegal operation")
+        }
+
         if (this.spaceStartKerning === null) {
             if (this.leadingSpaces === 0) {
                 this.spaceStartKerning = 0
@@ -799,7 +897,12 @@ TextBox.Paragraph.Chunk = class {
             this.spaceStartKerning + this.spaceEndKerning) * this.fontSize
     }
 
-    GetWidth(withSpacing) {
+    GetWidth(xPos, withSpacing) {
+        if (this.isTab) {
+            // XXX: Does not support custom tab stops nor left/center/right tab stops
+            const defaultTabStopWidth = 4 * this.fontSize;
+            return (Math.floor(xPos / defaultTabStopWidth) + 1) * defaultTabStopWidth - xPos
+        }
         if (this.block === null) {
             return 0
         }

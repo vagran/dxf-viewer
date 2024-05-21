@@ -218,7 +218,6 @@ function ParseBoundaryLoop(curr, scanner) {
             //XXX ignore some groups for now, mostly spline
             case 95:
             case 96:
-            case 40:
             case 42:
             case 97:
                 break;

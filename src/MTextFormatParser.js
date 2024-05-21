@@ -3,17 +3,6 @@
  * https://adndevblog.typepad.com/autocad/2017/09/dissecting-mtext-format-codes.html
  */
 
-const State = Object.freeze({
-    TEXT: 0,
-    ESCAPE: 1,
-    /* Skip currently unsupported format codes till ';' */
-    SKIP_FORMAT: 2,
-    /* For \pxq* paragraph formatting. Not found documentation yet, so temporal naming for now. */
-    PARAGRAPH1: 3,
-    PARAGRAPH2: 4,
-    PARAGRAPH3: 5
-})
-
 const EntityType = Object.freeze({
     TEXT: 0,
     SCOPE: 1,
@@ -22,14 +11,16 @@ const EntityType = Object.freeze({
     /** "alignment" property is either "r", "c", "l", "j", "d" for right, center, left, justify
      * (seems to be the same as left), distribute (justify) alignment.
      */
-    PARAGRAPH_ALIGNMENT: 4
+    PARAGRAPH_ALIGNMENT: 4,
+    PARAGRAPH_LINE_SPACING: 5,
+    TAB: 6,
 
     /* Many others are not yet implemented. */
 })
 
 /** Single letter format codes which are not terminated by ";". */
 const shortFormats = new Set([
-    "L", "l", "O", "o", "K", "k", "P", "X", "~"
+    "L", "l", "O", "o", "K", "k", "P", "J", "X", "~"
 ])
 
 const longFormats = new Set([
@@ -47,137 +38,165 @@ export class MTextFormatParser {
     }
 
     Parse(text) {
-        const n = text.length
         let textStart = 0
-        let state = State.TEXT
-        let scopeStack = []
-        let curEntities = this.entities
-        let curPos = 0
-        const _this = this
+        let cursor = 0
 
-        function EmitText() {
-            if (state !== State.TEXT || textStart === curPos) {
-                return
-            }
-            curEntities.push({
-                type: EntityType.TEXT,
-                content: text.slice(textStart, curPos)
-            })
-            textStart = curPos
-        }
+        function ParseScope(curEntities) {
+            while (cursor < text.length) {
+                const c = text.charAt(cursor)
 
-        function EmitEntity(type) {
-            curEntities.push({type: type})
-        }
+                switch (c) {
+                    case "{":
+                        EndText(curEntities)
+                        const scope = { type: EntityType.SCOPE, content: [] }
+                        curEntities.push(scope)
+                        cursor++
 
-        function PushScope() {
-            const scope = {
-                type: EntityType.SCOPE,
-                content: []
-            }
-            curEntities.push(scope)
-            curEntities = scope.content
-            scopeStack.push(scope)
-        }
-
-        function PopScope() {
-            if (scopeStack.length === 0) {
-                /* Stack underflow, just ignore now. */
-                return
-            }
-            scopeStack.pop()
-            if (scopeStack.length === 0) {
-                curEntities = _this.entities
-            } else {
-                curEntities = scopeStack[scopeStack.length - 1].content
-            }
-        }
-
-        for ( ;curPos < n; curPos++) {
-            const c = text.charAt(curPos)
-
-            switch (state) {
-
-            case State.TEXT:
-                if (c === "{") {
-                    EmitText()
-                    PushScope()
-                    textStart = curPos + 1
-                    continue
+                        // When entering a new scope, we need to reset the text start to not include the opening
+                        // curly brace
+                        BeginText()
+                        ParseScope(scope.content)
+                        BeginText()
+                        break
+                    case "}":
+                        EndText(curEntities)
+                        cursor++
+                        return
+                    case "\\":
+                        EndText(curEntities)
+                        cursor++
+                        ParseEscape(curEntities)
+                        BeginText()
+                        break
+                    case "^":
+                        EndText(curEntities);
+                        cursor++;
+                        ParseCaret(curEntities);
+                        BeginText();
+                        break;
+                    default:
+                        cursor++
                 }
-                if (c === "}") {
-                    EmitText()
-                    PopScope()
-                    textStart = curPos + 1
-                    continue
-                }
-                if (c === "\\") {
-                    EmitText()
-                    state = State.ESCAPE
-                    continue
-                }
-                continue
+            }
 
-            case State.ESCAPE:
-                if (shortFormats.has(c)) {
-                    switch (c) {
+            // Commit any remaining text
+            EndText(curEntities)
+        }
+
+        function ParseEscape(curEntities) {
+            const c = text.charAt(cursor)
+            if (shortFormats.has(c)) {
+                switch (c) {
                     case "P":
-                        EmitEntity(EntityType.PARAGRAPH)
+                        curEntities.push({ type: EntityType.PARAGRAPH })
                         break
                     case "~":
-                        EmitEntity(EntityType.NON_BREAKING_SPACE)
+                        curEntities.push({ type: EntityType.NON_BREAKING_SPACE })
                         break
-                    }
-                    state = State.TEXT
-                    textStart = curPos + 1
-                    continue
                 }
-                if (longFormats.has(c)) {
-                    switch (c) {
+
+                cursor++
+            } else if (longFormats.has(c)) {
+                switch (c) {
                     case "p":
-                        state = State.PARAGRAPH1
-                        continue
-                    }
-                    state = State.SKIP_FORMAT
-                    continue
+                        cursor++
+                        ParseParagraphProperties(curEntities)
+                        break
+                    default:
+                        SkipUntilAfter((c) => c === ";")
                 }
-                /* Include current character into a next text chunk. Backslash is also included if
-                 * character is not among allowed ones (that is how Autodesk viewer behaves).
-                 */
-                if (validEscapes.has(c)) {
-                    textStart = curPos
-                } else {
-                    textStart = curPos - 1
-                }
-                state = State.TEXT
-                continue
-
-            case State.PARAGRAPH1:
-                state = c === "x" ? State.PARAGRAPH2 : State.SKIP_FORMAT
-                continue
-
-            case State.PARAGRAPH2:
-                state = c === "q" ? State.PARAGRAPH3 : State.SKIP_FORMAT
-                continue
-
-            case State.PARAGRAPH3:
-                curEntities.push({type: EntityType.PARAGRAPH_ALIGNMENT, alignment: c})
-                state = State.SKIP_FORMAT
-                continue
-
-            case State.SKIP_FORMAT:
-                if (c === ";") {
-                    textStart = curPos + 1
-                    state = State.TEXT
-                }
-                continue
-
-            default:
-                throw new Error("Unhandled state")
+            } else if (validEscapes.has(c)) {
+                curEntities.push({ type: EntityType.TEXT, content: c })
+                cursor++
+            } else {
+                // Include backslash and the character for invalid escapes
+                curEntities.push({ type: EntityType.TEXT, content: text.slice(cursor - 1, cursor + 1) })
+                cursor++
             }
         }
 
-        EmitText()
+        function ParseCaret(curEntities) {
+            const c = text.charAt(cursor)
+            switch (c) {
+                case "I":
+                    curEntities.push({ type: EntityType.TAB })
+                    break
+                case "J":
+                    curEntities.push({ type: EntityType.PARAGRAPH })
+                    break
+                case "M": // CR - ignored
+                default: // XXX Render as empty square
+                    break
+            }
+            cursor++
+        }
+
+        function ParseParagraphProperties(curEntities) {
+            while (cursor < text.length) {
+                const c = text.charAt(cursor)
+                switch (c) {
+                    case "q": // Alignment
+                        curEntities.push({
+                            type: EntityType.PARAGRAPH_ALIGNMENT,
+                            alignment: text.charAt(cursor + 1)
+                        })
+                        cursor += 2
+                        break
+                    case "s": // Line spacing
+                        const lineSpacingType = text.charAt(cursor + 1)
+
+                        cursor += 2
+                        curEntities.push({
+                            type: EntityType.PARAGRAPH_LINE_SPACING,
+                            lineSpacingType,
+                            lineSpacingFactor: ParseFloat()
+                        })
+                        break
+                    case ";": // End of format
+                        cursor++
+                        return
+                    default:
+                        cursor++
+                }
+            }
+        }
+
+        function ParseFloat(defaultValue = 1.0) {
+            function isNumberChar(c) {
+                return ("0" <= c && c <= "9") || c === "."
+            }
+
+            const numStart = cursor
+            SkipWhile((c) => isNumberChar(c))
+
+            const number = parseFloat(text.substring(numStart, cursor));
+            if (isNaN(number)) return defaultValue
+            return number
+        }
+
+        function BeginText() {
+            textStart = cursor
+        }
+
+        function EndText(curEntities) {
+            if (textStart < cursor) {
+                curEntities.push({ type: EntityType.TEXT, content: text.slice(textStart, cursor) })
+            }
+        }
+
+        function SkipWhile(predicate) {
+            let currentChar;
+            while (cursor < text.length && predicate(currentChar = text.charAt(cursor))) {
+                cursor++
+            }
+        }
+
+        function SkipUntilAfter(predicate) {
+            SkipWhile((c) => !predicate(c))
+            cursor++
+        }
+
+        ParseScope(this.entities)
     }
 
     /** @typedef MTextFormatEntity
@@ -192,19 +211,19 @@ export class MTextFormatParser {
     }
 
     /** Return only text chunks in a flattened sequence of strings. */
-    *GetText() {
+    * GetText() {
 
-        function *TraverseItems(items) {
+        function* TraverseItems(items) {
             for (const item of items) {
                 if (item.type === EntityType.TEXT) {
                     yield item.content
                 } else if (item.type === EntityType.SCOPE) {
-                    yield *TraverseItems(item.content)
+                    yield* TraverseItems(item.content)
                 }
             }
         }
 
-        yield *TraverseItems(this.GetContent())
+        yield* TraverseItems(this.GetContent())
     }
 }
 

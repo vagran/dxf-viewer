@@ -86,10 +86,10 @@ export class DxfViewer {
             this.resizeObserver = new ResizeObserver(entries => this._OnResize(entries[0]))
             this.resizeObserver.observe(domContainer)
         }
-        domContainer.appendChild(this.canvas)
 
         this.canvas.addEventListener("pointerdown", this._OnPointerEvent.bind(this))
         this.canvas.addEventListener("pointerup", this._OnPointerEvent.bind(this))
+        this.canvas.addEventListener("pointermove", this._OnPointerEvent.bind(this))
 
         this.Render()
 
@@ -127,6 +127,8 @@ export class DxfViewer {
     }
 
     SetSize(width, height) {
+        if (width <= 0 || height <= 0) return;
+
         this._EnsureRenderer()
 
         const hScale = width / this.canvasWidth
@@ -188,7 +190,7 @@ export class DxfViewer {
         this.hasMissingChars = scene.hasMissingChars
 
         for (const layer of scene.layers) {
-            this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color))
+            this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color, layer.visible))
         }
 
         /* Load all blocks on the first pass. */
@@ -220,6 +222,9 @@ export class DxfViewer {
         }
 
         this._Emit("loaded")
+        if (!this.canvas.parentNode) {
+            this.domContainer.appendChild(this.canvas)
+        }
 
         if (scene.bounds) {
             this.FitView(scene.bounds.minX - scene.origin.x, scene.bounds.maxX - scene.origin.x,
@@ -242,14 +247,15 @@ export class DxfViewer {
         this.renderer.render(this.scene, this.camera)
     }
 
-    /** @return {Iterable<{name:String, color:number}>} List of layer names. */
+    /** @return {Iterable<{name:String, displayName: String, color:number, visible: boolean}>} List of layer names. */
     GetLayers() {
         const result = []
         for (const lyr of this.layers.values()) {
             result.push({
                 name: lyr.name,
                 displayName: lyr.displayName,
-                color: this._TransformColor(lyr.color)
+                color: this._TransformColor(lyr.color),
+                visible: lyr.visible
             })
         }
         return result
@@ -261,6 +267,8 @@ export class DxfViewer {
         if (!layer) {
             return
         }
+
+        layer.visible = show
         for (const obj of layer.objects) {
             obj.visible = show
         }
@@ -311,6 +319,8 @@ export class DxfViewer {
         this.simpleColorMaterial = null
         this.renderer.dispose()
         this.renderer = null
+
+        this.canvas.remove();
     }
 
     SetView(center, width) {
@@ -376,6 +386,7 @@ export class DxfViewer {
      *  * "resized" - viewport size changed. Details: {width, height}
      *  * "pointerdown" - Details: {domEvent, position:{x,y}}, position is in scene coordinates.
      *  * "pointerup"
+     *  * "pointermove"
      *  * "viewChanged"
      *  * "message" - Some message from the viewer. {message: string, level: string}.
      *
@@ -442,16 +453,27 @@ export class DxfViewer {
         this._Emit(e.type, {
             domEvent: e,
             canvasCoord,
-            position: this._CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
+            position: this.CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
         })
     }
 
     /** @return {{x,y}} Scene coordinate corresponding to the specified canvas pixel coordinates. */
-    _CanvasToSceneCoord(x, y) {
+    CanvasToSceneCoord(x, y) {
+        if (x < 0 || this.canvasWidth <= x || y < 0 || this.canvasHeight <= y) return null;
+
         const v = new three.Vector3(x * 2 / this.canvasWidth - 1,
                                     -y * 2 / this.canvasHeight + 1,
                                     1).unproject(this.camera)
         return {x: v.x, y: v.y}
+    }
+
+    SceneToCanvasCoord(x, y) {
+        const v = new three.Vector3(x, y, 1).project(this.camera)
+        const cx = (v.x + 1) * this.canvasWidth / 2;
+        const cy = (-v.y + 1) * this.canvasHeight / 2;
+
+        if (cx < 0 || this.canvasWidth <= cx || cy < 0 || this.canvasHeight <= cy) return null;
+        return {x: cx, y: cy}
     }
 
     _OnResize(entry) {
@@ -473,6 +495,7 @@ export class DxfViewer {
             this.scene.add(obj)
             if (layer) {
                 layer.PushObject(obj)
+                if (!layer.visible) obj.visible = false
             }
         }
     }
@@ -926,10 +949,11 @@ class Batch {
 }
 
 class Layer {
-    constructor(name, displayName, color) {
+    constructor(name, displayName, color, visible) {
         this.name = name
         this.displayName = displayName
         this.color = color
+        this.visible = visible
         this.objects = []
     }
 

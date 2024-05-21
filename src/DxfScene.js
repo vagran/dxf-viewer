@@ -119,6 +119,7 @@ export class DxfScene {
         /* 0 - CCW, 1 - CW */
         this.angDir = this.vars.get("ANGDIR") ?? 0
         this.pdSize = this.vars.get("PDSIZE") ?? 0
+        this.pdMode = this.vars.get("PDMODE") ?? 0
         this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
         if(dxf.tables && dxf.tables.layer) {
@@ -885,7 +886,8 @@ export class DxfScene {
             attachment: entity.attachmentPoint,
             lineSpacing: entity.lineSpacing,
             width: entity.width,
-            color, layer
+            color, layer,
+            columns: entity.columns
         })
     }
 
@@ -1027,12 +1029,6 @@ export class DxfScene {
         }
 
         const style = entity.hatchStyle ?? 0
-
-        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
-            //XXX other styles not yet supported
-            return
-        }
-
         const boundaryLoops = this._GetHatchBoundaryLoops(entity)
         if (boundaryLoops.length == 0) {
             console.warn("HATCH entity with empty boundary loops array " +
@@ -1983,7 +1979,7 @@ export class DxfScene {
             color = ColorCode.BY_BLOCK
         } else if (entity.colorIndex === 256) {
             color = ColorCode.BY_LAYER
-        } else if (entity.hasOwnProperty("color")) {
+        } else if (entity.color) {
             color = entity.color
         }
 
@@ -2125,7 +2121,8 @@ export class DxfScene {
             scene.layers.push({
                 name: layer.name,
                 displayName: layer.displayName,
-                color: layer.color
+                color: layer.color,
+                visible: layer.visible
             })
         }
 
