@@ -327,7 +327,7 @@ export class DxfViewer {
         cam.updateMatrix()
         cam.updateProjectionMatrix()
         if (this.controls) {
-            this.controls.target = new three.Vector3(cam.position.x, cam.position.y, 0)
+            this.controls.target.set(cam.position.x, cam.position.y, 0)
             this.controls.update()
         }
         this._Emit("viewChanged")

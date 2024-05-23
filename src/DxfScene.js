@@ -1984,6 +1984,7 @@ export class DxfScene {
         } else if (entity.colorIndex === 256) {
             color = ColorCode.BY_LAYER
         } else if (entity.hasOwnProperty("color")) {
+            /* Index is converted to color value by parser now. */
             color = entity.color
         }
 
