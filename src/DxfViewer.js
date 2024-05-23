@@ -326,6 +326,10 @@ export class DxfViewer {
         cam.rotation.set(0, 0, 0)
         cam.updateMatrix()
         cam.updateProjectionMatrix()
+        if (this.controls) {
+            this.controls.target = new three.Vector3(cam.position.x, cam.position.y, 0)
+            this.controls.update()
+        }
         this._Emit("viewChanged")
     }
 
@@ -408,6 +412,9 @@ export class DxfViewer {
     }
 
     _CreateControls() {
+        if (this.controls) {
+            this.controls.dispose()
+        }
         const controls = this.controls = new OrbitControls(this.camera, this.canvas)
         controls.enableRotate = false
         controls.mouseButtons = {
@@ -422,8 +429,8 @@ export class DxfViewer {
         controls.mouseZoomSpeedFactor = 0.05
         controls.target = new three.Vector3(this.camera.position.x, this.camera.position.y, 0)
         controls.addEventListener("change", () => {
-            this._Emit("viewChanged")
             this.Render()
+            this._Emit("viewChanged")
         })
         controls.update()
     }
