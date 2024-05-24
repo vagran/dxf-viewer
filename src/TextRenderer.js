@@ -887,7 +887,7 @@ class TextBlock {
         }
         const x = this.curX + offset * this.fontSize
         let vertices
-        if (shape.vertices) {
+        if (shape.vertices && shape.vertices.length > 0) {
             vertices = shape.GetVertices({x, y: 0}, this.fontSize)
             const xMin = x + shape.bounds.xMin * this.fontSize
             const xMax = x + shape.bounds.xMax * this.fontSize
