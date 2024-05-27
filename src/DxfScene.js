@@ -1474,6 +1474,10 @@ export class DxfScene {
 
     /** Flatten block definition batch. It is merged into suitable instant rendering batch. */
     _FlattenBatch(blockBatch, layerName, blockColor, blockLineType, transform) {
+        /* Use a layer from INSERT if no layer is specified in the block definition. */
+        if (blockBatch.key.layerName !== null) {
+            layerName = blockBatch.key.layerName
+        }
         const layer = this.layers.get(layerName)
         let color, lineType = 0
         if (blockBatch.key.color === ColorCode.BY_BLOCK) {
@@ -1982,6 +1986,15 @@ export class DxfScene {
         if (entity.colorIndex === 0) {
             color = ColorCode.BY_BLOCK
         } else if (entity.colorIndex === 256) {
+            /* Resolve color instantly if the entity has layer assigned, otherwise the layer is
+             * is taken from `INSERT` layer when rendering.
+             */
+            if (entity.hasOwnProperty("layer")) {
+                const layer = this.layers.get(entity.layer)
+                if (layer) {
+                    return layer.color
+                }
+            }
             color = ColorCode.BY_LAYER
         } else if (entity.hasOwnProperty("color")) {
             /* Index is converted to color value by parser now. */
@@ -2008,13 +2021,13 @@ export class DxfScene {
 
     /** @return {?string} Layer name, null for block entity. */
     _GetEntityLayer(entity, blockCtx = null) {
-        if (blockCtx) {
-            return null
-        }
         if (entity.hasOwnProperty("layer")) {
             return entity.layer
         }
-        return "0"
+        /* For block definition missing layer means taking layer from corresponding `INSERT` entity,
+         * for instant entities use layer "0" as fallback to match reference software behavior.
+         */
+        return blockCtx ? null : "0"
     }
 
     /** Check extrusionDirection property of the entity and return corresponding transform matrix.
@@ -2690,7 +2703,7 @@ const PdMode = Object.freeze({
     SHAPE_MASK: 0xf0
 })
 
-/** Special color values, used for block entities. Regular entities color is resolved instantly. */
+/** Special color values, used for block entities. Regular entity color is resolved instantly. */
 export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2
