@@ -97,6 +97,8 @@ export class DxfViewer {
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
         /* Indexed by layer name, value is Layer instance. */
         this.layers = new Map()
+        /* Default layer used when no layer specified. */
+        this.defaultLayer = null
         /* Indexed by block name, value is Block instance. */
         this.blocks = new Map()
 
@@ -190,6 +192,7 @@ export class DxfViewer {
         for (const layer of scene.layers) {
             this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color))
         }
+        this.defaultLayer = this.layers.get("0") ?? new Layer("0", "0", 0)
 
         /* Load all blocks on the first pass. */
         for (const batch of scene.batches) {
@@ -474,13 +477,10 @@ export class DxfViewer {
         }
         const objects = new Batch(this, scene, batch).CreateObjects()
 
-        const layer = this.layers.get(batch.key.layerName)
-
         for (const obj of objects) {
             this.scene.add(obj)
-            if (layer) {
-                layer.PushObject(obj)
-            }
+            const layer = obj._dxfViewerLayer ?? this.defaultLayer
+            layer.PushObject(obj)
         }
     }
 
@@ -794,16 +794,7 @@ class Batch {
             this.transforms1 = new three.InterleavedBufferAttribute(buf, 3, 3)
         }
 
-        if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE ||
-            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
-
-            const layer = this.viewer.layers.get(this.key.layerName)
-            if (layer) {
-                this.layerColor = layer.color
-            } else {
-                this.layerColor = 0
-            }
-        }
+        this.layer = this.key.layerName !== null ? this.viewer.layers.get(this.key.layerName) : null
     }
 
     GetInstanceType() {
@@ -835,7 +826,9 @@ class Batch {
 
     *_CreateObjects(instanceBatch) {
         const color = instanceBatch ?
-            instanceBatch._GetInstanceColor(this.key.color) : this.key.color
+            instanceBatch._GetInstanceColor(this) : this.key.color
+
+        const layer = this.layer ?? instanceBatch?.layer
 
         //XXX line type
         const materialFactory =
@@ -876,6 +869,7 @@ class Batch {
             const obj = new objConstructor(geometry, material)
             obj.frustumCulled = false
             obj.matrixAutoUpdate = false
+            obj._dxfViewerLayer = layer
             return obj
         }
 
@@ -918,17 +912,20 @@ class Batch {
     }
 
     /**
-     * @param defColor {number} Color value for block definition batch.
+     * @param blockBatch {Batch} Color value for block definition batch.
      * @return {number} RGB color value for a block instance.
      */
-    _GetInstanceColor(defColor) {
+    _GetInstanceColor(blockBatch) {
+        const defColor = blockBatch.key.color
         if (defColor === ColorCode.BY_BLOCK) {
             return this.key.color
         } else if (defColor === ColorCode.BY_LAYER) {
-            return this.layerColor
-        } else {
-            return defColor
+            if (blockBatch.layer) {
+                return blockBatch.layer.color
+            }
+            return this.layer ? this.layer.color : 0
         }
+        return defColor
     }
 }
 
