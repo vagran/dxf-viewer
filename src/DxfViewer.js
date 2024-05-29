@@ -740,7 +740,7 @@ const InstanceType = Object.freeze({
 
 class Batch {
     /**
-     * @param viewer {DxfViewer}
+     * @param {DxfViewer} viewer
      * @param scene Serialized scene.
      * @param batch Serialized scene batch.
      */
@@ -809,7 +809,7 @@ class Batch {
     }
 
     /** Create scene objects corresponding to batch data.
-     * @param instanceBatch {?Batch} Batch with instance transform. Null for non-instanced object.
+     * @param {?Batch} instanceBatch Batch with instance transform. Null for non-instanced object.
      */
     *CreateObjects(instanceBatch = null) {
         if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE ||
@@ -883,7 +883,7 @@ class Batch {
     }
 
     /**
-     * @param geometry {InstancedBufferGeometry}
+     * @param {InstancedBufferGeometry} geometry
      */
     _SetInstanceTransformAttribute(geometry) {
         if (!geometry.isInstancedBufferGeometry) {
@@ -905,14 +905,14 @@ class Batch {
         for (const batch of block.batches) {
             yield* batch.CreateObjects(this)
         }
-        if (this.hasOwnProperty("vertices")) {
+        if (this.vertices) {
             /* Dots for point shapes. */
             yield* this._CreateObjects()
         }
     }
 
     /**
-     * @param blockBatch {Batch} Color value for block definition batch.
+     * @param {Batch} blockBatch Block definition batch.
      * @return {number} RGB color value for a block instance.
      */
     _GetInstanceColor(blockBatch) {
