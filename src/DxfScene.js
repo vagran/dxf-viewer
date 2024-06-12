@@ -885,7 +885,14 @@ export class DxfScene {
             attachment: entity.attachmentPoint,
             lineSpacing: entity.lineSpacing,
             width: entity.width,
-            color, layer
+            color, layer,
+            boxHeight: entity?.boxHeight,
+            embeddedObject: entity?.embeddedObject,
+            // for future use: wrap text
+            embeddedObjectWidth: entity?.embeddedObjectWidth,
+            // for future use: wrap text
+            embeddedObjectGutterWidth: entity?.embeddedObjectGutterWidth,
+            embeddedObjectColumn: entity?.embeddedObjectColumn
         })
     }
 
