@@ -855,9 +855,11 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
+        const style = this._GetEntityTextStyle(entity)
+        const fixedHeight = style?.fixedTextHeight === 0 ? null : style?.fixedTextHeight
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
-            fontSize: entity.textHeight,
+            fontSize: entity.textHeight ?? (fixedHeight ?? 1),
             startPos: entity.startPoint,
             endPos: entity.endPoint,
             rotation: entity.rotation,
@@ -874,11 +876,14 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
+        const style = this._GetEntityTextStyle(entity)
+        const fixedHeight = style?.fixedTextHeight === 0 ? null : style?.fixedTextHeight
         const parser = new MTextFormatParser()
         parser.Parse(ParseSpecialChars(entity.text))
         yield* this.textRenderer.RenderMText({
             formattedText: parser.GetContent(),
-            fontSize: entity.height,
+            // May still be overwritten by inline formatting codes
+            fontSize: entity.height ?? fixedHeight,
             position: entity.position,
             rotation: entity.rotation,
             direction: entity.direction,
@@ -2028,6 +2033,14 @@ export class DxfScene {
          * for instant entities use layer "0" as fallback to match reference software behavior.
          */
         return blockCtx ? null : "0"
+    }
+
+    /** @returns {TextStyle | null}  */
+    _GetEntityTextStyle(entity) {
+        if (entity.hasOwnProperty("styleName")) {
+            return this.fontStyles.get(entity.styleName) ?? null
+        }
+        return null
     }
 
     /** Check extrusionDirection property of the entity and return corresponding transform matrix.

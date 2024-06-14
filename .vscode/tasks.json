@@ -15,5 +15,17 @@
                 }
             }
         },
+        {
+            "label": "npm publish",
+            "type": "process",
+            "command": "npm",
+            "args": ["publish"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
+                }
+            }
+        }
     ]
 }

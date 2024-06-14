@@ -35,6 +35,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 50:
             entity.rotation = curr.value;
             break;
+        case 7: // Text style name
+            entity.styleName = curr.value;
+            break;
         case 71:
             entity.attachmentPoint = curr.value;
             break;

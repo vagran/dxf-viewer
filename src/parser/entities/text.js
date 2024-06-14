@@ -27,6 +27,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 50: // Rotation in degrees
             entity.rotation = curr.value;
             break;
+        case 7: // Text style name
+            entity.styleName = curr.value;
+            break;
         case 1: // Text
             entity.text = curr.value;
             break;
