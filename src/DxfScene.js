@@ -118,6 +118,7 @@ export class DxfScene {
         this.angBase = this.vars.get("ANGBASE") ?? 0
         /* 0 - CCW, 1 - CW */
         this.angDir = this.vars.get("ANGDIR") ?? 0
+        this.pdMode = this.vars.get("PDMODE") ?? 0
         this.pdSize = this.vars.get("PDSIZE") ?? 0
         this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
