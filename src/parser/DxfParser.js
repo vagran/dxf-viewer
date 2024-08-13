@@ -261,7 +261,7 @@ DxfParser.prototype._parse = function(dxfString) {
                     curr = scanner.next();
                     break;
                 case 67:
-                    block.paperSpace = (curr.value && curr.value == 1) ? true : false;
+                    block.inPaperSpace = (curr.value && curr.value == 1) ? true : false;
                     curr = scanner.next();
                     break;
                 case 70:
