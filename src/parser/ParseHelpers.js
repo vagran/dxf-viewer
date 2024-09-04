@@ -105,7 +105,7 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
             entity.lineTypeScale = curr.value;
             break;
         case 60:
-            entity.visible = curr.value === 0;
+            entity.hidden = !!curr.value;
             break;
         case 62: // Acad Index Color. 0 inherits ByBlock. 256 inherits ByLayer. Default is bylayer
             entity.colorIndex = curr.value;

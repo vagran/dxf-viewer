@@ -205,7 +205,7 @@ export class DxfScene {
 
     /** @return False to suppress the specified entity, true to permit rendering. */
     _FilterEntity(entity) {
-        if (entity.hasOwnProperty("visible") && !entity.visible) {
+        if (entity.hidden) {
             return false
         }
         return !this.options.suppressPaperSpace || !entity.inPaperSpace
