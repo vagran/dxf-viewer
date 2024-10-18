@@ -1,4 +1,4 @@
-import * as helpers from '../ParseHelpers'
+import * as helpers from "../ParseHelpers.js"
 
 export default function EntityParser() {}
 
@@ -237,10 +237,14 @@ function ParseBoundaryLoop(curr, scanner) {
 
         if (!entity) {
             if (curr.code != 92) {
-                return null;
+                return null
             }
-            entity = {type: curr.value};
-            curr = scanner.next();
+            entity = {
+                type: curr.value,
+                isExternal: (curr.value & 1) != 0,
+                isOutermost: (curr.value & 16) != 0
+            }
+            curr = scanner.next()
         }
 
         if ((entity.type & 2) && !polylineParsed) {
@@ -249,10 +253,10 @@ function ParseBoundaryLoop(curr, scanner) {
         }
 
         while (numEdges) {
-            const edge = ParseEdge();
+            const edge = ParseEdge()
             if (edge) {
-                entity.edges.push(edge);
-                numEdges--;
+                entity.edges.push(edge)
+                numEdges--
             } else {
                 numEdges = 0;
             }
@@ -260,9 +264,9 @@ function ParseBoundaryLoop(curr, scanner) {
 
         while (numSourceRefs) {
             if (curr.code == 330) {
-                entity.sourceRefs.push(curr.value);
-                numSourceRefs--;
-                curr = scanner.next();
+                entity.sourceRefs.push(curr.value)
+                numSourceRefs--
+                curr = scanner.next()
             } else {
                 numSourceRefs = 0
             }
@@ -270,22 +274,22 @@ function ParseBoundaryLoop(curr, scanner) {
 
         switch (curr.code) {
         case 93:
-            numEdges = curr.value;
+            numEdges = curr.value
             if (numEdges > 0) {
                 entity.edges = []
             }
             break;
         case 97:
-            numSourceRefs = curr.value;
+            numSourceRefs = curr.value
             if (numSourceRefs > 0) {
                 entity.sourceRefs = []
             }
             break;
         default:
-            scanner.rewind();
-            return entity;
+            scanner.rewind()
+            return entity
         }
-        curr = scanner.next();
+        curr = scanner.next()
     }
 }
 

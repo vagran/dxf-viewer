@@ -1,5 +1,5 @@
 import { Vector2, Matrix3, Box2 } from "three"
-import { IntersectSegmentsParametric } from "./math/utils"
+import { IntersectSegmentsParametric } from "./math/utils.js"
 
 export const HatchStyle = Object.freeze({
     ODD_PARITY: 0,
@@ -49,11 +49,13 @@ class ClipCalculator {
         this._CreateNodes()
         /* Sort from line start towards end. */
         this.nodes.sort((e1, e2) => e1.intersection[0] - e2.intersection[0])
-        if (this.style == HatchStyle.ODD_PARITY) {
-            return this._GenerateOddParitySegments()
+        if (this.style == HatchStyle.THROUGH_ENTIRE_AREA) {
+            return this._GenerateThroughAllSegments()
         }
-        //XXX assume through all for all the reset style
-        return this._GenerateThroughAllSegments()
+        /* ODD_PARITY and OUTERMOST are differentiated by filtering loops list (for outermost style
+         * only external and outermost loop should be left).
+         */
+        return this._GenerateOddParitySegments()
     }
 
     _ProcessEdges() {

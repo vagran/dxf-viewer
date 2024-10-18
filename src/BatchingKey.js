@@ -2,7 +2,8 @@
 export class BatchingKey {
     /**
      * Components order matters for lookup by prefix.
-     * @param layerName {?String} Layer name, null if not bound to a layer (e.g. block definition).
+     * @param layerName {?String} Layer name, null if not bound to a layer (e.g. block definition
+     *  without layer specified).
      * @param blockName {?String} Block name if applicable. If specified and geometryType is not
      *  BLOCK_INSTANCE, the batch is part of block definition. Otherwise it is block instance.
      * @param geometryType {?number} One of BatchingKey.GeometryType.

@@ -1,5 +1,5 @@
-import AUTO_CAD_COLOR_INDEX from './AutoCadColorIndex';
-import ExtendedDataParser from './ExtendedDataParser';
+import AUTO_CAD_COLOR_INDEX from "./AutoCadColorIndex.js";
+import ExtendedDataParser from "./ExtendedDataParser.js";
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
@@ -105,7 +105,7 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
             entity.lineTypeScale = curr.value;
             break;
         case 60:
-            entity.visible = curr.value === 0;
+            entity.hidden = !!curr.value;
             break;
         case 62: // Acad Index Color. 0 inherits ByBlock. 256 inherits ByLayer. Default is bylayer
             entity.colorIndex = curr.value;

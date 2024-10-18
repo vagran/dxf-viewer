@@ -1,5 +1,5 @@
 
-import * as helpers from '../ParseHelpers'
+import * as helpers from "../ParseHelpers.js"
 
 export default function EntityParser() {}
 
@@ -34,6 +34,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             break;
         case 50:
             entity.rotation = curr.value;
+            break;
+        case 7: // Text style name
+            entity.styleName = curr.value;
             break;
         case 71:
             entity.attachmentPoint = curr.value;

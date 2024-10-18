@@ -1,14 +1,15 @@
-import { DynamicBuffer, NativeType } from "./DynamicBuffer"
-import { BatchingKey } from "./BatchingKey"
+import { DynamicBuffer, NativeType } from "./DynamicBuffer.js"
+import { BatchingKey } from "./BatchingKey.js"
 import { Matrix3, Vector2 } from "three"
-import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer"
-import { RBTree } from "./RBTree"
-import { MTextFormatParser } from "./MTextFormatParser"
-import dimStyleCodes from './parser/DimStyleCodes'
-import { LinearDimension } from "./LinearDimension"
-import { HatchCalculator, HatchStyle } from "./HatchCalculator"
-import { LookupPattern, Pattern } from "./Pattern"
-import "./patterns"
+import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer.js"
+import { RBTree } from "./RBTree.js"
+import { MTextFormatParser } from "./MTextFormatParser.js"
+import dimStyleCodes from "./parser/DimStyleCodes.js"
+import { LinearDimension } from "./LinearDimension.js"
+import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
+import { LookupPattern, Pattern } from "./Pattern.js"
+import "./patterns/index.js"
+import earcut from "earcut"
 
 
 /** Use 16-bit indices for indexed geometry. */
@@ -118,6 +119,7 @@ export class DxfScene {
         this.angBase = this.vars.get("ANGBASE") ?? 0
         /* 0 - CCW, 1 - CW */
         this.angDir = this.vars.get("ANGDIR") ?? 0
+        this.pdMode = this.vars.get("PDMODE") ?? 0
         this.pdSize = this.vars.get("PDSIZE") ?? 0
         this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
@@ -203,6 +205,9 @@ export class DxfScene {
 
     /** @return False to suppress the specified entity, true to permit rendering. */
     _FilterEntity(entity) {
+        if (entity.hidden) {
+            return false
+        }
         return !this.options.suppressPaperSpace || !entity.inPaperSpace
     }
 
@@ -855,9 +860,11 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
+        const style = this._GetEntityTextStyle(entity)
+        const fixedHeight = style?.fixedTextHeight === 0 ? null : style?.fixedTextHeight
         yield* this.textRenderer.Render({
             text: ParseSpecialChars(entity.text),
-            fontSize: entity.textHeight,
+            fontSize: entity.textHeight ?? (fixedHeight ?? 1),
             startPos: entity.startPoint,
             endPos: entity.endPoint,
             rotation: entity.rotation,
@@ -874,11 +881,14 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
+        const style = this._GetEntityTextStyle(entity)
+        const fixedHeight = style?.fixedTextHeight === 0 ? null : style?.fixedTextHeight
         const parser = new MTextFormatParser()
         parser.Parse(ParseSpecialChars(entity.text))
         yield* this.textRenderer.RenderMText({
             formattedText: parser.GetContent(),
-            fontSize: entity.height,
+            // May still be overwritten by inline formatting codes
+            fontSize: entity.height ?? fixedHeight,
             position: entity.position,
             rotation: entity.rotation,
             direction: entity.direction,
@@ -1020,19 +1030,29 @@ export class DxfScene {
         }
     }
 
+
+    /**
+     * @param {Vector2[]} loop Loop vertices. Transformed in-place if transform specified.
+     * @param {Matrix3 | null} transform
+     * @param {number[] | null} result Resulting coordinates appended to this array.
+     * @return {number[]} Each pair of numbers form vertex coordinate. This format is required for
+     *  `earcut` library.
+     */
+    _TransformBoundaryLoop(loop, transform, result) {
+        if (!result) {
+            result = []
+        }
+        for (const v of loop) {
+            if (transform) {
+                v.applyMatrix3(transform)
+            }
+            result.push(v.x)
+            result.push(v.y)
+        }
+        return result
+    }
+
     *_DecomposeHatch(entity, blockCtx) {
-        if (entity.isSolid) {
-            //XXX solid hatch not yet supported
-            return
-        }
-
-        const style = entity.hatchStyle ?? 0
-
-        if (style != HatchStyle.ODD_PARITY && style != HatchStyle.THROUGH_ENTIRE_AREA) {
-            //XXX other styles not yet supported
-            return
-        }
-
         const boundaryLoops = this._GetHatchBoundaryLoops(entity)
         if (boundaryLoops.length == 0) {
             console.warn("HATCH entity with empty boundary loops array " +
@@ -1040,11 +1060,68 @@ export class DxfScene {
             return
         }
 
-        const calc = new HatchCalculator(boundaryLoops, style)
-
+        const style = entity.hatchStyle ?? 0
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
         const transform = this._GetEntityExtrusionTransform(entity)
+
+        let filteredBoundaryLoops = null
+
+        /* Make external loop first, outermost the second, all the rest in arbitrary order. Now is
+         * required only for solid infill.
+         */
+        boundaryLoops.sort((a, b) => {
+            if (a.isExternal != b.isExternal) {
+                return a.isExternal ? -1 : 1
+            }
+            if (a.isOutermost != b.isOutermost) {
+                return a.isOutermost ? -1 : 1
+            }
+            return 0
+        })
+
+        if (style == HatchStyle.THROUGH_ENTIRE_AREA) {
+            /* Leave only external loop. */
+            filteredBoundaryLoops = [boundaryLoops[0]]
+
+        } else if (style == HatchStyle.OUTERMOST) {
+            /* Leave external and outermost loop. */
+            filteredBoundaryLoops = []
+            for (const loop of boundaryLoops) {
+                if (loop.isExternal || loop.isOutermost) {
+                    filteredBoundaryLoops.push(loop.vertices)
+                }
+            }
+            if (filteredBoundaryLoops.length == 0) {
+                filteredBoundaryLoops = null
+            }
+        }
+
+        if (!filteredBoundaryLoops) {
+            /* Fall-back to full list. */
+            filteredBoundaryLoops = boundaryLoops.map(loop => loop.vertices)
+        }
+
+        if (entity.isSolid) {
+            const coords = this._TransformBoundaryLoop(filteredBoundaryLoops[0], transform)
+            const holes = []
+            for (let i = 1; i < filteredBoundaryLoops.length; i++) {
+                holes.push(coords.length / 2)
+                this._TransformBoundaryLoop(filteredBoundaryLoops[i], transform, coords)
+            }
+            const indices = earcut(coords, holes)
+            const vertices = []
+            for (const loop of filteredBoundaryLoops) {
+                vertices.push(...loop)
+            }
+            yield new Entity({
+                type: Entity.Type.TRIANGLES,
+                vertices, indices, layer, color
+            })
+            return
+        }
+
+        const calc = new HatchCalculator(filteredBoundaryLoops, style)
 
         let pattern = null
         if (entity.patternName) {
@@ -1234,7 +1311,14 @@ export class DxfScene {
         }
     }
 
-    /** @return {Vector2[][]} Each loop is a list of points in OCS coordinates. */
+    /**
+     * @typedef {Object} HatchBoundaryLoop
+     * @property {Vector2[]} vertices List of points in OCS coordinates.
+     * @property {Boolean} isExternal
+     * @property {Boolean} isOutermost
+     */
+
+    /** @return {HatchBoundaryLoop[]} Each loop is a list of points in OCS coordinates. */
     _GetHatchBoundaryLoops(entity) {
         if (!entity.boundaryLoops) {
             return []
@@ -1262,8 +1346,6 @@ export class DxfScene {
 
         for (const loop of entity.boundaryLoops) {
             const vertices = []
-
-            //XXX handle external references
 
             if (loop.type & 2) {
                 /* Polyline. */
@@ -1366,7 +1448,11 @@ export class DxfScene {
                 }
             }
             if (vertices.length > 2) {
-                result.push(vertices)
+                result.push({
+                    vertices,
+                    isExternal: loop.isExternal,
+                    isOutermost: loop.isOutermost
+                })
             }
         }
 
@@ -1474,6 +1560,10 @@ export class DxfScene {
 
     /** Flatten block definition batch. It is merged into suitable instant rendering batch. */
     _FlattenBatch(blockBatch, layerName, blockColor, blockLineType, transform) {
+        /* Use a layer from INSERT if no layer is specified in the block definition. */
+        if (blockBatch.key.layerName !== null) {
+            layerName = blockBatch.key.layerName
+        }
         const layer = this.layers.get(layerName)
         let color, lineType = 0
         if (blockBatch.key.color === ColorCode.BY_BLOCK) {
@@ -1958,8 +2048,7 @@ export class DxfScene {
                                     BatchingKey.GeometryType.INDEXED_TRIANGLES,
                                     entity.color, 0)
         const batch = this._GetBatch(key)
-        //XXX splitting into chunks is not yet implemented. Currently used only for text glyphs so
-        // should fit into one chunk
+        //XXX splitting into chunks is not yet implemented.
         const chunk = batch.PushChunk(entity.vertices.length)
         for (const v of entity.vertices) {
             chunk.PushVertex(this._TransformVertex(v, blockCtx))
@@ -1982,8 +2071,18 @@ export class DxfScene {
         if (entity.colorIndex === 0) {
             color = ColorCode.BY_BLOCK
         } else if (entity.colorIndex === 256) {
+            /* Resolve color instantly if the entity has layer assigned, otherwise the layer is
+             * is taken from `INSERT` layer when rendering.
+             */
+            if (entity.hasOwnProperty("layer")) {
+                const layer = this.layers.get(entity.layer)
+                if (layer) {
+                    return layer.color
+                }
+            }
             color = ColorCode.BY_LAYER
         } else if (entity.hasOwnProperty("color")) {
+            /* Index is converted to color value by parser now. */
             color = entity.color
         }
 
@@ -2007,13 +2106,21 @@ export class DxfScene {
 
     /** @return {?string} Layer name, null for block entity. */
     _GetEntityLayer(entity, blockCtx = null) {
-        if (blockCtx) {
-            return null
-        }
         if (entity.hasOwnProperty("layer")) {
             return entity.layer
         }
-        return "0"
+        /* For block definition missing layer means taking layer from corresponding `INSERT` entity,
+         * for instant entities use layer "0" as fallback to match reference software behavior.
+         */
+        return blockCtx ? null : "0"
+    }
+
+    /** @returns {TextStyle | null}  */
+    _GetEntityTextStyle(entity) {
+        if (entity.hasOwnProperty("styleName")) {
+            return this.fontStyles.get(entity.styleName) ?? null
+        }
+        return null
     }
 
     /** Check extrusionDirection property of the entity and return corresponding transform matrix.
@@ -2689,7 +2796,7 @@ const PdMode = Object.freeze({
     SHAPE_MASK: 0xf0
 })
 
-/** Special color values, used for block entities. Regular entities color is resolved instantly. */
+/** Special color values, used for block entities. Regular entity color is resolved instantly. */
 export const ColorCode = Object.freeze({
     BY_LAYER: -1,
     BY_BLOCK: -2

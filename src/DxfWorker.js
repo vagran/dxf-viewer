@@ -1,5 +1,5 @@
-import {DxfFetcher} from "./DxfFetcher"
-import {DxfScene} from "./DxfScene"
+import {DxfFetcher} from "./DxfFetcher.js"
+import {DxfScene} from "./DxfScene.js"
 import opentype from "opentype.js"
 
 const MSG_SIGNATURE = "DxfWorkerMsg"

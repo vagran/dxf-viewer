@@ -1,5 +1,5 @@
 import {Vector2, Matrix3} from "three"
-import { ParseSpecialChars } from "./TextRenderer"
+import { ParseSpecialChars } from "./TextRenderer.js"
 
 /**
  * @property {{color: ?number, start: Vector2, end: Vector2}[]} lines

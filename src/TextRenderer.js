@@ -1,8 +1,8 @@
-import {Entity} from "./DxfScene"
+import {Entity} from "./DxfScene.js"
 import {ShapePath} from "three/src/extras/core/ShapePath.js"
 import {ShapeUtils} from "three/src/extras/ShapeUtils.js"
 import {Matrix3, Vector2} from "three"
-import {MTextFormatParser} from "./MTextFormatParser"
+import {MTextFormatParser} from "./MTextFormatParser.js"
 
 /** Regex for parsing special characters in text entities. */
 const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-fA-F]{4}))/g
@@ -147,16 +147,16 @@ export class TextRenderer {
     }
 
     /**
-     * @param text {string}
-     * @param startPos {{x,y}}
-     * @param endPos {?{x,y}} TEXT group second alignment point.
-     * @param rotation {?number} Rotation attribute, deg.
-     * @param widthFactor {?number} Relative X scale factor (group 41)
-     * @param hAlign {?number} Horizontal text justification type code (group 72)
-     * @param vAlign {?number} Vertical text justification type code (group 73).
-     * @param color {number}
-     * @param layer {?string}
-     * @param fontSize {number}
+     * @param {string} text
+     * @param {{x,y}} startPos
+     * @param {?{x,y}} endPos TEXT group second alignment point.
+     * @param {?number} rotation Rotation attribute, deg.
+     * @param {?number} widthFactor Relative X scale factor (group 41)
+     * @param {?number} hAlign Horizontal text justification type code (group 72)
+     * @param {?number} vAlign Vertical text justification type code (group 73).
+     * @param {number} color
+     * @param {?string} layer
+     * @param {number} fontSize Font size.
      * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
@@ -176,7 +176,8 @@ export class TextRenderer {
     /**
      * @param {MTextFormatEntity[]} formattedText Parsed formatted text.
      * @param {{x, y}} position Insertion position.
-     * @param {Number} fontSize
+     * @param {?number} fontSize If not specified, then it still may be defined by inline
+     *  formatting codes, otherwise 1 is used as fall-back value.
      * @param {?Number} width Text block width, no wrapping if undefined.
      * @param {?Number} rotation Text block rotation in degrees.
      * @param {?{x, y}} direction Text block orientation defined as direction vector. Takes a
@@ -190,6 +191,9 @@ export class TextRenderer {
      */
     *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
                  attachment, lineSpacing = 1, color, layer = null}) {
+        if (!fontSize) {
+            fontSize = 1;
+        }
         const box = new TextBox(fontSize, this._GetCharShape.bind(this))
         box.FeedText(formattedText)
         yield* box.Render(position, width, rotation, direction, attachment, lineSpacing, color,
@@ -887,7 +891,7 @@ class TextBlock {
         }
         const x = this.curX + offset * this.fontSize
         let vertices
-        if (shape.vertices) {
+        if (shape.vertices && shape.vertices.length > 0) {
             vertices = shape.GetVertices({x, y: 0}, this.fontSize)
             const xMin = x + shape.bounds.xMin * this.fontSize
             const xMax = x + shape.bounds.xMax * this.fontSize
