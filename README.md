@@ -1,4 +1,5 @@
 # DXF viewer [![npm](https://img.shields.io/npm/v/dxf-viewer)](https://www.npmjs.com/package/dxf-viewer)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fvagran%2Fdxf-viewer.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fvagran%2Fdxf-viewer?ref=badge_shield)
 
 *If you just need to view your DXF, [click here](https://vagran.github.io/dxf-viewer-example/).*
 
@@ -81,6 +82,9 @@ issue report with sample files rather than a pull request.
 
 This project is licensed under the terms of the
 [Mozilla Public License 2.0](https://choosealicense.com/licenses/mpl-2.0/).
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fvagran%2Fdxf-viewer.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fvagran%2Fdxf-viewer?ref=badge_large)
 
 ## Donations
 
