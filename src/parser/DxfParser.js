@@ -175,10 +175,10 @@ DxfParser.prototype._parse = function(dxfString) {
 
         while(true) {
             if(groupIs(0, 'ENDSEC')) {
-                if(currVarName) header[currVarName] = currVarValue;
+                if (currVarName != null) header[currVarName] = currVarValue;
                 break;
             } else if(curr.code === 9) {
-                if(currVarName) header[currVarName] = currVarValue;
+                if (currVarName != null) header[currVarName] = currVarValue;
                 currVarName = curr.value;
                 // Filter here for particular variables we are interested in
             } else {

@@ -33,10 +33,14 @@ DxfArrayScanner.prototype.next = function() {
         code: parseInt(this._data[this._pointer])
     };
 
+    if (isNaN(group.code)) {
+        throw new Error("Cannot parse group code: " + this._data[this._pointer])
+    }
+
     this._pointer++;
 
     group.value = parseGroupValue(group.code, this._data[this._pointer]);
-    
+
     this._pointer++;
 
     if(group.code === 0 && group.value === 'EOF') this._eof = true;
@@ -53,10 +57,14 @@ DxfArrayScanner.prototype.peek = function() {
         else
             throw new Error('Cannot call \'next\' after EOF group has been read');
     }
-    
+
     var group = {
         code: parseInt(this._data[this._pointer])
     };
+
+    if (isNaN(group.code)) {
+        throw new Error("Cannot parse group code: " + this._data[this._pointer])
+    }
 
     group.value = parseGroupValue(group.code, this._data[this._pointer + 1]);
 
@@ -78,7 +86,7 @@ DxfArrayScanner.prototype.hasNext = function() {
     if(this._eof) {
         return false;
     }
-    
+
     // We need to be sure there are two lines available
     if(this._pointer > this._data.length - 2) {
         return false;
