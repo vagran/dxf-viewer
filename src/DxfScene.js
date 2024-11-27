@@ -1560,11 +1560,11 @@ export class DxfScene {
 
     /** Flatten block definition batch. It is merged into suitable instant rendering batch. */
     _FlattenBatch(blockBatch, layerName, blockColor, blockLineType, transform) {
-        /* Use a layer from INSERT if no layer is specified in the block definition. */
-        if (blockBatch.key.layerName !== null) {
-            layerName = blockBatch.key.layerName
-        }
-        const layer = this.layers.get(layerName)
+        /* INSERT layer (if specified) takes precedence over layer specified in block definition.
+         * Use layer from block definition only if no layer in INSERT.
+         */
+        layerName ??= blockBatch.key.layerName
+        const layer = layerName ? this.layers.get(layerName) : null
         let color, lineType = 0
         if (blockBatch.key.color === ColorCode.BY_BLOCK) {
             color = blockColor

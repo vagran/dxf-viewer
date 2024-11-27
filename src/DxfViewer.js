@@ -828,7 +828,8 @@ class Batch {
         const color = instanceBatch ?
             instanceBatch._GetInstanceColor(this) : this.key.color
 
-        const layer = this.layer ?? instanceBatch?.layer
+        /* INSERT layer (if specified) takes precedence over layer specified in block definition. */
+        const layer = instanceBatch?.layer ?? this.layer
 
         //XXX line type
         const materialFactory =
