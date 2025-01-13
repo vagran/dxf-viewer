@@ -1754,9 +1754,19 @@ export class DxfScene {
                     indices: [],
                     hiddenEdges: []
                 }
-                for (const vIdx of v.faces) {
+                for (let vIdx of v.faces) {
                     if (vIdx == 0) {
                         break
+                    }
+                    if (vIdx > vertices.length) {
+                        /* It was observed that some software may produce negative values as 16-bits
+                         * complements. Seen this in files produced by `dwg2dxf`.
+                         */
+                        if (0x10000 - vIdx > vertices.length) {
+                            /* Index out of range, give up. */
+                            continue
+                        }
+                        vIdx = vIdx - 0x10000
                     }
                     face.indices.push(vIdx < 0 ? -vIdx - 1 : vIdx - 1)
                     face.hiddenEdges.push(vIdx < 0)
