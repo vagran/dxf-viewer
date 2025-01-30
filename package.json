@@ -1,6 +1,6 @@
 {
     "name": "dxf-viewer",
-    "version": "1.0.39",
+    "version": "1.0.40",
     "description": "JavaScript DXF file viewer",
     "main": "src/index.js",
     "author": "Artyom Lebedev<artyom.lebedev@gmail.com>",
