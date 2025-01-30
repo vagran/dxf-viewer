@@ -1082,7 +1082,7 @@ export class DxfScene {
 
         if (style == HatchStyle.THROUGH_ENTIRE_AREA) {
             /* Leave only external loop. */
-            filteredBoundaryLoops = [boundaryLoops[0]]
+            filteredBoundaryLoops = [boundaryLoops[0].vertices]
 
         } else if (style == HatchStyle.OUTERMOST) {
             /* Leave external and outermost loop. */
