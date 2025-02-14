@@ -208,6 +208,13 @@ export class DxfScene {
         if (entity.hidden) {
             return false
         }
+        const layerName = this._GetEntityLayer(entity)
+        if (layerName != "0") {
+            const layer = this.layers.get(layerName)
+            if (layer?.frozen) {
+                return false
+            }
+        }
         return !this.options.suppressPaperSpace || !entity.inPaperSpace
     }
 
@@ -2239,6 +2246,9 @@ export class DxfScene {
         })
 
         for (const layer of this.layers.values()) {
+            if (layer.frozen) {
+                continue
+            }
             scene.layers.push({
                 name: layer.name,
                 displayName: layer.displayName,
