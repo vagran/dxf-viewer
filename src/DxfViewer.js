@@ -246,9 +246,12 @@ export class DxfViewer {
     }
 
     /** @return {Iterable<{name:String, color:number}>} List of layer names. */
-    GetLayers() {
+    GetLayers(nonEmptyOnly = false) {
         const result = []
         for (const lyr of this.layers.values()) {
+            if (nonEmptyOnly && lyr.objects.length == 0) {
+                continue
+            }
             result.push({
                 name: lyr.name,
                 displayName: lyr.displayName,
