@@ -15,21 +15,21 @@ export type DxfSceneOptions = {
 
 /** See DxfViewer.DefaultOptions for default values and documentation. */
 export type DxfViewerOptions = {
-    canvasWidth: number,
-    canvasHeight: number,
-    autoResize: boolean,
-    clearColor: THREE.Color,
-    clearAlpha: number,
-    canvasAlpha: boolean,
-    canvasPremultipliedAlpha: boolean,
-    antialias: boolean,
-    colorCorrection: boolean,
-    blackWhiteInversion: boolean,
-    pointSize: number,
-    sceneOptions: DxfSceneOptions,
-    retainParsedDxf: boolean,
-    preserveDrawingBuffer: boolean,
-    fileEncoding: string
+    canvasWidth?: number,
+    canvasHeight?: number,
+    autoResize?: boolean,
+    clearColor?: THREE.Color,
+    clearAlpha?: number,
+    canvasAlpha?: boolean,
+    canvasPremultipliedAlpha?: boolean,
+    antialias?: boolean,
+    colorCorrection?: boolean,
+    blackWhiteInversion?: boolean,
+    pointSize?: number,
+    sceneOptions?: DxfSceneOptions,
+    retainParsedDxf?: boolean,
+    preserveDrawingBuffer?: boolean,
+    fileEncoding?: string
 }
 
 export type DxfViewerLoadParams = {
