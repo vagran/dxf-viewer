@@ -1,16 +1,16 @@
 /** See TextRenderer.DefaultOptions for default values and documentation. */
 export type TextRendererOptions = {
-    curveSubdivision: number,
-    fallbackChar: string
+    curveSubdivision?: number,
+    fallbackChar?: string
 }
 
 /** See DxfScene.DefaultOptions for default values and documentation. */
 export type DxfSceneOptions = {
-    arcTessellationAngle: number,
-    minArcTessellationSubdivisions: number,
-    wireframeMesh: boolean,
-    suppressPaperSpace: boolean,
-    textOptions: TextRendererOptions,
+    arcTessellationAngle?: number,
+    minArcTessellationSubdivisions?: number,
+    wireframeMesh?: boolean,
+    suppressPaperSpace?: boolean,
+    textOptions?: TextRendererOptions,
 }
 
 /** See DxfViewer.DefaultOptions for default values and documentation. */
