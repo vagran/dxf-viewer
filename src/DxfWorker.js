@@ -107,8 +107,10 @@ export class DxfWorker {
             return
         }
         const data = msg.data
-        if (msg.type === DxfWorker.WorkerMsg.PROGRESS && req.progressCbk) {
-            req.progressCbk(data.phase, data.size, data.totalSize)
+        if (msg.type === DxfWorker.WorkerMsg.PROGRESS) {
+            if (req.progressCb) {
+                req.progressCbk(data.phase, data.size, data.totalSize)
+            }
             return
         }
         this.requests.delete(seq)
