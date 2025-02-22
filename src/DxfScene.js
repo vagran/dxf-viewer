@@ -1131,19 +1131,20 @@ export class DxfScene {
         const calc = new HatchCalculator(filteredBoundaryLoops, style)
 
         let pattern = null
-        if (entity.patternName) {
+        if (entity.definitionLines) {
+            pattern = new Pattern(entity.definitionLines, entity.patternName, false)
+        }
+        if (pattern == null && entity.patternName) {
             pattern = LookupPattern(entity.patternName, this.isMetric)
             if (!pattern) {
                 console.log(`Hatch pattern with name ${entity.patternName} not found ` +
                             `(metric: ${this.isMetric})`)
             }
         }
-        if (pattern == null && entity.definitionLines) {
-            pattern = new Pattern(entity.definitionLines, null, false)
-        }
         if (pattern == null) {
             pattern = LookupPattern("ANSI31")
         }
+
         if (!pattern) {
             return
         }
@@ -1152,11 +1153,14 @@ export class DxfScene {
 
         for (const seedPoint of seedPoints) {
 
-            const patTransform = calc.GetPatternTransform({
+            /* Seems pattern transform is not applied at all if using lines definition embedded into
+             * HATCH entity (according to observation of AutoDesk viewer behavior).
+             */
+            const patTransform = pattern.offsetInLineSpace ? calc.GetPatternTransform({
                 seedPoint,
                 angle: entity.patternAngle,
                 scale: entity.patternScale
-            })
+            }) : new Matrix3()
 
             for (const line of pattern.lines) {
 
