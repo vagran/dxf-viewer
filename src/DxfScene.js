@@ -387,7 +387,9 @@ export class DxfScene {
 
     /** Check if start/end with are not specified. */
     _IsPlainLine(entity) {
-        return !Boolean(entity.startWidth || entity.endWidth)
+        //XXX until shaped polylines rendering implemented
+        return true
+        // return !Boolean(entity.startWidth || entity.endWidth)
     }
 
     *_DecomposeLine(entity, blockCtx) {
