@@ -18,7 +18,8 @@ const MessageLevel = Object.freeze({
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
 export class DxfViewer {
 
-    /** @param domContainer Container element to create the canvas in. Usually empty div. Should not
+    /**
+     * @param domContainer Container element to create the canvas in. Usually empty div. Should not
      *  have padding if auto-resize feature is used.
      * @param options Some options can be overridden if specified. See DxfViewer.DefaultOptions.
      */
@@ -106,7 +107,8 @@ export class DxfViewer {
         this.worker = null
     }
 
-    /** @return {boolean} True if renderer exists. May be false in case when WebGL context is lost
+    /**
+     * @returns {boolean} True if renderer exists. May be false in case when WebGL context is lost
      * (e.g. after wake up from sleep). In such case page should be reloaded.
      */
     HasRenderer() {
@@ -157,17 +159,17 @@ export class DxfViewer {
     }
 
     /** Load DXF into the viewer. Old content is discarded, state is reset.
-     * @param url {string} DXF file URL.
-     * @param fonts {?string[]} List of font URLs. Files should have typeface.js format. Fonts are
+     * @param {string} url DXF file URL.
+     * @param {?string[]} fonts List of font URLs. Files should have typeface.js format. Fonts are
      *  used in the specified order, each one is checked until necessary glyph is found. Text is not
      *  rendered if fonts are not specified.
-     * @param progressCbk {?Function} (phase, processedSize, totalSize)
+     * @param {?Function} progressCbk (phase, processedSize, totalSize)
      *  Possible phase values:
      *  * "font"
      *  * "fetch"
      *  * "parse"
      *  * "prepare"
-     * @param workerFactory {?Function} Factory for worker creation. The worker script should
+     * @param {?Function} workerFactory Factory for worker creation. The worker script should
      *  invoke DxfViewer.SetupWorker() function.
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {

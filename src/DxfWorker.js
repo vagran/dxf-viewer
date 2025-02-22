@@ -28,9 +28,9 @@ export class DxfWorker {
 
     /**
      * @param url DXF file URL.
-     * @param fonts {?string[]} Fonts URLs.
+     * @param {?string[]} fonts Fonts URLs.
      * @param options Viewer options. See DxfViewer.DefaultOptions.
-     * @param progressCbk {Function?} (phase, processedSize, totalSize)
+     * @param {?Function} progressCbk (phase, processedSize, totalSize)
      */
     async Load(url, fonts, options, progressCbk) {
         if (this.worker) {
@@ -107,8 +107,10 @@ export class DxfWorker {
             return
         }
         const data = msg.data
-        if (msg.type === DxfWorker.WorkerMsg.PROGRESS && req.progressCbk) {
-            req.progressCbk(data.phase, data.size, data.totalSize)
+        if (msg.type === DxfWorker.WorkerMsg.PROGRESS) {
+            if (req.progressCbk) {
+                req.progressCbk(data.phase, data.size, data.totalSize)
+            }
             return
         }
         this.requests.delete(seq)
