@@ -2109,7 +2109,7 @@ export class DxfScene {
                 }
             }
             color = ColorCode.BY_LAYER
-        } else if (entity.hasOwnProperty("color")) {
+        } else if (entity.hasOwnProperty("color") && entity.color != null) {
             /* Index is converted to color value by parser now. */
             color = entity.color
         }
@@ -2121,7 +2121,7 @@ export class DxfScene {
             /* BY_BLOCK is not useful when not in block so replace it by layer as well. */
             if (entity.hasOwnProperty("layer")) {
                 const layer = this.layers.get(entity.layer)
-                if (layer) {
+                if (layer && layer.color != null) {
                     return layer.color
                 }
             }
@@ -2134,7 +2134,7 @@ export class DxfScene {
 
     /** @return {?string} Layer name, null for block entity. */
     _GetEntityLayer(entity, blockCtx = null) {
-        if (entity.hasOwnProperty("layer")) {
+        if (entity.hasOwnProperty("layer") && entity.layer != null) {
             return entity.layer
         }
         /* For block definition missing layer means taking layer from corresponding `INSERT` entity,
