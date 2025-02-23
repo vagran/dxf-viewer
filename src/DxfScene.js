@@ -2117,8 +2117,11 @@ export class DxfScene {
         if (blockCtx) {
             return color
         }
-        if (color === ColorCode.BY_LAYER || color === ColorCode.BY_BLOCK) {
+        if (color === ColorCode.BY_BLOCK) {
             /* BY_BLOCK is not useful when not in block so replace it by layer as well. */
+            color = ColorCode.BY_LAYER
+        }
+        if (color === ColorCode.BY_LAYER) {
             if (entity.hasOwnProperty("layer")) {
                 const layer = this.layers.get(entity.layer)
                 if (layer && layer.color != null) {
