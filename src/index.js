@@ -1,2 +1,2 @@
-export {DxfFetcher} from "./DxfFetcher"
-export {DxfViewer} from "./DxfViewer"
+export {DxfFetcher} from "./DxfFetcher.js"
+export {DxfViewer} from "./DxfViewer.js"
