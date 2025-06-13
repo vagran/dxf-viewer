@@ -853,6 +853,7 @@ export class DxfScene {
                     indices.push(0, 1, 2)
                 } else {
                     indices.push(1, 2, 3)
+                    indices.push(2, 3, 0)
                 }
                 _vertices.push(v3)
             }
