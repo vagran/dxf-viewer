@@ -24,6 +24,13 @@ export class DxfViewer {
      * @param options Some options can be overridden if specified. See DxfViewer.DefaultOptions.
      */
     constructor(domContainer, options = null) {
+        this.dimensions = {dxfWidth: 0, dxfHeight: 0};
+        this.totalCuts = 0;
+        this.cutsLength = 0;
+        this.area = 0;
+        this.shapes = [];
+        this.bends = [];
+
         this.domContainer = domContainer
         this.options = Object.create(DxfViewer.DefaultOptions)
         if (options) {
@@ -130,6 +137,15 @@ export class DxfViewer {
         return this.parsedDxf
     }
 
+    GetFileDetails() {
+        return {
+            dimensions: this.dimensions,
+            totalCuts: this.totalCuts,
+            cutsLength: this.cutsLength,
+            area: this.area,
+        }
+    }
+
     SetSize(width, height) {
         this._EnsureRenderer()
 
@@ -183,12 +199,17 @@ export class DxfViewer {
 
         this.worker = new DxfWorker(workerFactory ? workerFactory() : null)
         const {scene, dxf} = await this.worker.Load(url, fonts, this.options, progressCbk)
+        this.SetFileDetails(scene?.entityVertices);
         await this.worker.Destroy()
         this.worker = null
         this.parsedDxf = dxf
 
         this.origin = scene.origin
         this.bounds = scene.bounds
+        this.dimensions = {
+            dxfWidth: scene.bounds.maxY - scene.bounds.minY,
+            dxfHeight: scene.bounds.maxX - scene.bounds.minX
+        };
         this.hasMissingChars = scene.hasMissingChars
 
         for (const layer of scene.layers) {
@@ -245,6 +266,167 @@ export class DxfViewer {
     Render() {
         this._EnsureRenderer()
         this.renderer.render(this.scene, this.camera)
+    }
+    
+    checkTangentLayer (layer) {
+        const bendKeywords = ['tangent', 'bend_extent'];
+        return bendKeywords.some(substr=>layer.toLowerCase().indexOf(substr) >= 0);
+    }
+
+    checkBendLayer (layer) {
+        const bendKeywords = ['bend', 'reference'];
+        return bendKeywords.some(substr=>layer.toLowerCase().indexOf(substr) >= 0);
+    }
+
+    _TransformVertex(vs=[]) {
+        return vs.map(v=>{return { x: v.x - this.origin.x, y: v.y - this.origin.y }})
+    }
+
+    getAllLastPoints(entities) {
+        let points = [];
+        for (let i = 0; i < entities.length; i++) {
+            const entity = entities[i];
+            if(!this.checkBendLayer(entity.layer) && !entity.lineType && !this.checkTangentLayer(entity.layer)){
+                points.push({
+                    startPointx : entity.vertices[0].x,
+                    startPointy : entity.vertices[0].y,
+                    endPointx : entity.vertices[entity.vertices.length - 1].x,
+                    endPointy : entity.vertices[entity.vertices.length - 1].y,
+                    visited: false,
+                    entity,
+                    points: entity.vertices,
+                });
+            }
+        }
+        return points;
+    }
+
+    SetFileDetails(entityVertices) {
+        let lastPoints = this.getAllLastPoints(entityVertices);
+        let cuts = [];
+        var maxArea = 0;
+        let cutLength = 0;
+
+        function round3(value){
+            return Math.round(value*1000)/1000;
+        }
+
+        function markPointVisited ({startPointx, startPointy, endPointx, endPointy}) {
+            const index = lastPoints.findIndex(el=> el.startPointx===startPointx && el.startPointy===startPointy && el.endPointx===endPointx && el.endPointy===endPointy);
+            if(index >= 0) {
+                lastPoints[index].visited = true;
+            }
+        }
+
+        function visitAllPoints({startPointx, startPointy, endPointx, endPointy}, entity, points) {
+            markPointVisited({startPointx, startPointy, endPointx, endPointy});
+            let allPoints = [...points];
+            let ended = false;
+            let connectedPoints = [entity];
+            while(!ended) {
+                const index = lastPoints.findIndex(
+                    el =>
+                    (round3(el.startPointx)===round3(endPointx) && round3(el.startPointy)===round3(endPointy) && !el.visited) || 
+                    (round3(el.endPointx)===round3(startPointx) && round3(el.endPointy)===round3(startPointy) && !el.visited) || 
+                    (round3(el.endPointx)===round3(endPointx) && round3(el.endPointy)===round3(endPointy) && !el.visited) || 
+                    (round3(el.startPointx)===round3(startPointx) && round3(el.startPointy)===round3(startPointy) && !el.visited)
+                );
+                if (index < 0) {
+                    ended = true;
+                    cuts.push(connectedPoints);
+                } else {
+    
+                    if(round3(lastPoints[index].startPointx)===round3(endPointx) && round3(lastPoints[index].startPointy)===round3(endPointy)){
+                        allPoints = [...allPoints, ...lastPoints[index].points];
+                    }
+                    else if(round3(lastPoints[index].endPointx)===round3(startPointx) && round3(lastPoints[index].endPointy)===round3(startPointy)){
+                        allPoints = [...lastPoints[index].points, ...allPoints];
+                    }
+                    else if(round3(lastPoints[index].endPointx)===round3(endPointx) && round3(lastPoints[index].endPointy)===round3(endPointy)){
+                        allPoints = [ ...allPoints, ...lastPoints[index].points.reverse()];
+                    }
+                    else if(round3(lastPoints[index].startPointx)===round3(startPointx) && round3(lastPoints[index].startPointy)===round3(startPointy)){
+                        allPoints = [...lastPoints[index].points.reverse(), ...allPoints];
+                    }
+    
+                    startPointx = allPoints[0].x;
+                    startPointy = allPoints[0].y;
+                    endPointx = allPoints[allPoints.length - 1].x;
+                    endPointy = allPoints[allPoints.length - 1].y;
+                    entity = lastPoints[index].entity;
+                    lastPoints[index].visited = true;
+                    connectedPoints.push(lastPoints[index].entity);
+                }
+            }
+            return allPoints.map(el=>new three.Vector2(el.x, el.y));
+        }
+
+        function isPointVisited({startPointx, startPointy, endPointx, endPointy}) {
+            const found = lastPoints.find(el=> el.startPointx===startPointx && el.startPointy===startPointy && el.endPointx===endPointx && el.endPointy===endPointy);
+            if(found) {
+                return found.visited;
+            }
+            else {
+                return true;
+            }
+        }
+
+        for (let i = 0; i < entityVertices.length; i++) {
+            const entity = entityVertices[i];
+            if(!this.checkBendLayer(entity.layer) && !entity.lineType && !this.checkTangentLayer(entity.layer) && !isPointVisited({
+                startPointx : entity.vertices[0].x,
+                startPointy : entity.vertices[0].y,
+                endPointx : entity.vertices[entity.vertices.length - 1].x,
+                endPointy : entity.vertices[entity.vertices.length - 1].y,
+            })) {
+                const points = visitAllPoints({
+                    startPointx : entity.vertices[0].x,
+                    startPointy : entity.vertices[0].y,
+                    endPointx : entity.vertices[entity.vertices.length - 1].x,
+                    endPointy : entity.vertices[entity.vertices.length - 1].y,
+                }, entity, entity.vertices);
+                this.shapes.push(points);
+                cutLength += this.getVectorDistance(points);
+                const area = this.calcPolygonArea(points);
+                if (area > maxArea){
+                    maxArea = area;
+                }
+            } else if(this.checkBendLayer(entity.layer)) {
+                this.bends.push(entity.vertices.map(el=>new three.Vector2(el.x, el.y)));
+            }
+        }
+
+        console.log("TOTAL LENGTH : " + cutLength.toFixed(3));
+        console.log("TOTAL CUTS : " + cuts.length);
+        console.log("TOTAL AREA : " + maxArea.toFixed(3));
+
+        this.totalCuts = cuts.length;
+        this.cutsLength = cutLength;
+        this.area = maxArea;
+    }
+
+    getVectorDistance(vectors) {
+        let sum=0;
+        for(let i=0;i<vectors.length;i++){
+            sum+=vectors[i].distanceTo(vectors[i === vectors.length - 1 ? 0 : i + 1]);
+        }
+        return sum;
+    }
+
+    calcPolygonArea(vertices) {
+        var total = 0;
+    
+        for (var i = 0, l = vertices.length; i < l; i++) {
+          var addX = vertices[i].x;
+          var addY = vertices[i === vertices.length - 1 ? 0 : i + 1].y;
+          var subX = vertices[i === vertices.length - 1 ? 0 : i + 1].x;
+          var subY = vertices[i].y;
+
+          total += (addX * addY * 0.5);
+          total -= (subX * subY * 0.5);
+        }
+    
+        return Math.abs(total);
     }
 
     /** @return {Iterable<{name:String, color:number}>} List of layer names. */
