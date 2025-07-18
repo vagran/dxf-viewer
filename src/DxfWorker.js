@@ -123,9 +123,9 @@ export class DxfWorker {
 
     async _OnError(error) {
         console.error("DxfWorker worker error", error)
-        const reqs = Array.from(this.requests.values)
+        const requests = Array.from(this.requests.values)
         this.requests.clear()
-        reqs.forEach(req => req.SetError(error))
+        requests.forEach(req => req.SetError(error))
     }
 
     async _SendRequest(type, data = null, progressCbk = null) {
