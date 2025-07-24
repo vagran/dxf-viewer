@@ -34,10 +34,10 @@ export type DxfViewerOptions = {
 
 export type DxfViewerLoadParams = {
     url: string,
-    fonts: string[] | null,
-    progressCbk: ((phase: "font" | "fetch" | "parse" | "prepare",
+    fonts?: string[] | null,
+    progressCbk?: ((phase: "font" | "fetch" | "parse" | "prepare",
                    processedSize: number, totalSize: number) => void) | null,
-    workerFactory: (() => Worker) | null
+    workerFactory?: (() => Worker) | null
 }
 
 export type LayerInfo = {
