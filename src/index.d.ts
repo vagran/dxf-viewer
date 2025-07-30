@@ -30,6 +30,7 @@ export type DxfViewerOptions = {
     retainParsedDxf?: boolean,
     preserveDrawingBuffer?: boolean,
     fileEncoding?: string
+    renderer?: THREE.WebGLRenderer | null,
 }
 
 export type DxfViewerLoadParams = {
