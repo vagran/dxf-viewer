@@ -1,6 +1,6 @@
 {
     "name": "dxf-3d-loader",
-    "version": "1.0.42+pix4d.1",
+    "version": "1.0.43",
     "description": "JavaScript DXF 3D file loader",
     "main": "src/index.js",
     "author": "Pix4d SA",
