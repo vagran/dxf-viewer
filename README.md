@@ -1,6 +1,6 @@
 The project is a fork of https://github.com/vagran/dxf-viewer - Kudos to authors and contributors!
 
-# DXF viewer [![npm](https://img.shields.io/npm/v/dxf-viewer)](https://www.npmjs.com/package/dxf-viewer)
+# DXF loader
 
 ## Install
 
