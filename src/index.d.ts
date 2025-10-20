@@ -65,7 +65,7 @@ export declare class DxfViewer {
     Load(params: DxfViewerLoadParams): Promise<void>
     Render(): void
     SetSize(width: number, height: number): void
-    SetView(center: THREE.Vector3, width: number): void
+    SetView(center: THREE.Vector3, width: number, zoom: number): void
     ShowLayer(name: string, show: boolean): void
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
