@@ -321,7 +321,7 @@ export class DxfViewer {
         this.renderer = null
     }
 
-    SetView(center, width, zoom = 1) {
+    SetView(center, width) {
         const aspect = this.canvasWidth / this.canvasHeight
         const height = width / aspect
         const cam = this.camera
@@ -329,7 +329,7 @@ export class DxfViewer {
         cam.right = width / 2
         cam.top = height / 2
         cam.bottom = -height / 2
-        cam.zoom = zoom
+        cam.zoom = 1
         cam.position.set(center.x, center.y, 1)
         cam.rotation.set(0, 0, 0)
         cam.updateMatrix()
