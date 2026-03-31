@@ -228,7 +228,7 @@ export class DxfScene {
 
         const ProcessEntity = async (entity) => {
             if (!this._FilterEntity(entity)) {
-                return
+                return true
             }
             let ret
             if (entity.type === "TEXT" || entity.type === "ATTRIB" || entity.type === "ATTDEF") {
