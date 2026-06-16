@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF Text Rendering Test</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/+esm",
+            "three/": "https://cdn.jsdelivr.net/npm/three@0.161.0/",
+            "loglevel": "https://cdn.jsdelivr.net/npm/loglevel@1.9.1/+esm",
+            "opentype.js": "https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/+esm",
+            "earcut": "https://cdn.jsdelivr.net/npm/earcut@3.0.0/+esm"
+        }
+    }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        #dxf-viewer-container {
+            margin-top: 30px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #ffffff;
+            position: relative;
+            width: 100%;
+            height: 600px;
+        }
+        #dxf-error-message {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8d7da;
+            border-radius: 4px;
+            color: #721c24;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>DXF Text Rendering Test</h1>
+    <p>Testing text rendering in DXF viewer with various fonts.</p>
+
+    <button id="download-dxf-btn" style="padding: 10px 20px; font-size: 16px; cursor: pointer; margin-bottom: 20px;">Download DXF File</button>
+
+    <div id="dxf-viewer-container"></div>
+
+    <div id="dxf-error-message">
+        <strong>Error:</strong> <span id="dxf-error-text"></span>
+    </div>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { DxfViewer } from "../src/index.js";
+        import Drawing from "https://cdn.jsdelivr.net/npm/dxf-writer@1.18.4/+esm";
+
+        function showError(message) {
+            document.getElementById("dxf-error-text").textContent = message;
+            document.getElementById("dxf-error-message").style.display = "block";
+        }
+
+        async function createAndRenderDXF() {
+            try {
+                // Create DXF drawing
+                const drawing = new Drawing();
+                drawing.setUnits("Inches");
+
+                // Add line types
+                drawing.addLineType("DASHED", "---- ", [0.5, -0.5]);
+                drawing.addLineType("DOTTED", ". ", [0.1, -0.1]);
+
+                // Create layers
+                drawing.addLayer("BORDER", 1, "CONTINUOUS");
+                drawing.addLayer("DIAGONAL", 5, "DASHED");
+                drawing.addLayer("CUSTOM", 4, "CONTINUOUS");
+                drawing.addLayer("CIRCLES", 3, "CONTINUOUS");
+                drawing.addLayer("TEXT", 8, "CONTINUOUS");
+
+                // Draw border
+                drawing.setActiveLayer("BORDER");
+                drawing.drawLine(0, 0, 10, 0);
+                drawing.drawLine(10, 0, 10, 8);
+                drawing.drawLine(10, 8, 0, 8);
+                drawing.drawLine(0, 8, 0, 0);
+
+                // Draw diagonal lines
+                drawing.setActiveLayer("DIAGONAL");
+                drawing.drawLine(0, 0, 10, 8);
+                drawing.drawLine(10, 0, 0, 8);
+
+                // Draw rectangle
+                drawing.setActiveLayer("CUSTOM");
+                drawing.drawLine(3, 2, 7, 2);
+                drawing.drawLine(7, 2, 7, 6);
+                drawing.drawLine(7, 6, 3, 6);
+                drawing.drawLine(3, 6, 3, 2);
+
+                // Draw X inside rectangle
+                drawing.drawLine(3, 2, 7, 6);
+                drawing.drawLine(7, 2, 3, 6);
+
+                // Draw circle
+                drawing.setActiveLayer("CIRCLES");
+                drawing.drawCircle(5, 4, 1);
+
+                // Draw text - make it HUGE and change layer color to bright white
+                drawing.addLayer("TEXT", 7, "CONTINUOUS");  // 7 = white color
+                drawing.setActiveLayer("TEXT");
+
+                // Test full alphabet - uppercase
+                drawing.drawText(0.5, 7, 0.3, 0, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
+                // Test full alphabet - lowercase
+                drawing.drawText(0.5, 6.5, 0.3, 0, "abcdefghijklmnopqrstuvwxyz");
+
+                // Test numbers and special characters with holes
+                drawing.drawText(0.5, 6, 0.3, 0, "0123456789 @&#%");
+
+                // Test specific hole characters
+                drawing.drawText(1, 4, 0.8, 0, "ADOPQR");
+
+                // Get DXF string
+                const dxfString = drawing.toDxfString();
+
+                // Create viewer
+                const container = document.getElementById("dxf-viewer-container");
+                if (!container) {
+                    throw new Error("Viewer container element not found");
+                }
+
+                const viewer = new DxfViewer(container, {
+                    autoResize: true,
+                    clearColor: new THREE.Color("#000"),  // Black background for better contrast
+                    colorCorrection: false
+                });
+
+                // Create blob URL for DXF
+                const blob = new Blob([dxfString], { type: "application/dxf" });
+                const url = URL.createObjectURL(blob);
+
+                // Use WOFF font from cdnfonts (which our modified viewer now supports!)
+                const fontUrls = [
+                    "https://fonts.cdnfonts.com/s/18153/FivoSans-Regular.woff"
+                ];
+
+                // Load DXF
+                await viewer.Load({
+                    url: url,
+                    fonts: fontUrls
+                });
+
+                // Setup download button
+                document.getElementById("download-dxf-btn").addEventListener("click", () => {
+                    const blob = new Blob([dxfString], { type: "application/dxf" });
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = downloadUrl;
+                    link.download = "alphabet-test.dxf";
+                    link.click();
+                    URL.revokeObjectURL(downloadUrl);
+                });
+
+                URL.revokeObjectURL(url);
+
+            } catch (err) {
+                console.error("Failed to render DXF:", err);
+                showError(err.message);
+            }
+        }
+
+        // Start when page loads
+        window.addEventListener('load', () => {
+            setTimeout(createAndRenderDXF, 100);
+        });
+    </script>
+</body>
+</html>

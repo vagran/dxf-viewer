@@ -173,7 +173,24 @@ export class DxfWorker {
                 if (progressCbk) {
                     progressCbk("prepare", 0, null)
                 }
-                return opentype.parse(data)
+
+                // Check if this is a WOFF file and convert to TTF if needed
+                const uint8View = new Uint8Array(data)
+                const signature = String.fromCharCode(...uint8View.slice(0, 4))
+
+                let font
+                if (signature === "wOFF" || signature === "wOF2") {
+                    // WOFF font detected - convert to TTF format
+                    const woffFont = opentype.parse(data)
+                    const ttfBuffer = woffFont.toArrayBuffer()
+                    font = opentype.parse(ttfBuffer)
+                    // Mark this font as converted from WOFF for different hole detection handling
+                    font._isConvertedFromWoff = true
+                } else {
+                    font = opentype.parse(data)
+                }
+
+                return font
             }
         }
 

@@ -258,17 +258,22 @@ class CharShape {
         this.advance = glyph.advance
         this.bounds = glyph.bounds
         if (glyph.path) {
-            const shapes = glyph.path.toShapes(false)
+            // Only use automatic hole detection for WOFF-converted fonts
+            // Native TTF fonts handle holes correctly with toShapes(false)
+            const useHoleDetection = font.data && font.data._isConvertedFromWoff
+            const shapes = glyph.path.toShapes(useHoleDetection)
             this.vertices = []
             this.indices = []
             for (const shape of shapes) {
                 const shapePoints = shape.extractPoints(options.curveSubdivision)
-                /* Ensure proper vertices winding. */
-                if (!ShapeUtils.isClockWise(shapePoints.shape)) {
-                    shapePoints.shape = shapePoints.shape.reverse()
-                    for (const hole of shapePoints.holes) {
-                        if (ShapeUtils.isClockWise(hole)) {
-                            shapePoints.holes[h] = hole.reverse()
+                /* Ensure proper vertices winding when not using automatic hole detection. */
+                if (!useHoleDetection) {
+                    if (!ShapeUtils.isClockWise(shapePoints.shape)) {
+                        shapePoints.shape = shapePoints.shape.reverse()
+                        for (let h = 0; h < shapePoints.holes.length; h++) {
+                            if (ShapeUtils.isClockWise(shapePoints.holes[h])) {
+                                shapePoints.holes[h] = shapePoints.holes[h].reverse()
+                            }
                         }
                     }
                 }
@@ -368,9 +373,24 @@ class Font {
                 break
             }
         }
+
+        // Calculate bounds from glyph if not provided (some WOFF fonts don't have bounds)
+        let xMin = glyph.xMin
+        let xMax = glyph.xMax
+        let yMin = glyph.yMin
+        let yMax = glyph.yMax
+
+        if (xMin === undefined || xMax === undefined || yMin === undefined || yMax === undefined) {
+            const bounds = glyph.getBoundingBox()
+            xMin = bounds.x1
+            xMax = bounds.x2
+            yMin = bounds.y1
+            yMax = bounds.y2
+        }
+
         return {advance: glyph.advanceWidth * scale, path,
-                bounds: {xMin: glyph.xMin * scale, xMax: glyph.xMax * scale,
-                         yMin: glyph.yMin * scale, yMax: glyph.yMax * scale}}
+                bounds: {xMin: xMin * scale, xMax: xMax * scale,
+                         yMin: yMin * scale, yMax: yMax * scale}}
     }
 
     /**
