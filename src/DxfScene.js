@@ -30,6 +30,25 @@ const MAX_HATCH_LINES = 20000
  */
 const MAX_HATCH_SEGMENTS = 20000
 
+/** Built-in linetype patterns used as fallback when the DXF file does not define them in its
+ * LTYPE table.  Values are in drawing units (mm for metric).
+ * Pattern convention: positive = dash length, negative = gap length, value = length.
+ * CENTER uses: 12 mm dash – 3 mm gap – 0.5 mm dot – 3 mm gap (total 18.5 mm).
+ */
+const BUILTIN_LINETYPES = Object.freeze({
+    "CENTER":  { pattern: [12.7, -2.54, 0, -2.54],                patternLength: 17.78 },
+    "CENTER2": { pattern: [6.35, -2.54, 0, -2.54],               patternLength: 11.43 },
+    "CENTERX2":{ pattern: [25.4, -5.08, 0, -5.08],               patternLength: 35.56 },
+    "DASHED":  { pattern: [6.0,  -3.0],                           patternLength: 9.0  },
+    "DASHED2": { pattern: [3.0,  -1.5],                           patternLength: 4.5  },
+    "DASHEDX2":{ pattern: [12.0, -6.0],                           patternLength: 18.0 },
+    "HIDDEN":  { pattern: [3.0,  -1.5],                           patternLength: 4.5  },
+    "HIDDEN2": { pattern: [1.5,  -0.75],                          patternLength: 2.25 },
+    "HIDDENX2":{ pattern: [6.0,  -3.0],                           patternLength: 9.0  },
+    "PHANTOM": { pattern: [12.0, -3.0, 0.5, -3.0, 0.5, -3.0],   patternLength: 22.0 },
+    "DOT":     { pattern: [0.0,  -3.0],                           patternLength: 3.0  },
+})
+
 
 /** Default values for system variables. Entry may be either value or function to call for obtaining
  * a value, the function `this` argument is DxfScene.
@@ -127,6 +146,44 @@ export class DxfScene {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 layer.displayName = ParseSpecialChars(layer.name)
                 this.layers.set(layer.name, layer)
+            }
+        }
+
+        /* Global linetype scale from header (DXF $LTSCALE system variable). */
+        this.ltScale = this.vars.get("LTSCALE") ?? 1
+
+        /* Build linetype pattern map: uppercase name → {id, pattern, patternLength}
+         * id 0 is reserved for solid/continuous. Patterned types get ids 1, 2, …
+         * DXF pattern array: positive = dash length, negative = gap length, value = length.
+         * DXF-defined patterns take precedence; BUILTIN_LINETYPES fill in any gaps.
+         */
+        this.lineTypePatterns = new Map()
+        let lineTypeNextId = 1
+        if (dxf.tables?.lineType?.lineTypes) {
+            for (const [, lt] of Object.entries(dxf.tables.lineType.lineTypes)) {
+                const name = lt.name?.toUpperCase()
+                if (!name || name === "CONTINUOUS" || name === "BYLAYER" ||
+                    name === "BYBLOCK") {
+                    continue
+                }
+                if (!lt.pattern || lt.pattern.length === 0 || !lt.patternLength) {
+                    continue
+                }
+                this.lineTypePatterns.set(name, {
+                    id: lineTypeNextId++,
+                    pattern: lt.pattern,
+                    patternLength: lt.patternLength
+                })
+            }
+        }
+        /* Add built-in patterns for any linetype name not supplied by the DXF file. */
+        for (const [name, def] of Object.entries(BUILTIN_LINETYPES)) {
+            if (!this.lineTypePatterns.has(name)) {
+                this.lineTypePatterns.set(name, {
+                    id: lineTypeNextId++,
+                    pattern: def.pattern,
+                    patternLength: def.patternLength
+                })
             }
         }
 
@@ -382,8 +439,21 @@ export class DxfScene {
      * @return {number}
      */
     _GetLineType(entity, vertex = null, blockCtx = null) {
-        //XXX lookup
-        return 0
+        /* Per-vertex lineType (POLYLINE vertices can override) takes precedence. */
+        let ltName = (vertex?.lineType ?? entity.lineType)?.toUpperCase?.()
+        if (!ltName || ltName === "BYLAYER") {
+            const layerName = this._GetEntityLayer(entity, blockCtx)
+            const layer = this.layers.get(layerName)
+            ltName = layer?.lineType?.toUpperCase?.()
+        }
+        if (!ltName || ltName === "CONTINUOUS" || ltName === "BYBLOCK") {
+            return 0
+        }
+        return this.lineTypePatterns.get(ltName)?.id ?? 0
+    }
+
+    _GetLineTypeScale(entity) {
+        return (entity.lineTypeScale ?? 1) * this.ltScale
     }
 
     /** Check if start/end with are not specified. */
@@ -393,6 +463,93 @@ export class DxfScene {
         // return !Boolean(entity.startWidth || entity.endWidth)
     }
 
+    /** Expand a single straight segment into dash sub-segments according to a linetype pattern.
+     *
+     * DXF pattern array convention (per DXF spec §LTYPE table):
+     *   positive element = dash of that length
+     *   negative element = gap (space) of that absolute length
+     *   zero element     = dot (rendered as a minimal dash of 0.5 × scale)
+     *
+     * Returns a flat array of {x,y} vertices in pairs (start0,end0, start1,end1, …).
+     * Returns null when ltId is 0 (solid) so callers can take the fast path.
+     *
+     * @param {object} startPt  {x, y}
+     * @param {object} endPt    {x, y}
+     * @param {number} ltId     Linetype id from this.lineTypePatterns; 0 → solid (returns null)
+     * @param {number} scale    Combined LTSCALE × entity lineTypeScale
+     */
+    _ExpandDashedSegments(startPt, endPt, ltId, scale) {
+        if (ltId === 0) {
+            return null
+        }
+        let info = null
+        for (const v of this.lineTypePatterns.values()) {
+            if (v.id === ltId) { info = v; break }
+        }
+        if (!info) {
+            return null
+        }
+
+        const dx = endPt.x - startPt.x
+        const dy = endPt.y - startPt.y
+        const totalLen = Math.sqrt(dx * dx + dy * dy)
+        if (totalLen < 1e-10) {
+            return []
+        }
+
+        const scaledPatLen = info.patternLength * scale
+        /* Degenerate pattern — render as solid. */
+        if (scaledPatLen < 1e-10) {
+            return null
+        }
+
+        const ux = dx / totalLen
+        const uy = dy / totalLen
+        const result = []
+        let t = 0
+        let patIdx = 0
+
+        while (t < totalLen - 1e-10) {
+            const elem = info.pattern[patIdx]
+            const isDash = elem > 0
+            const isDot = elem === 0
+            /* For a dot, use a minimal visible length so it appears as a short tick. */
+            const elemLen = isDot ? (scale * 0.5) : Math.abs(elem) * scale
+            const segEnd = Math.min(t + (elemLen < 1e-10 ? scale * 0.5 : elemLen), totalLen)
+
+            if (isDash || isDot) {
+                result.push(
+                    { x: startPt.x + ux * t,      y: startPt.y + uy * t },
+                    { x: startPt.x + ux * segEnd,  y: startPt.y + uy * segEnd }
+                )
+            }
+
+            t = segEnd
+            patIdx = (patIdx + 1) % info.pattern.length
+        }
+        return result
+    }
+
+    /** Expand a straight segment as dashes, collecting into an existing vertices array.
+     * When the segment is solid (ltId=0) the original two points are pushed as-is.
+     *
+     * @param {Array}  vertices  Output array; alternating start/end pairs are pushed.
+     * @param {object} startPt   {x, y} — already in scene coordinates.
+     * @param {object} endPt     {x, y} — already in scene coordinates.
+     * @param {number} ltId      0 → solid
+     * @param {number} scale
+     */
+    _PushDashedSegment(vertices, startPt, endPt, ltId, scale) {
+        const dashes = this._ExpandDashedSegments(startPt, endPt, ltId, scale)
+        if (dashes === null) {
+            vertices.push(startPt, endPt)
+        } else {
+            for (const v of dashes) {
+                vertices.push(v)
+            }
+        }
+    }
+
     *_DecomposeLine(entity, blockCtx) {
         /* start/end width, bulge - seems cannot be present, at least with current parser */
         if (entity.vertices.length !== 2) {
@@ -400,12 +557,97 @@ export class DxfScene {
         }
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
-        yield new Entity({
-            type: Entity.Type.LINE_SEGMENTS,
-            vertices: entity.vertices,
-            layer, color,
-            lineType: this._GetLineType(entity, entity.vertices[0])
-        })
+        const lineType = this._GetLineType(entity, entity.vertices[0], blockCtx)
+
+        if (lineType === 0) {
+            yield new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices: entity.vertices,
+                layer, color, lineType: 0
+            })
+            return
+        }
+
+        const scale = this._GetLineTypeScale(entity)
+        const vertices = []
+        this._PushDashedSegment(vertices, entity.vertices[0], entity.vertices[1],
+                                lineType, scale)
+        if (vertices.length >= 2) {
+            yield new Entity({ type: Entity.Type.LINE_SEGMENTS, vertices, layer, color, lineType: 0 })
+        }
+    }
+
+    /** Expand a connected vertex list (polyline or tessellated curve) into dash sub-segment pairs
+     * according to a linetype pattern.  The pattern is applied continuously across all segments
+     * (PLINEGEN=0 equivalent — each entity starts fresh from the beginning of the pattern).
+     *
+     * @param {Array}   vertices  Connected vertex list [{x,y}, …].
+     * @param {number}  ltId      Linetype id; 0 → solid (returns null for fast-path).
+     * @param {number}  scale     Combined LTSCALE × entity lineTypeScale.
+     * @param {boolean} isClosed  Whether the last vertex connects back to the first.
+     * @return {Array|null}  Flat array of {x,y} vertex pairs, or null when ltId is 0.
+     */
+    _ExpandDashedPolylineVertices(vertices, ltId, scale, isClosed) {
+        if (ltId === 0) {
+            return null
+        }
+        let info = null
+        for (const v of this.lineTypePatterns.values()) {
+            if (v.id === ltId) { info = v; break }
+        }
+        if (!info) {
+            return null
+        }
+
+        /* Pre-scale the pattern elements. Zero elements become a minimal tick. */
+        const scaledPat = info.pattern.map(elem =>
+            elem === 0 ? scale * 0.5 : Math.abs(elem) * scale
+        )
+        const totalPatLen = scaledPat.reduce((a, b) => a + b, 0)
+        if (totalPatLen < 1e-10) {
+            return null
+        }
+
+        const result = []
+        let patIdx = 0
+        let consumed = 0
+
+        const numSegs = isClosed ? vertices.length : vertices.length - 1
+        for (let i = 0; i < numSegs; i++) {
+            const spt = vertices[i]
+            const ept = vertices[(i + 1) % vertices.length]
+            const dx = ept.x - spt.x
+            const dy = ept.y - spt.y
+            const segLen = Math.sqrt(dx * dx + dy * dy)
+            if (segLen < 1e-10) {
+                continue
+            }
+            const ux = dx / segLen
+            const uy = dy / segLen
+            let t = 0
+
+            while (t < segLen - 1e-10) {
+                const elem = info.pattern[patIdx]
+                const isDash = elem >= 0
+                const elemLen = scaledPat[patIdx]
+                const elemRemain = elemLen - consumed
+                const take = Math.min(elemRemain, segLen - t)
+
+                if (isDash) {
+                    result.push({ x: spt.x + ux * t,            y: spt.y + uy * t })
+                    result.push({ x: spt.x + ux * (t + take),   y: spt.y + uy * (t + take) })
+                }
+
+                t += take
+                consumed += take
+
+                if (consumed >= elemLen - 1e-10) {
+                    consumed = 0
+                    patIdx = (patIdx + 1) % info.pattern.length
+                }
+            }
+        }
+        return result
     }
 
     /** Generate vertices for bulged line segment.
@@ -558,14 +800,26 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
+        const isClosed = entity.endAngle === undefined
         const vertices = []
         this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
                                    startAngle: entity.startAngle, endAngle: entity.endAngle,
                                    transform: this._GetEntityExtrusionTransform(entity)})
+
+        if (lineType !== 0) {
+            const scale = this._GetLineTypeScale(entity)
+            const expanded = this._ExpandDashedPolylineVertices(vertices, lineType, scale, isClosed)
+            if (expanded !== null && expanded.length >= 2) {
+                yield new Entity({
+                    type: Entity.Type.LINE_SEGMENTS, vertices: expanded, layer, color, lineType: 0
+                })
+                return
+            }
+        }
         yield new Entity({
             type: Entity.Type.POLYLINE,
-            vertices, layer, color, lineType,
-            shape: entity.endAngle === undefined
+            vertices, layer, color, lineType: 0,
+            shape: isClosed
         })
     }
 
@@ -576,9 +830,20 @@ export class DxfScene {
         const vertices = []
         this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
                                    transform: this._GetEntityExtrusionTransform(entity)})
+
+        if (lineType !== 0) {
+            const scale = this._GetLineTypeScale(entity)
+            const expanded = this._ExpandDashedPolylineVertices(vertices, lineType, scale, true)
+            if (expanded !== null && expanded.length >= 2) {
+                yield new Entity({
+                    type: Entity.Type.LINE_SEGMENTS, vertices: expanded, layer, color, lineType: 0
+                })
+                return
+            }
+        }
         yield new Entity({
             type: Entity.Type.POLYLINE,
-            vertices, layer, color, lineType,
+            vertices, layer, color, lineType: 0,
             shape: true
         })
     }
@@ -611,9 +876,19 @@ export class DxfScene {
                                     */
                                    ccwAngleDir: !this._GetEntityExtrusionTransform(entity)})
 
+        if (lineType !== 0) {
+            const scale = this._GetLineTypeScale(entity)
+            const expanded = this._ExpandDashedPolylineVertices(vertices, lineType, scale, isClosed)
+            if (expanded !== null && expanded.length >= 2) {
+                yield new Entity({
+                    type: Entity.Type.LINE_SEGMENTS, vertices: expanded, layer, color, lineType: 0
+                })
+                return
+            }
+        }
         yield new Entity({
             type: Entity.Type.POLYLINE,
-            vertices, layer, color, lineType,
+            vertices, layer, color, lineType: 0,
             shape: isClosed
         })
     }
@@ -1671,6 +1946,7 @@ export class DxfScene {
         entityVertices = this._MirrorEntityVertices(entity, entityVertices)
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
+        const lineTypeScale = this._GetLineTypeScale(entity)
         const _this = this
         let startIdx = 0
         let curPlainLine = this._IsPlainLine(entityVertices[0])
@@ -1704,12 +1980,26 @@ export class DxfScene {
             }
 
             if (curPlainLine) {
-                yield new Entity({
-                                     type: Entity.Type.POLYLINE,
-                                     vertices, layer, color,
-                                     lineType: curLineType,
-                                     shape: isClosed
-                                 })
+                if (curLineType !== 0) {
+                    const expanded = _this._ExpandDashedPolylineVertices(
+                        vertices, curLineType, lineTypeScale, isClosed)
+                    if (expanded !== null && expanded.length >= 2) {
+                        yield new Entity({
+                            type: Entity.Type.LINE_SEGMENTS,
+                            vertices: expanded, layer, color, lineType: 0
+                        })
+                    } else {
+                        yield new Entity({
+                            type: Entity.Type.POLYLINE,
+                            vertices, layer, color, lineType: 0, shape: isClosed
+                        })
+                    }
+                } else {
+                    yield new Entity({
+                        type: Entity.Type.POLYLINE,
+                        vertices, layer, color, lineType: 0, shape: isClosed
+                    })
+                }
             } else {
                 yield* _this._GenerateShapedPolyline(vertices, layer, color, curLineType, isClosed)
             }
@@ -1883,7 +2173,17 @@ export class DxfScene {
             vertices.push({x: pt[0], y: pt[1]})
         }
         //XXX extrusionDirection (normalVector) transform?
-        yield new Entity({type: Entity.Type.POLYLINE, vertices, layer, color, lineType})
+        if (lineType !== 0) {
+            const scale = this._GetLineTypeScale(entity)
+            const expanded = this._ExpandDashedPolylineVertices(vertices, lineType, scale, false)
+            if (expanded !== null && expanded.length >= 2) {
+                yield new Entity({
+                    type: Entity.Type.LINE_SEGMENTS, vertices: expanded, layer, color, lineType: 0
+                })
+                return
+            }
+        }
+        yield new Entity({type: Entity.Type.POLYLINE, vertices, layer, color, lineType: 0})
     }
 
     /** Get a point on a B-spline.

@@ -609,6 +609,10 @@ DxfParser.prototype._parse = function(dxfString) {
                     layer.color = getAcadColor(layer.colorIndex);
                     curr = scanner.next();
                     break;
+                case 6: // linetype name
+                    layer.lineType = curr.value;
+                    curr = scanner.next();
+                    break;
                 case 70: // frozen layer
                     layer.frozen = ((curr.value & 1) !== 0 || (curr.value & 2) !== 0);
                     curr = scanner.next();
