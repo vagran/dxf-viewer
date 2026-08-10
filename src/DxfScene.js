@@ -1062,6 +1062,76 @@ export class DxfScene {
         return result
     }
 
+    /**
+     * Nesting test for two boundary loops which do not properly intersect.
+     *
+     * Probes with edge midpoints rather than vertices, skipping any probe which lands on the other
+     * loop's boundary. Adjacent boundary loops routinely touch - wall segments meeting at a corner,
+     * two fills sharing an edge - and a probe sitting exactly on the other loop reads as "inside"
+     * as easily as "outside", which would turn a filled loop into its neighbour's hole.
+     *
+     * @param {Vector2[]} inner
+     * @param {Vector2[]} outer
+     * @return {boolean}
+     */
+    _IsLoopInsideLoop(inner, outer) {
+        for (let i = 0; i < inner.length; i++) {
+            const a = inner[i]
+            const b = inner[(i + 1) % inner.length]
+            const pt = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}
+            if (this._IsPointOnLoop(pt, outer)) {
+                continue
+            }
+            return this._IsPointInsideLoop(pt, outer)
+        }
+        return false
+    }
+
+    /**
+     * @param {{x: number, y: number}} pt
+     * @param {Vector2[]} loop
+     * @return {boolean} True if the point lies on one of the loop's edges.
+     */
+    _IsPointOnLoop(pt, loop) {
+        const EPS = 1e-9
+        for (let i = 0; i < loop.length; i++) {
+            const a = loop[i]
+            const b = loop[(i + 1) % loop.length]
+            const dx = b.x - a.x
+            const dy = b.y - a.y
+            const len = Math.sqrt(dx * dx + dy * dy)
+            if (len == 0) {
+                continue
+            }
+            if (Math.abs(dx * (pt.y - a.y) - dy * (pt.x - a.x)) / len > EPS) {
+                continue
+            }
+            const dot = (pt.x - a.x) * dx + (pt.y - a.y) * dy
+            if (dot >= -EPS && dot <= len * len + EPS) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * @param {{x: number, y: number}} pt
+     * @param {Vector2[]} loop
+     * @return {boolean} True if the point lies inside the loop (ray casting, odd crossing count).
+     */
+    _IsPointInsideLoop(pt, loop) {
+        let inside = false
+        for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+            const a = loop[i]
+            const b = loop[j]
+            if ((a.y > pt.y) != (b.y > pt.y) &&
+                pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) {
+                inside = !inside
+            }
+        }
+        return inside
+    }
+
     *_DecomposeHatch(entity, blockCtx) {
         const boundaryLoops = this._GetHatchBoundaryLoops(entity)
         if (boundaryLoops.length == 0) {
@@ -1113,21 +1183,59 @@ export class DxfScene {
         }
 
         if (entity.isSolid) {
-            const coords = this._TransformBoundaryLoop(filteredBoundaryLoops[0], transform)
-            const holes = []
-            for (let i = 1; i < filteredBoundaryLoops.length; i++) {
-                holes.push(coords.length / 2)
-                this._TransformBoundaryLoop(filteredBoundaryLoops[i], transform, coords)
+            /* The loops of one solid HATCH are not necessarily a single contour plus its islands.
+             * A wall fill routinely carries a dozen disjoint external loops, one per wall segment.
+             * Treating loops 1..n as holes of loop 0 hands earcut a self-inconsistent polygon: the
+             * loops lying outside loop 0 are dropped, and with enough of them the triangulation
+             * spreads across the whole hull instead. Nesting depth decides which is which - even
+             * depth opens a contour, odd depth is a hole of the innermost loop containing it.
+             */
+            const loops = filteredBoundaryLoops.filter(loop => loop.length >= 3)
+            for (const loop of loops) {
+                if (transform) {
+                    for (const v of loop) {
+                        v.applyMatrix3(transform)
+                    }
+                }
             }
-            const indices = earcut(coords, holes)
-            const vertices = []
-            for (const loop of filteredBoundaryLoops) {
-                vertices.push(...loop)
+            /* O(n^2) containment scan, n being the loop count of a single hatch (16 on the drawing
+             * this was found on). Index the loops by bounding box if that ever becomes a problem. */
+            const isInside = loops.map(
+                (loop, i) => loops.map((other, j) => i != j && this._IsLoopInsideLoop(loop, other)))
+            const depths = isInside.map(row => row.reduce((n, inside) => inside ? n + 1 : n, 0))
+            const holes = loops.map(() => [])
+            for (let i = 0; i < loops.length; i++) {
+                if (depths[i] % 2 == 0) {
+                    continue
+                }
+                for (let j = 0; j < loops.length; j++) {
+                    if (isInside[i][j] && depths[j] == depths[i] - 1) {
+                        holes[j].push(loops[i])
+                        break
+                    }
+                }
             }
-            yield new Entity({
-                type: Entity.Type.TRIANGLES,
-                vertices, indices, layer, color
-            })
+            for (let i = 0; i < loops.length; i++) {
+                if (depths[i] % 2 != 0) {
+                    continue
+                }
+                const vertices = [...loops[i]]
+                const coords = this._TransformBoundaryLoop(loops[i], null)
+                const holeIndices = []
+                for (const hole of holes[i]) {
+                    holeIndices.push(coords.length / 2)
+                    this._TransformBoundaryLoop(hole, null, coords)
+                    vertices.push(...hole)
+                }
+                const indices = earcut(coords, holeIndices)
+                if (indices.length == 0) {
+                    continue
+                }
+                yield new Entity({
+                    type: Entity.Type.TRIANGLES,
+                    vertices, indices, layer, color
+                })
+            }
             return
         }
 
