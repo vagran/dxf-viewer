@@ -85,6 +85,9 @@ export class DxfWorker {
             transfers.push(scene.vertices)
             transfers.push(scene.indices)
             transfers.push(scene.transforms)
+            if (scene.arcLengths) {
+                transfers.push(scene.arcLengths)
+            }
             return {scene, dxf}
         }
         case DxfWorker.WorkerMsg.DESTROY:
