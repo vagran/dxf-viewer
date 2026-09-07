@@ -14,10 +14,12 @@ import LWPolyline from "./entities/lwpolyline.js";
 import MText from "./entities/mtext.js";
 import Point from "./entities/point.js";
 import Polyline from "./entities/polyline.js";
+import Ray from "./entities/ray.js";
 import Solid from "./entities/solid.js";
 import Spline from "./entities/spline.js";
 import Text from "./entities/text.js";
 import Hatch from "./entities/hatch.js";
+import XLine from "./entities/xline.js";
 import dimStyleCodes from "./DimStyleCodes.js";
 //import Vertex from "./entities/.js";
 
@@ -45,10 +47,12 @@ function registerDefaultEntityHandlers(dxfParser) {
     dxfParser.registerEntityHandler(MText);
     dxfParser.registerEntityHandler(Point);
     dxfParser.registerEntityHandler(Polyline);
+    dxfParser.registerEntityHandler(Ray);
     dxfParser.registerEntityHandler(Solid);
     dxfParser.registerEntityHandler(Spline);
     dxfParser.registerEntityHandler(Text);
     dxfParser.registerEntityHandler(Hatch);
+    dxfParser.registerEntityHandler(XLine);
     //dxfParser.registerEntityHandler(require('./entities/vertex'));
 }
 

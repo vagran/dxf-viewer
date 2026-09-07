@@ -65,6 +65,12 @@ const DEFAULT_VARS = {
     DIMZIN: 8, //XXX 0 for imperial,
 }
 
+/* Length used to draw semi-infinite (RAY) and infinite (XLINE) entities. Chosen well above any
+ * realistic drawing extents while remaining within single-precision float headroom after the
+ * origin shift performed by _TransformVertex.
+ */
+const INFINITE_LINE_LENGTH = 1e6
+
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
  * transfer it to the main thread, and easily apply it to a Three.js scene there.
@@ -344,6 +350,12 @@ export class DxfScene {
         case "HATCH":
             renderEntities = this._DecomposeHatch(entity, blockCtx)
             break
+        case "RAY":
+            renderEntities = this._DecomposeRay(entity, blockCtx)
+            break
+        case "XLINE":
+            renderEntities = this._DecomposeXLine(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -405,6 +417,49 @@ export class DxfScene {
             vertices: entity.vertices,
             layer, color,
             lineType: this._GetLineType(entity, entity.vertices[0])
+        })
+    }
+
+    *_DecomposeRay(entity, blockCtx) {
+        if (!entity.basePoint || !entity.direction) {
+            return
+        }
+        const dx = entity.direction.x, dy = entity.direction.y
+        if (dx === 0 && dy === 0) {
+            return
+        }
+        const K = INFINITE_LINE_LENGTH
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const farPoint = { x: entity.basePoint.x + dx * K, y: entity.basePoint.y + dy * K }
+        yield new Entity({
+            type: Entity.Type.LINE_SEGMENTS,
+            vertices: [entity.basePoint, farPoint],
+            layer, color,
+            lineType: this._GetLineType(entity, entity.basePoint),
+            boundsVertex: entity.basePoint
+        })
+    }
+
+    *_DecomposeXLine(entity, blockCtx) {
+        if (!entity.basePoint || !entity.direction) {
+            return
+        }
+        const dx = entity.direction.x, dy = entity.direction.y
+        if (dx === 0 && dy === 0) {
+            return
+        }
+        const K = INFINITE_LINE_LENGTH
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const negFar = { x: entity.basePoint.x - dx * K, y: entity.basePoint.y - dy * K }
+        const posFar = { x: entity.basePoint.x + dx * K, y: entity.basePoint.y + dy * K }
+        yield new Entity({
+            type: Entity.Type.LINE_SEGMENTS,
+            vertices: [negFar, posFar],
+            layer, color,
+            lineType: this._GetLineType(entity, entity.basePoint),
+            boundsVertex: entity.basePoint
         })
     }
 
@@ -2007,8 +2062,16 @@ export class DxfScene {
         const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
         const batch = this._GetBatch(key)
+        /* For semi-infinite / infinite entities (RAY, XLINE) the far endpoints must not extend
+         * scene bounds. Instead the caller supplies a boundsVertex that represents the finite
+         * anchor point (base of the ray / midpoint of the xline).
+         */
+        if (entity.boundsVertex && !blockCtx) {
+            this._UpdateBounds(entity.boundsVertex)
+        }
+        const skipBounds = Boolean(entity.boundsVertex)
         for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v, blockCtx))
+            batch.PushVertex(this._TransformVertex(v, blockCtx, skipBounds))
         }
     }
 
@@ -2198,12 +2261,14 @@ export class DxfScene {
      * @param blockCtx {BlockContext}
      * @return {{x: number, y: number}}
      */
-    _TransformVertex(v, blockCtx = null) {
+    _TransformVertex(v, blockCtx = null, skipBounds = false) {
         if (blockCtx) {
             /* Block definition in block coordinates. So it should not touch bounds and origin. */
             return blockCtx.TransformVertex(v)
         }
-        this._UpdateBounds(v)
+        if (!skipBounds) {
+            this._UpdateBounds(v)
+        }
         return { x: v.x - this.origin.x, y: v.y - this.origin.y }
     }
 
@@ -2702,7 +2767,8 @@ export class Entity {
      * @param lineType {?number}
      * @param shape {Boolean} true if closed shape.
      */
-    constructor({type, vertices, indices = null, layer = null, color, lineType = 0, shape = false}) {
+    constructor({type, vertices, indices = null, layer = null, color, lineType = 0, shape = false,
+                 boundsVertex = null}) {
         this.type = type
         this.vertices = vertices
         this.indices = indices
@@ -2710,6 +2776,7 @@ export class Entity {
         this.color = color
         this.lineType = lineType
         this.shape = shape
+        this.boundsVertex = boundsVertex
     }
 
     *_IterateVertices(startIndex, count) {
