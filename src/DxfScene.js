@@ -223,7 +223,8 @@ export class DxfScene {
         function IsTextEntity(entity) {
             return entity.type === "TEXT" || entity.type === "MTEXT" ||
                    entity.type === "DIMENSION" || entity.type === "ATTDEF" ||
-                   entity.type === "ATTRIB"
+                   entity.type === "ATTRIB" ||
+                   entity.type === "ACAD_TABLE"
         }
 
         /* Should return false if unable to resolve some characters, true otherwise. */
@@ -256,6 +257,25 @@ export class DxfScene {
                             ret = false
                             break
                         }
+                    }
+                }
+
+            } else if (entity.type === "ACAD_TABLE") {
+                ret = true
+                if (entity.cellTexts) {
+                    for (const raw of entity.cellTexts) {
+                        if (!raw) {
+                            continue
+                        }
+                        const parser = new MTextFormatParser()
+                        parser.Parse(ParseSpecialChars(raw))
+                        for (const text of parser.GetText()) {
+                            if (!await this.textRenderer.FetchFonts(ParseSpecialChars(text))) {
+                                ret = false
+                                break
+                            }
+                        }
+                        if (!ret) break
                     }
                 }
 
@@ -344,6 +364,15 @@ export class DxfScene {
         case "HATCH":
             renderEntities = this._DecomposeHatch(entity, blockCtx)
             break
+        case "ACAD_TABLE":
+            /* Preferred path: the entity references a `*T` block that already contains the
+             * AutoCAD-authored grid and text geometry. Delegate to the INSERT handler. */
+            if (entity.name && this.blocks.get(entity.name)) {
+                this._ProcessInsert(entity, blockCtx)
+                return
+            }
+            renderEntities = this._DecomposeAcadTable(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -406,6 +435,98 @@ export class DxfScene {
             layer, color,
             lineType: this._GetLineType(entity, entity.vertices[0])
         })
+    }
+
+    /* Grid + text fallback for ACAD_TABLE when the associated `*T` block is unavailable. Emits
+     * horizontal and vertical grid lines and places each cell text string at the top-left of its
+     * cell with a small inset. Cells are filled left-to-right, top-to-bottom. */
+    *_DecomposeAcadTable(entity, blockCtx) {
+        const rowH = entity.rowHeights || []
+        const colW = entity.columnWidths || []
+        const rows = entity.rowCount ?? rowH.length
+        const cols = entity.columnCount ?? colW.length
+        if (!entity.position || rows <= 0 || cols <= 0 ||
+            rowH.length !== rows || colW.length !== cols) {
+
+            return
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const lineType = this._GetLineType(entity, entity.position)
+        const originX = entity.position.x
+        const originY = entity.position.y
+        /* Cumulative offsets: x[c] = left edge of column c; y[r] = top edge of row r
+         * (rows extend downward from insertion point). */
+        const xs = [0]
+        for (let c = 0; c < cols; c++) {
+            xs.push(xs[c] + colW[c])
+        }
+        const ys = [0]
+        for (let r = 0; r < rows; r++) {
+            ys.push(ys[r] + rowH[r])
+        }
+        const totalW = xs[cols]
+        const totalH = ys[rows]
+
+        /* Horizontal grid lines. */
+        for (let r = 0; r <= rows; r++) {
+            const y = originY - ys[r]
+            yield new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices: [
+                    { x: originX, y },
+                    { x: originX + totalW, y }
+                ],
+                layer, color, lineType
+            })
+        }
+        /* Vertical grid lines. */
+        for (let c = 0; c <= cols; c++) {
+            const x = originX + xs[c]
+            yield new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices: [
+                    { x, y: originY },
+                    { x, y: originY - totalH }
+                ],
+                layer, color, lineType
+            })
+        }
+
+        /* Cell text — fill row-major up to available strings. */
+        if (this.textRenderer.canRender && entity.cellTexts && entity.cellTexts.length > 0) {
+            const inset = 0.1
+            let ti = 0
+            for (let r = 0; r < rows && ti < entity.cellTexts.length; r++) {
+                const rowHeight = rowH[r]
+                const fontSize = Math.max(0.01, rowHeight * 0.6)
+                for (let c = 0; c < cols && ti < entity.cellTexts.length; c++) {
+                    const raw = entity.cellTexts[ti++]
+                    if (!raw) {
+                        continue
+                    }
+                    /* Strip any MTEXT formatting codes to plain text. */
+                    const parser = new MTextFormatParser()
+                    parser.Parse(ParseSpecialChars(raw))
+                    const text = [...parser.GetText()].join("").split(/\r?\n/)[0]
+                    if (!text) {
+                        continue
+                    }
+                    yield* this.textRenderer.Render({
+                        text,
+                        fontSize,
+                        startPos: {
+                            x: originX + xs[c] + inset,
+                            y: originY - ys[r + 1] + inset
+                        },
+                        rotation: 0,
+                        hAlign: 0,
+                        vAlign: 0,
+                        color, layer
+                    })
+                }
+            }
+        }
     }
 
     /** Generate vertices for bulged line segment.
