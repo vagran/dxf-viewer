@@ -2,6 +2,7 @@ import DxfArrayScanner from "./DxfArrayScanner.js";
 import AUTO_CAD_COLOR_INDEX from "./AutoCadColorIndex.js";
 
 import Face from "./entities/3dface.js";
+import AcadTable from "./entities/acadtable.js";
 import Arc from "./entities/arc.js";
 import AttDef from "./entities/attdef.js";
 import Attribute from "./entities/attribute.js"
@@ -33,6 +34,7 @@ log.setLevel('error');
 function registerDefaultEntityHandlers(dxfParser) {
     // Supported entities here (some entity code is still being refactored into this flow)
     dxfParser.registerEntityHandler(Face);
+    dxfParser.registerEntityHandler(AcadTable);
     dxfParser.registerEntityHandler(Arc);
     dxfParser.registerEntityHandler(AttDef);
     dxfParser.registerEntityHandler(Attribute);
