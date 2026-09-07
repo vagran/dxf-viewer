@@ -65,6 +65,13 @@ const DEFAULT_VARS = {
     DIMZIN: 8, //XXX 0 for imperial,
 }
 
+/* Rendered length used for dot (pattern element = 0) segments in an LTYPE pattern. Small but
+ * non-zero so it visibly appears at typical drawing scales. */
+const DOT_LENGTH = 0.1
+
+/* Maximum number of LTYPE pattern elements passed to the fragment shader uniform array. */
+const MAX_LTYPE_ELEMENTS = 16
+
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
  * transfer it to the main thread, and easily apply it to a Three.js scene there.
@@ -94,6 +101,11 @@ export class DxfScene {
         this.fontStyles = new Map()
         /* Indexed by entity handle. */
         this.inserts = new Map()
+        /* Line type name -> 1-based ID. Zero is reserved for solid (continuous) lines. */
+        this.lineTypeIds = new Map()
+        /* Pattern array indexed by (ID - 1). Each entry: {pattern: number[], patternLength: number}
+         * where pattern element sign encodes dash (>0), gap (<0), or dot (0). */
+        this.lineTypePatterns = []
         this.bounds = null
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
@@ -127,6 +139,34 @@ export class DxfScene {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 layer.displayName = ParseSpecialChars(layer.name)
                 this.layers.set(layer.name, layer)
+            }
+        }
+
+        if (dxf.tables && dxf.tables.lineType && dxf.tables.lineType.lineTypes) {
+            for (const [, lt] of Object.entries(dxf.tables.lineType.lineTypes)) {
+                if (!lt || !lt.name || !lt.pattern || lt.pattern.length === 0) {
+                    continue
+                }
+                if (lt.name === "CONTINUOUS" || lt.name === "ByLayer" ||
+                    lt.name === "ByBlock") {
+                    continue
+                }
+                /* patternLength is the sum of absolute segment lengths; recompute if missing. */
+                let patternLength = lt.patternLength
+                if (!patternLength || patternLength <= 0) {
+                    patternLength = 0
+                    for (const s of lt.pattern) {
+                        patternLength += Math.abs(s) || DOT_LENGTH
+                    }
+                }
+                if (patternLength <= 0) {
+                    continue
+                }
+                this.lineTypeIds.set(lt.name, this.lineTypePatterns.length + 1)
+                this.lineTypePatterns.push({
+                    pattern: lt.pattern.slice(0, MAX_LTYPE_ELEMENTS),
+                    patternLength
+                })
             }
         }
 
@@ -382,8 +422,24 @@ export class DxfScene {
      * @return {number}
      */
     _GetLineType(entity, vertex = null, blockCtx = null) {
-        //XXX lookup
-        return 0
+        if (this.lineTypeIds.size === 0) {
+            return 0
+        }
+        const raw = entity.lineType
+        if (raw && raw !== "CONTINUOUS" && raw !== "ByBlock" && raw !== "ByLayer") {
+            return this.lineTypeIds.get(raw) ?? 0
+        }
+        /* ByLayer / empty / CONTINUOUS -> use the layer's default linetype. */
+        const layerName = entity.layer
+        if (!layerName) {
+            return 0
+        }
+        const layer = this.layers.get(layerName)
+        const layerLt = layer?.lineType
+        if (!layerLt || layerLt === "CONTINUOUS") {
+            return 0
+        }
+        return this.lineTypeIds.get(layerLt) ?? 0
     }
 
     /** Check if start/end with are not specified. */
@@ -2007,8 +2063,14 @@ export class DxfScene {
         const key = new BatchingKey(entity.layer, blockCtx?.name,
                                     BatchingKey.GeometryType.LINES, entity.color, entity.lineType)
         const batch = this._GetBatch(key)
-        for (const v of entity.vertices) {
-            batch.PushVertex(this._TransformVertex(v, blockCtx))
+        /* LINES geometry: each consecutive pair is an independent segment, so the LTYPE pattern
+         * resets at every pair. */
+        for (let i = 0; i < entity.vertices.length; i += 2) {
+            const v0 = entity.vertices[i]
+            const v1 = entity.vertices[i + 1]
+            const len = batch.hasLineType ? Math.hypot(v1.x - v0.x, v1.y - v0.y) : 0
+            batch.PushVertex(this._TransformVertex(v0, blockCtx), 0)
+            batch.PushVertex(this._TransformVertex(v1, blockCtx), len)
         }
     }
 
@@ -2029,17 +2091,26 @@ export class DxfScene {
                                         BatchingKey.GeometryType.LINES, entity.color,
                                         entity.lineType)
             const batch = this._GetBatch(key)
+            /* Polyline: arc-length is continuous across the joint. Each pair pushed reuses the
+             * running arc for the shared vertex on both sides so pattern phase is preserved. */
+            let arc = 0
             let prev = null
             for (const v of entity.vertices) {
                 if (prev !== null) {
-                    batch.PushVertex(this._TransformVertex(prev, blockCtx))
-                    batch.PushVertex(this._TransformVertex(v, blockCtx))
+                    const seg = batch.hasLineType ? Math.hypot(v.x - prev.x, v.y - prev.y) : 0
+                    batch.PushVertex(this._TransformVertex(prev, blockCtx), arc)
+                    batch.PushVertex(this._TransformVertex(v, blockCtx), arc + seg)
+                    arc += seg
                 }
                 prev = v
             }
             if (entity.shape && verticesCount > 2) {
-                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1], blockCtx))
-                batch.PushVertex(this._TransformVertex(entity.vertices[0], blockCtx))
+                const vLast = entity.vertices[verticesCount - 1]
+                const vFirst = entity.vertices[0]
+                const seg = batch.hasLineType ?
+                    Math.hypot(vFirst.x - vLast.x, vFirst.y - vLast.y) : 0
+                batch.PushVertex(this._TransformVertex(vLast, blockCtx), arc)
+                batch.PushVertex(this._TransformVertex(vFirst, blockCtx), arc + seg)
             }
             return
         }
@@ -2048,11 +2119,32 @@ export class DxfScene {
                                     BatchingKey.GeometryType.INDEXED_LINES,
                                     entity.color, entity.lineType)
         const batch = this._GetBatch(key)
+        /* Pre-compute cumulative arc-length per source vertex when this batch carries an LTYPE.
+         * Passed into _IterateLineChunks so each yielded chunk includes a parallel arcLengths
+         * iterator over the same source-vertex sequence. */
+        let arcs = null
+        if (batch.hasLineType) {
+            arcs = new Array(verticesCount)
+            arcs[0] = 0
+            for (let i = 1; i < verticesCount; i++) {
+                const p = entity.vertices[i - 1]
+                const c = entity.vertices[i]
+                arcs[i] = arcs[i - 1] + Math.hypot(c.x - p.x, c.y - p.y)
+            }
+        }
         /* Line may be split if exceeds chunk limit. */
-        for (const lineChunk of entity._IterateLineChunks()) {
+        for (const lineChunk of entity._IterateLineChunks(arcs)) {
             const chunk = batch.PushChunk(lineChunk.verticesCount)
-            for (const v of lineChunk.vertices) {
-                chunk.PushVertex(this._TransformVertex(v, blockCtx))
+            if (lineChunk.arcLengths) {
+                const arcIter = lineChunk.arcLengths[Symbol.iterator]()
+                for (const v of lineChunk.vertices) {
+                    chunk.PushVertex(this._TransformVertex(v, blockCtx),
+                                     arcIter.next().value)
+                }
+            } else {
+                for (const v of lineChunk.vertices) {
+                    chunk.PushVertex(this._TransformVertex(v, blockCtx))
+                }
             }
             for (const idx of lineChunk.indices) {
                 chunk.PushIndex(idx)
@@ -2232,10 +2324,12 @@ export class DxfScene {
         let verticesSize = 0
         let indicesSize = 0
         let transformsSize = 0
+        let arcLengthsSize = 0
         this.batches.each(b => {
             verticesSize += b.GetVerticesBufferSize()
             indicesSize += b.GetIndicesBufferSize()
             transformsSize += b.GetTransformsSize()
+            arcLengthsSize += b.GetArcLengthsBufferSize()
         })
 
         const scene = {
@@ -2246,7 +2340,11 @@ export class DxfScene {
             layers: [],
             origin: this.origin,
             bounds: this.bounds,
-            hasMissingChars: this.hasMissingChars
+            hasMissingChars: this.hasMissingChars,
+            lineTypePatterns: this.lineTypePatterns
+        }
+        if (arcLengthsSize > 0) {
+            scene.arcLengths = new ArrayBuffer(arcLengthsSize)
         }
 
         const buffers = {
@@ -2255,7 +2353,9 @@ export class DxfScene {
             indices: new Uint16Array(scene.indices),
             indicesOffset: 0,
             transforms: new Float32Array(scene.transforms),
-            transformsOffset: 0
+            transformsOffset: 0,
+            arcLengths: scene.arcLengths ? new Float32Array(scene.arcLengths) : null,
+            arcLengthsOffset: 0
         }
 
         this.batches.each(b => {
@@ -2282,18 +2382,30 @@ export class DxfScene {
 class RenderBatch {
     constructor(key) {
         this.key = key
+        /* Only line batches carry a per-vertex arc-length attribute (needed to render dashed
+         * LTYPE patterns in the fragment shader). Solid (lineType == 0) and non-line batches
+         * skip it entirely. */
+        this.hasLineType = key.lineType != null && key.lineType !== 0 &&
+            (key.geometryType === BatchingKey.GeometryType.LINES ||
+             key.geometryType === BatchingKey.GeometryType.INDEXED_LINES)
         if (key.IsIndexed()) {
             this.chunks = []
         } else if (key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
             this.transforms = new DynamicBuffer(NativeType.FLOAT32)
         } else {
             this.vertices = new DynamicBuffer(NativeType.FLOAT32)
+            if (this.hasLineType) {
+                this.arcLengths = new DynamicBuffer(NativeType.FLOAT32)
+            }
         }
     }
 
-    PushVertex(v) {
+    PushVertex(v, arc = 0) {
         const idx = this.vertices.Push(v.x)
         this.vertices.Push(v.y)
+        if (this.hasLineType) {
+            this.arcLengths.Push(arc)
+        }
         return idx
     }
 
@@ -2336,7 +2448,7 @@ class RenderBatch {
         if (curChunk === null) {
             curChunk = this._NewChunk(verticesCount)
         }
-        return new IndexedChunkWriter(curChunk, verticesCount)
+        return new IndexedChunkWriter(curChunk, verticesCount, this.hasLineType)
     }
 
     /** Merge other batch into this one. They should have the same geometry type. Instanced batches
@@ -2363,7 +2475,11 @@ class RenderBatch {
                     if (transform) {
                         v.applyMatrix3(transform)
                     }
-                    chunkWriter.PushVertex(v)
+                    /* Arc-length is preserved unchanged under translation; scaled block
+                     * instances will get slightly stretched patterns which is acceptable v1
+                     * behavior. */
+                    const arc = chunk.arcLengths ? chunk.arcLengths.Get(i / 2) : 0
+                    chunkWriter.PushVertex(v, arc)
                 }
                 const numIndices = chunk.indices.size
                 for (let i = 0; i < numIndices; i ++) {
@@ -2378,7 +2494,8 @@ class RenderBatch {
                 if (transform) {
                     v.applyMatrix3(transform)
                 }
-                this.PushVertex(v)
+                const arc = batch.arcLengths ? batch.arcLengths.Get(i / 2) : 0
+                this.PushVertex(v, arc)
             }
         }
     }
@@ -2396,6 +2513,21 @@ class RenderBatch {
         } else {
             return this.vertices.GetSize() * Float32Array.BYTES_PER_ELEMENT
         }
+    }
+
+    /** @return Arc-length buffer required size in bytes (0 when this batch has no LTYPE). */
+    GetArcLengthsBufferSize() {
+        if (!this.hasLineType) {
+            return 0
+        }
+        if (this.key.IsIndexed()) {
+            let size = 0
+            for (const chunk of this.chunks) {
+                size += chunk.arcLengths.GetSize()
+            }
+            return size * Float32Array.BYTES_PER_ELEMENT
+        }
+        return this.arcLengths.GetSize() * Float32Array.BYTES_PER_ELEMENT
     }
 
     /** @return Indices buffer required size in bytes. */
@@ -2451,12 +2583,19 @@ class RenderBatch {
             }
             this.vertices.CopyTo(buffers.vertices, buffers.verticesOffset)
             buffers.verticesOffset += size
+            if (this.hasLineType) {
+                const arcSize = this.arcLengths.GetSize()
+                batch.arcLengthsOffset = buffers.arcLengthsOffset
+                batch.arcLengthsSize = arcSize
+                this.arcLengths.CopyTo(buffers.arcLengths, buffers.arcLengthsOffset)
+                buffers.arcLengthsOffset += arcSize
+            }
             return batch
         }
     }
 
     _NewChunk(initialCapacity) {
-        const chunk = new IndexedChunk(initialCapacity)
+        const chunk = new IndexedChunk(initialCapacity, this.hasLineType)
         this.chunks.push(chunk)
         return chunk
     }
@@ -2629,7 +2768,7 @@ BlockContext.Type = Object.freeze({
 })
 
 class IndexedChunk {
-    constructor(initialCapacity) {
+    constructor(initialCapacity, hasLineType = false) {
         if (initialCapacity < 16) {
             initialCapacity = 16
         }
@@ -2637,6 +2776,10 @@ class IndexedChunk {
         this.indices = new DynamicBuffer(NativeType.UINT16, initialCapacity * 2)
         /* Two components per vertex. */
         this.vertices = new DynamicBuffer(NativeType.FLOAT32, initialCapacity * 2)
+        if (hasLineType) {
+            /* One arc-length float per vertex. */
+            this.arcLengths = new DynamicBuffer(NativeType.FLOAT32, initialCapacity)
+        }
     }
 
     Serialize(buffers) {
@@ -2655,24 +2798,35 @@ class IndexedChunk {
             this.indices.CopyTo(buffers.indices, buffers.indicesOffset)
             buffers.indicesOffset += size
         }
+        if (this.arcLengths) {
+            const size = this.arcLengths.GetSize()
+            chunk.arcLengthsOffset = buffers.arcLengthsOffset
+            chunk.arcLengthsSize = size
+            this.arcLengths.CopyTo(buffers.arcLengths, buffers.arcLengthsOffset)
+            buffers.arcLengthsOffset += size
+        }
         return chunk
     }
 }
 
 class IndexedChunkWriter {
-    constructor(chunk, verticesCount) {
+    constructor(chunk, verticesCount, hasLineType = false) {
         this.chunk = chunk
         this.verticesCount = verticesCount
         this.verticesOffset = this.chunk.vertices.GetSize() / 2
         this.numVerticesPushed = 0
+        this.hasLineType = hasLineType
     }
 
-    PushVertex(v) {
+    PushVertex(v, arc = 0) {
         if (this.numVerticesPushed === this.verticesCount) {
             throw new Error()
         }
         this.chunk.vertices.Push(v.x)
         this.chunk.vertices.Push(v.y)
+        if (this.hasLineType) {
+            this.chunk.arcLengths.Push(arc)
+        }
         this.numVerticesPushed++
     }
 
@@ -2725,7 +2879,7 @@ export class Entity {
      *  * "indices" - iterator for indices.
      *  Closed shapes are handled properly.
      */
-    *_IterateLineChunks() {
+    *_IterateLineChunks(arcs = null) {
         const verticesCount = this.vertices.length
         if (verticesCount < 2) {
             return
@@ -2752,48 +2906,49 @@ export class Entity {
                 break
             }
 
-            let vertices, indices, chunkVerticesCount
+            /* Build the source-vertex index list for this chunk so both vertex and arc-length
+             * iterators can walk it in lock-step. */
+            let srcIndices
+            let close = false
             if (count < 2) {
-                /* Either last vertex or last shape-closing vertex, or both. */
                 if (count === 1 && this.shape) {
-                    /* Both. */
-                    vertices = (function*() {
-                        yield this.vertices[chunkOffset]
-                        yield this.vertices[0]
-                    })()
+                    srcIndices = [chunkOffset, 0]
                 } else if (count === 1) {
-                    /* Just last vertex. Take previous one to make a line. */
-                    vertices = (function*() {
-                        yield this.vertices[chunkOffset - 1]
-                        yield this.vertices[chunkOffset]
-                    })()
+                    srcIndices = [chunkOffset - 1, chunkOffset]
                 } else {
-                    /* Just shape-closing vertex. Take last one to make a line. */
-                    vertices = (function*() {
-                        yield this.vertices[verticesCount - 1]
-                        yield this.vertices[0]
-                    })()
+                    srcIndices = [verticesCount - 1, 0]
                 }
-                indices = _IterateLineIndices(2, false)
-                chunkVerticesCount = 2
             } else if (isLast && this.shape && chunkOffset > 0 && count < INDEXED_CHUNK_SIZE) {
-                /* Additional vertex to close the shape. */
-                vertices = (function*() {
-                    yield* _this._IterateVertices(chunkOffset, count)
-                    yield this.vertices[0]
-                })()
-                indices = _IterateLineIndices(count + 1, false)
-                chunkVerticesCount = count + 1
+                srcIndices = new Array(count + 1)
+                for (let i = 0; i < count; i++) {
+                    srcIndices[i] = chunkOffset + i
+                }
+                srcIndices[count] = 0
             } else {
-                vertices = this._IterateVertices(chunkOffset, count)
-                indices = _IterateLineIndices(count,
-                                              isLast && chunkOffset === 0 && this.shape)
-                chunkVerticesCount = count
+                srcIndices = new Array(count)
+                for (let i = 0; i < count; i++) {
+                    srcIndices[i] = chunkOffset + i
+                }
+                close = isLast && chunkOffset === 0 && this.shape
+            }
+            const chunkVerticesCount = srcIndices.length
+            const vertices = (function*() {
+                for (const i of srcIndices) yield _this.vertices[i]
+            })()
+            const indices = _IterateLineIndices(chunkVerticesCount, close)
+            let arcLengths = null
+            if (arcs) {
+                arcLengths = (function*() {
+                    for (const i of srcIndices) {
+                        yield arcs[i] ?? 0
+                    }
+                })()
             }
             yield {
                 verticesCount: chunkVerticesCount,
                 vertices,
-                indices
+                indices,
+                arcLengths
             }
         }
     }

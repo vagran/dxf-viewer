@@ -101,6 +101,8 @@ export class DxfViewer {
 
         /* Indexed by MaterialKey, value is {key, material}. */
         this.materials = new RBTree((m1, m2) => m1.key.Compare(m2.key))
+        /* LTYPE pattern definitions per (lineType ID - 1); populated from the scene at load. */
+        this.lineTypePatterns = []
         /* Indexed by layer name, value is Layer instance. */
         this.layers = new Map()
         /* Default layer used when no layer specified. */
@@ -195,6 +197,7 @@ export class DxfViewer {
         this.origin = scene.origin
         this.bounds = scene.bounds
         this.hasMissingChars = scene.hasMissingChars
+        this.lineTypePatterns = scene.lineTypePatterns || []
 
         for (const layer of scene.layers) {
             this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color))
@@ -496,15 +499,15 @@ export class DxfViewer {
         }
     }
 
-    _GetSimpleColorMaterial(color, instanceType = InstanceType.NONE) {
-        const key = new MaterialKey(instanceType, null, color, 0)
+    _GetSimpleColorMaterial(color, instanceType = InstanceType.NONE, lineType = 0) {
+        const key = new MaterialKey(instanceType, null, color, lineType)
         let entry = this.materials.find({key})
         if (entry !== null) {
             return entry.material
         }
         entry = {
             key,
-            material: this._CreateSimpleColorMaterialInstance(color, instanceType)
+            material: this._CreateSimpleColorMaterialInstance(color, instanceType, lineType)
         }
         this.materials.insert(entry)
         return entry.material
@@ -529,13 +532,50 @@ export class DxfViewer {
 
     /** @param color {number} Color RGB numeric value.
      * @param instanceType {number}
+     * @param lineType {number} 0 for solid, 1-based ID into scene.lineTypePatterns for dashed.
      */
-    _CreateSimpleColorMaterialInstance(color, instanceType = InstanceType.NONE) {
+    _CreateSimpleColorMaterialInstance(color, instanceType = InstanceType.NONE, lineType = 0) {
+        if (lineType && lineType > 0) {
+            const patternInfo = this.lineTypePatterns[lineType - 1]
+            if (patternInfo) {
+                return this._CreateDashedLineMaterial(color, patternInfo, instanceType)
+            }
+        }
         const src = this.simpleColorMaterial[instanceType]
         /* Should reuse compiled shaders. */
         const m = src.clone()
         m.uniforms.color = { value: new three.Color(color) }
         return m
+    }
+
+    /** Build a dashed-line material variant. Each LTYPE gets its own compiled shader because
+     * the pattern lengths are baked in as a uniform-array plus scalars set at construction.
+     * @param color {number} Color RGB numeric value.
+     * @param patternInfo {{pattern:number[], patternLength:number}}
+     * @param instanceType {number}
+     */
+    _CreateDashedLineMaterial(color, patternInfo, instanceType = InstanceType.NONE) {
+        const shaders = this._GenerateShaders(instanceType, false, true)
+        /* Pad pattern to a fixed length so the uniform layout is stable across instances. */
+        const MAX = 16
+        const padded = new Float32Array(MAX)
+        for (let i = 0; i < patternInfo.pattern.length && i < MAX; i++) {
+            padded[i] = patternInfo.pattern[i]
+        }
+        return new three.RawShaderMaterial({
+            uniforms: {
+                color: { value: new three.Color(color) },
+                uPattern: { value: padded },
+                uPatternCount: { value: Math.min(patternInfo.pattern.length, MAX) },
+                uPatternLen: { value: patternInfo.patternLength }
+            },
+            vertexShader: shaders.vertex,
+            fragmentShader: shaders.fragment,
+            depthTest: false,
+            depthWrite: false,
+            glslVersion: three.GLSL3,
+            side: three.DoubleSide
+        })
     }
 
     _GetSimplePointMaterial(color, instanceType = InstanceType.NONE) {
@@ -585,7 +625,7 @@ export class DxfViewer {
         return m
     }
 
-    _GenerateShaders(instanceType, pointSize) {
+    _GenerateShaders(instanceType, pointSize, dashed = false) {
         const fullInstanceAttr = instanceType === InstanceType.FULL ?
             `
             /* First row. */
@@ -612,6 +652,37 @@ export class DxfViewer {
         const pointSizeUniform = pointSize ? "uniform float pointSize;" : ""
         const pointSizeAssigment = pointSize ? "gl_PointSize = pointSize;" : ""
 
+        const dashedVaryings = dashed ? "in float arcLength;\nout float vArc;" : ""
+        const dashedVertexAssign = dashed ? "vArc = arcLength;" : ""
+        const dashedFragUniforms = dashed ?
+            `
+            uniform float uPattern[16];
+            uniform int uPatternCount;
+            uniform float uPatternLen;
+            in float vArc;
+            ` : ""
+        /* Walk the pattern until finding the segment containing vArc mod patternLen; discard
+         * when that segment is a gap (negative). Dots (value 0) render as a short DOT_LENGTH
+         * stroke to remain visible. */
+        const dashedFragLogic = dashed ?
+            `
+            if (uPatternCount > 0 && uPatternLen > 0.0) {
+                float t = mod(vArc, uPatternLen);
+                float acc = 0.0;
+                for (int i = 0; i < 16; i++) {
+                    if (i >= uPatternCount) break;
+                    float seg = uPattern[i];
+                    float segLen = abs(seg);
+                    if (segLen == 0.0) segLen = 0.1;
+                    if (t < acc + segLen) {
+                        if (seg < 0.0) discard;
+                        break;
+                    }
+                    acc += segLen;
+                }
+            }
+            ` : ""
+
         return {
             vertex: `
 
@@ -620,6 +691,7 @@ export class DxfViewer {
             in vec2 position;
             ${fullInstanceAttr}
             ${pointInstanceAttr}
+            ${dashedVaryings}
             uniform mat4 modelViewMatrix;
             uniform mat4 projectionMatrix;
             ${pointSizeUniform}
@@ -630,6 +702,7 @@ export class DxfViewer {
                 ${pointInstanceTransform}
                 gl_Position = projectionMatrix * modelViewMatrix * pos;
                 ${pointSizeAssigment}
+                ${dashedVertexAssign}
             }
             `,
             fragment: `
@@ -637,9 +710,11 @@ export class DxfViewer {
             precision highp float;
             precision highp int;
             uniform vec3 color;
+            ${dashedFragUniforms}
             out vec4 fragColor;
 
             void main() {
+                ${dashedFragLogic}
                 fragColor = vec4(color, 1.0);
             }
             `
@@ -777,6 +852,13 @@ class Batch {
             if (this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE) {
                 this.transforms = new three.InstancedBufferAttribute(verticesArray, 2)
             }
+            if (scene.arcLengths && batch.hasOwnProperty("arcLengthsOffset")) {
+                const arcArray =
+                    new Float32Array(scene.arcLengths,
+                                     batch.arcLengthsOffset * Float32Array.BYTES_PER_ELEMENT,
+                                     batch.arcLengthsSize)
+                this.arcLengths = new three.BufferAttribute(arcArray, 1)
+            }
         }
 
         if (batch.hasOwnProperty("chunks")) {
@@ -791,10 +873,18 @@ class Batch {
                     new Uint16Array(scene.indices,
                                     rawChunk.indicesOffset * Uint16Array.BYTES_PER_ELEMENT,
                                     rawChunk.indicesSize)
-                this.chunks.push({
+                const chunkData = {
                     vertices: new three.BufferAttribute(verticesArray, 2),
                     indices: new three.BufferAttribute(indicesArray, 1)
-                })
+                }
+                if (scene.arcLengths && rawChunk.hasOwnProperty("arcLengthsOffset")) {
+                    const arcArray =
+                        new Float32Array(scene.arcLengths,
+                                         rawChunk.arcLengthsOffset * Float32Array.BYTES_PER_ELEMENT,
+                                         rawChunk.arcLengthsSize)
+                    chunkData.arcLengths = new three.BufferAttribute(arcArray, 1)
+                }
+                this.chunks.push(chunkData)
             }
         }
 
@@ -848,14 +938,15 @@ class Batch {
         /* INSERT layer (if specified) takes precedence over layer specified in block definition. */
         const layer = instanceBatch?.layer ?? this.layer
 
-        //XXX line type
-        const materialFactory =
+        const isPointMaterial =
             this.key.geometryType === BatchingKey.GeometryType.POINTS ||
-            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE ?
-                this.viewer._GetSimplePointMaterial : this.viewer._GetSimpleColorMaterial
-
-        const material = materialFactory.call(this.viewer, this.viewer._TransformColor(color),
-                                              instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
+            this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE
+        const transformedColor = this.viewer._TransformColor(color)
+        const instanceTypeArg = instanceBatch?.GetInstanceType() ?? InstanceType.NONE
+        const material = isPointMaterial ?
+            this.viewer._GetSimplePointMaterial(transformedColor, instanceTypeArg) :
+            this.viewer._GetSimpleColorMaterial(transformedColor, instanceTypeArg,
+                                                this.key.lineType ?? 0)
 
         let objConstructor
         switch (this.key.geometryType) {
@@ -876,10 +967,13 @@ class Batch {
             throw new Error("Unexpected geometry type:" + this.key.geometryType)
         }
 
-        function CreateObject(vertices, indices) {
+        function CreateObject(vertices, indices, arcLengths) {
             const geometry = instanceBatch ?
                 new three.InstancedBufferGeometry() : new three.BufferGeometry()
             geometry.setAttribute("position", vertices)
+            if (arcLengths) {
+                geometry.setAttribute("arcLength", arcLengths)
+            }
             instanceBatch?._SetInstanceTransformAttribute(geometry)
             if (indices) {
                 geometry.setIndex(indices)
@@ -893,10 +987,10 @@ class Batch {
 
         if (this.chunks) {
             for (const chunk of this.chunks) {
-                yield CreateObject(chunk.vertices, chunk.indices)
+                yield CreateObject(chunk.vertices, chunk.indices, chunk.arcLengths)
             }
         } else {
-            yield CreateObject(this.vertices)
+            yield CreateObject(this.vertices, undefined, this.arcLengths)
         }
     }
 

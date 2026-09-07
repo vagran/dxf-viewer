@@ -617,6 +617,10 @@ DxfParser.prototype._parse = function(dxfString) {
                     layer.color = curr.value;
                     curr = scanner.next();
                     break;
+                case 6: // Default linetype name for the layer
+                    layer.lineType = curr.value;
+                    curr = scanner.next();
+                    break;
                 case 0:
                     // New Layer
                     if(curr.value === 'LAYER') {
