@@ -223,7 +223,8 @@ export class DxfScene {
         function IsTextEntity(entity) {
             return entity.type === "TEXT" || entity.type === "MTEXT" ||
                    entity.type === "DIMENSION" || entity.type === "ATTDEF" ||
-                   entity.type === "ATTRIB"
+                   entity.type === "ATTRIB" ||
+                   entity.type === "MLEADER" || entity.type === "MULTILEADER"
         }
 
         /* Should return false if unable to resolve some characters, true otherwise. */
@@ -253,6 +254,19 @@ export class DxfScene {
                 if (dim) {
                     for (const text of dim.GetTexts()) {
                         if (!await this.textRenderer.FetchFonts(text)) {
+                            ret = false
+                            break
+                        }
+                    }
+                }
+
+            } else if (entity.type === "MLEADER" || entity.type === "MULTILEADER") {
+                ret = true
+                if (entity.text) {
+                    const parser = new MTextFormatParser()
+                    parser.Parse(ParseSpecialChars(entity.text))
+                    for (const text of parser.GetText()) {
+                        if (!await this.textRenderer.FetchFonts(ParseSpecialChars(text))) {
                             ret = false
                             break
                         }
@@ -344,6 +358,10 @@ export class DxfScene {
         case "HATCH":
             renderEntities = this._DecomposeHatch(entity, blockCtx)
             break
+        case "MLEADER":
+        case "MULTILEADER":
+            renderEntities = this._DecomposeMLeader(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -406,6 +424,106 @@ export class DxfScene {
             layer, color,
             lineType: this._GetLineType(entity, entity.vertices[0])
         })
+    }
+
+    /**
+     * Emit a filled arrowhead triangle whose tip is at `tip` and whose base is `size` units
+     * back along the vector from `back` towards `tip`. Base width is `size / 2`
+     * (matching the built-in dimension arrowhead aspect ratio).
+     */
+    *_EmitArrowHead(tip, back, size, layer, color) {
+        const dx = tip.x - back.x
+        const dy = tip.y - back.y
+        const len = Math.hypot(dx, dy)
+        if (len === 0 || size <= 0) {
+            return
+        }
+        const ux = dx / len, uy = dy / len
+        /* Perpendicular to arrow axis, half-base offset. */
+        const px = -uy * (size * 0.25)
+        const py = ux * (size * 0.25)
+        const baseCenter = { x: tip.x - ux * size, y: tip.y - uy * size }
+        yield new Entity({
+            type: Entity.Type.TRIANGLES,
+            vertices: [
+                { x: tip.x, y: tip.y },
+                { x: baseCenter.x + px, y: baseCenter.y + py },
+                { x: baseCenter.x - px, y: baseCenter.y - py }
+            ],
+            indices: [0, 1, 2],
+            layer, color
+        })
+    }
+
+    *_DecomposeMLeader(entity, blockCtx) {
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const lineType = this._GetLineType(entity, null)
+
+        /* Gather leader lines. Prefer sub-object grouping when available, else fall back to the
+         * flat vertex list.
+         */
+        const leaderLines = (entity.leaderLines && entity.leaderLines.length > 0)
+            ? entity.leaderLines.filter(l => l.length >= 2)
+            : (entity.vertices && entity.vertices.length >= 2 ? [entity.vertices] : [])
+
+        const arrowSize = entity.arrowSize ?? this.vars.get("DIMASZ") ?? DEFAULT_VARS.DIMASZ
+
+        for (const line of leaderLines) {
+            yield new Entity({
+                type: Entity.Type.POLYLINE,
+                vertices: line,
+                layer, color, lineType
+            })
+            /* Arrow head on the first vertex of each leader line. */
+            yield* this._EmitArrowHead(line[0], line[1], arrowSize, layer, color)
+        }
+
+        /* Text content (contentType 1 = MTEXT; skip block and tolerance content). */
+        if (this.textRenderer.canRender && entity.text &&
+            (entity.contentType === undefined || entity.contentType === 1)) {
+
+            const fontSize = entity.charHeight ?? arrowSize
+            const parser = new MTextFormatParser()
+            parser.Parse(ParseSpecialChars(entity.text))
+            /* Flatten formatted MTEXT to plain lines: paragraph markers already split via the
+             * text stream, but for a minimal render we concatenate all text chunks and split on
+             * newline. Rich formatting is intentionally discarded. */
+            const plain = [...parser.GetText()].join("")
+            const lines = plain.split(/\r?\n/)
+
+            /* Text anchor: explicit insertion point wins; else fall back to a small offset from
+             * the end of the last leader line. */
+            let startX, startY
+            if (entity.textInsertionPoint) {
+                startX = entity.textInsertionPoint.x
+                startY = entity.textInsertionPoint.y
+            } else if (leaderLines.length > 0) {
+                const lastLine = leaderLines[leaderLines.length - 1]
+                const anchor = lastLine[lastLine.length - 1]
+                startX = anchor.x + arrowSize * 0.5
+                startY = anchor.y
+            } else {
+                return
+            }
+
+            const lineSpacing = 1.5 * fontSize
+            for (let i = 0; i < lines.length; i++) {
+                const t = lines[i]
+                if (!t) {
+                    continue
+                }
+                yield* this.textRenderer.Render({
+                    text: t,
+                    fontSize,
+                    startPos: { x: startX, y: startY - i * lineSpacing },
+                    rotation: 0,
+                    hAlign: 0,
+                    vAlign: 0,
+                    color, layer
+                })
+            }
+        }
     }
 
     /** Generate vertices for bulged line segment.
