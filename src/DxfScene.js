@@ -344,6 +344,9 @@ export class DxfScene {
         case "HATCH":
             renderEntities = this._DecomposeHatch(entity, blockCtx)
             break
+        case "LEADER":
+            renderEntities = this._DecomposeLeader(entity, blockCtx)
+            break
         default:
             console.log("Unhandled entity type: " + entity.type)
             return
@@ -406,6 +409,56 @@ export class DxfScene {
             layer, color,
             lineType: this._GetLineType(entity, entity.vertices[0])
         })
+    }
+
+    /**
+     * Emit a filled arrowhead triangle whose tip is at `tip` and whose base is `size` units
+     * back along the vector from `back` towards `tip`. Base width is `size / 2`
+     * (matching the built-in dimension arrowhead aspect ratio).
+     */
+    *_EmitArrowHead(tip, back, size, layer, color) {
+        const dx = tip.x - back.x
+        const dy = tip.y - back.y
+        const len = Math.hypot(dx, dy)
+        if (len === 0 || size <= 0) {
+            return
+        }
+        const ux = dx / len, uy = dy / len
+        /* Perpendicular to arrow axis, half-base offset. */
+        const px = -uy * (size * 0.25)
+        const py = ux * (size * 0.25)
+        const baseCenter = { x: tip.x - ux * size, y: tip.y - uy * size }
+        yield new Entity({
+            type: Entity.Type.TRIANGLES,
+            vertices: [
+                { x: tip.x, y: tip.y },
+                { x: baseCenter.x + px, y: baseCenter.y + py },
+                { x: baseCenter.x - px, y: baseCenter.y - py }
+            ],
+            indices: [0, 1, 2],
+            layer, color
+        })
+    }
+
+    *_DecomposeLeader(entity, blockCtx) {
+        const vertices = entity.vertices
+        if (!vertices || vertices.length < 2) {
+            return
+        }
+        const layer = this._GetEntityLayer(entity, blockCtx)
+        const color = this._GetEntityColor(entity, blockCtx)
+        const lineType = this._GetLineType(entity, vertices[0])
+        yield new Entity({
+            type: Entity.Type.POLYLINE,
+            vertices,
+            layer, color, lineType
+        })
+        /* Default arrowheadFlag is 1 (enabled) per DXF spec. */
+        const arrowEnabled = entity.arrowheadFlag !== 0
+        if (arrowEnabled) {
+            const arrowSize = this.vars.get("DIMASZ") ?? DEFAULT_VARS.DIMASZ
+            yield* this._EmitArrowHead(vertices[0], vertices[1], arrowSize, layer, color)
+        }
     }
 
     /** Generate vertices for bulged line segment.
