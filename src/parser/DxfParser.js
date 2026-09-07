@@ -11,6 +11,7 @@ import Ellipse from "./entities/ellipse.js";
 import Insert from "./entities/insert.js";
 import Line from "./entities/line.js";
 import LWPolyline from "./entities/lwpolyline.js";
+import MLeader from "./entities/mleader.js";
 import MText from "./entities/mtext.js";
 import Point from "./entities/point.js";
 import Polyline from "./entities/polyline.js";
@@ -42,6 +43,9 @@ function registerDefaultEntityHandlers(dxfParser) {
     dxfParser.registerEntityHandler(Insert);
     dxfParser.registerEntityHandler(Line);
     dxfParser.registerEntityHandler(LWPolyline);
+    dxfParser.registerEntityHandler(MLeader);
+    /* Some files use the shorter "MLEADER" spelling; wire the same handler under both names. */
+    dxfParser._entityHandlers['MLEADER'] = dxfParser._entityHandlers['MULTILEADER'];
     dxfParser.registerEntityHandler(MText);
     dxfParser.registerEntityHandler(Point);
     dxfParser.registerEntityHandler(Polyline);
