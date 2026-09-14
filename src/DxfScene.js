@@ -1075,11 +1075,33 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
         const transform = this._GetEntityExtrusionTransform(entity)
 
+        if (entity.isSolid) {
+            /* A HATCH can contain several separate outlines. Earcut accepts one outline
+             * and its holes, not all remaining DXF paths as holes of the first path.
+             * Doing the latter bridges unrelated walls and fills the rooms between them.
+             */
+            for (const loops of this._GroupSolidHatchLoops(boundaryLoops, style)) {
+                const coords = []
+                const holes = []
+                const vertices = []
+                for (const loop of loops) {
+                    if (vertices.length) {
+                        holes.push(vertices.length)
+                    }
+                    this._TransformBoundaryLoop(loop, transform, coords)
+                    vertices.push(...loop)
+                }
+                yield new Entity({
+                    type: Entity.Type.TRIANGLES,
+                    vertices, indices: earcut(coords, holes), layer, color
+                })
+            }
+            return
+        }
+
         let filteredBoundaryLoops = null
 
-        /* Make external loop first, outermost the second, all the rest in arbitrary order. Now is
-         * required only for solid infill.
-         */
+        /* Keep external loops first for pattern hatch style filtering. */
         boundaryLoops.sort((a, b) => {
             if (a.isExternal != b.isExternal) {
                 return a.isExternal ? -1 : 1
@@ -1110,25 +1132,6 @@ export class DxfScene {
         if (!filteredBoundaryLoops) {
             /* Fall-back to full list. */
             filteredBoundaryLoops = boundaryLoops.map(loop => loop.vertices)
-        }
-
-        if (entity.isSolid) {
-            const coords = this._TransformBoundaryLoop(filteredBoundaryLoops[0], transform)
-            const holes = []
-            for (let i = 1; i < filteredBoundaryLoops.length; i++) {
-                holes.push(coords.length / 2)
-                this._TransformBoundaryLoop(filteredBoundaryLoops[i], transform, coords)
-            }
-            const indices = earcut(coords, holes)
-            const vertices = []
-            for (const loop of filteredBoundaryLoops) {
-                vertices.push(...loop)
-            }
-            yield new Entity({
-                type: Entity.Type.TRIANGLES,
-                vertices, indices, layer, color
-            })
-            return
         }
 
         const calc = new HatchCalculator(filteredBoundaryLoops, style)
@@ -1336,6 +1339,74 @@ export class DxfScene {
      * @property {Boolean} isExternal
      * @property {Boolean} isOutermost
      */
+
+    /** Group non-crossing solid hatch boundaries by containment, independent of path order
+     * and winding. Even depths are filled islands; their immediate children are holes.
+     */
+    _GroupSolidHatchLoops(boundaryLoops, style) {
+        const Contains = (vertices, point) => {
+            let inside = false
+            for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                const a = vertices[i]
+                const b = vertices[j]
+                if ((a.y > point.y) != (b.y > point.y) &&
+                    point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) {
+                    inside = !inside
+                }
+            }
+            return inside
+        }
+        const loops = boundaryLoops.map(({vertices}) => {
+            let area = 0
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+            for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                const p = vertices[i]
+                const q = vertices[j]
+                area += (q.x - vertices[0].x) * (p.y - vertices[0].y) -
+                        (p.x - vertices[0].x) * (q.y - vertices[0].y)
+                minX = Math.min(minX, p.x)
+                minY = Math.min(minY, p.y)
+                maxX = Math.max(maxX, p.x)
+                maxY = Math.max(maxY, p.y)
+            }
+            return {vertices, area: Math.abs(area), minX, minY, maxX, maxY,
+                    parent: null, depth: 0}
+        })
+        for (const loop of loops) {
+            for (const candidate of loops) {
+                if (candidate.area <= loop.area ||
+                    (loop.parent && candidate.area >= loop.parent.area) ||
+                    candidate.minX > loop.minX || candidate.minY > loop.minY ||
+                    candidate.maxX < loop.maxX || candidate.maxY < loop.maxY) {
+                    continue
+                }
+                if (Contains(candidate.vertices, loop.vertices[0])) {
+                    loop.parent = candidate
+                }
+            }
+        }
+        for (const loop of loops) {
+            for (let parent = loop.parent; parent; parent = parent.parent) {
+                loop.depth++
+            }
+        }
+        const result = []
+        for (const loop of loops) {
+            if (style == HatchStyle.ODD_PARITY ? loop.depth % 2 != 0 : loop.depth != 0) {
+                continue
+            }
+            const group = [loop.vertices]
+            if (style != HatchStyle.THROUGH_ENTIRE_AREA) {
+                for (const child of loops) {
+                    if (child.parent == loop) {
+                        group.push(child.vertices)
+                    }
+                }
+            }
+            result.push(group)
+        }
+        return result
+    }
 
     /** @return {HatchBoundaryLoop[]} Each loop is a list of points in OCS coordinates. */
     _GetHatchBoundaryLoops(entity) {

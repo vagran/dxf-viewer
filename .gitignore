@@ -7,3 +7,7 @@ test-data/
 scratch/
 package-lock.json
 dist/
+
+# Private full-drawing screenshots; publish only the zoomed proof.
+/proof/before.png
+/proof/after.png

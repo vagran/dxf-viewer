@@ -1,0 +1,17 @@
+✔ separate outlines remain separate with hatch style 0 (3.479404ms)
+✔ separate outlines remain separate with hatch style 1 (0.665701ms)
+✔ separate outlines remain separate with hatch style 2 (0.397501ms)
+✔ unordered nested islands and holes obey hatch style 0 (1.210601ms)
+✔ unordered nested islands and holes obey hatch style 1 (0.435001ms)
+✔ unordered nested islands and holes obey hatch style 2 (0.2633ms)
+✔ a hole is assigned to its containing outline, not the first outline (0.551501ms)
+✔ negative extrusion mirrors solid hatch geometry once (1.258402ms)
+✔ 187C: all 17 wall outlines triangulate independently with no room-spanning triangles (9.952412ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36.449843
