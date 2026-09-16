@@ -5,5 +5,4 @@ test-data/
 *.tgz
 *.orig
 scratch/
-package-lock.json
 dist/
