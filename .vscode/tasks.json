@@ -9,10 +9,7 @@
             "command": "npm",
             "args": ["link"],
             "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
-                }
+                "cwd": "${workspaceFolder}"
             }
         },
         {
@@ -21,10 +18,7 @@
             "command": "npm",
             "args": ["publish"],
             "options": {
-                "cwd": "${workspaceFolder}",
-                "env": {
-                    "PATH": "${config:env.nodeDir}/bin:${env:PATH}"
-                }
+                "cwd": "${workspaceFolder}"
             }
         }
     ]

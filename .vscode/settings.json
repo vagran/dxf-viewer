@@ -1,13 +1,13 @@
 {
     "cSpell.words": [
         "earcut",
+        "opentype",
         "polylines",
         "Qcad",
+        "readlink",
+        "reloadable",
         "unsuppress",
         "wireframe",
         "XDATA"
-    ],
-    "env": {
-        "nodeDir": "/opt/node-v18"
-    }
+    ]
 }

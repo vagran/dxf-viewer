@@ -10,6 +10,13 @@ export class DxfFetcher {
     /** @param progressCbk {Function} (phase, receivedSize, totalSize) */
     async Fetch(progressCbk = null) {
         const response = await fetch(this.url)
+        /* Without this the error body is fed to the parser as if it were a drawing, and an HTTP
+         * failure is reported as "Cannot parse group code: <!DOCTYPE html>" or "Empty file".
+         */
+        if (!response.ok) {
+            throw new Error(`Failed to fetch DXF file: HTTP ${response.status} ` +
+                            `${response.statusText}`)
+        }
         const totalSize = +response.headers.get('Content-Length')
 
         const reader = response.body.getReader()

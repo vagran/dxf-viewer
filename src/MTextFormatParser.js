@@ -4,7 +4,7 @@
  * https://ezdxf.readthedocs.io/en/stable/dxfentities/mtext.html#mtext-inline-codes
  */
 
-import colorTable from "./parser/AutoCadColorIndex"
+import colorTable from "./parser/AutoCadColorIndex.js"
 
 const State = Object.freeze({
     TEXT: 0,
