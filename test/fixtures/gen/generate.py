@@ -29,6 +29,8 @@ import re
 import sys
 
 import ezdxf
+from fontTools.fontBuilder import FontBuilder
+from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 FIXTURES_DIR = pathlib.Path(__file__).resolve().parent.parent
 
@@ -260,6 +262,104 @@ def _Mesh3dFace(doc, msp):
     msp.add_3dface([(20, 0), (30, 0), (30, 10), (30, 10)], dxfattribs={"color": 4})
 
 
+# --------------------------------------------------------------------------------------------
+# Test font.
+#
+# Generated rather than donated. A real TTF would be hundreds of kilobytes, would raise a licensing
+# question for a published package, and -- the point -- would have outlines nobody can check by
+# hand. This one is under 1 KB, every glyph is a rectangle with known coordinates, and the awkward
+# cases (a contour with a hole, a kerning pair, a character with no glyph at all) are there on
+# purpose.
+# --------------------------------------------------------------------------------------------
+
+FONT_UNITS_PER_EM = 1000
+# Font.scale in TextRenderer is 100 / (unitsPerEm * 72), so with 1000 units/em every measurement
+# below divides by 720 -- which keeps the expected values in the tests short enough to verify.
+FONT_KERN_PAIR = ("A", "B")
+FONT_KERN_VALUE = -120
+
+
+def _Rect(pen, x0, y0, x1, y1, clockwise=True):
+    """A rectangular contour.
+
+    TrueType fills by non-zero winding with **clockwise outer contours** and counter-clockwise
+    holes, and three.js\'s ShapePath.toShapes relies on exactly that to tell one from the other.
+    Getting it backwards does not fail -- it silently swaps them, so a glyph with a hole comes out
+    as a small solid box instead of a ring.
+    """
+    points = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    if clockwise:
+        points.reverse()
+    pen.moveTo(points[0])
+    for point in points[1:]:
+        pen.lineTo(point)
+    pen.closePath()
+
+
+def _WriteFont():
+    """Writes fonts/test-font.ttf.
+
+    Glyph shapes, all rectangles so the tessellated output can be read by eye:
+      A  a plain 800x800 box, advance 1000
+      B  the same box with a 400x400 hole in it, which is what exercises hole triangulation
+      I  a narrow 200x800 box with a smaller advance, so layout cannot ignore advance widths
+      space  no outline, advance 500
+    "Z" is deliberately absent, to exercise the missing-glyph path and `hasMissingChars`.
+    """
+    glyphs = {}
+
+    pen = TTGlyphPen(None)
+    _Rect(pen, 100, 0, 900, 800)
+    glyphs["A"] = pen.glyph()
+
+    pen = TTGlyphPen(None)
+    _Rect(pen, 100, 0, 900, 800)
+    _Rect(pen, 300, 200, 700, 600, clockwise=False)
+    glyphs["B"] = pen.glyph()
+
+    pen = TTGlyphPen(None)
+    _Rect(pen, 100, 0, 300, 800)
+    glyphs["I"] = pen.glyph()
+
+    glyphs["space"] = TTGlyphPen(None).glyph()
+    glyphs[".notdef"] = TTGlyphPen(None).glyph()
+
+    order = [".notdef", "space", "A", "B", "I"]
+    advances = {".notdef": 500, "space": 500, "A": 1000, "B": 1000, "I": 400}
+
+    fb = FontBuilder(FONT_UNITS_PER_EM, isTTF=True)
+    fb.setupGlyphOrder(order)
+    fb.setupCharacterMap({0x20: "space", 0x41: "A", 0x42: "B", 0x49: "I"})
+    fb.setupGlyf(glyphs)
+    fb.setupHorizontalMetrics({name: (advances[name], 100) for name in order})
+    fb.setupHorizontalHeader(ascent=800, descent=-200)
+    fb.setupNameTable({"familyName": "DxfViewerTest", "styleName": "Regular"})
+    fb.setupOS2(sTypoAscender=800, sTypoDescender=-200, usWinAscent=800, usWinDescent=200)
+    fb.setupPost()
+
+    from fontTools.ttLib.tables._k_e_r_n import KernTable_format_0, table__k_e_r_n
+    subtable = KernTable_format_0()
+    subtable.version = 0
+    subtable.coverage = 1
+    subtable.format = 0
+    subtable.kernTable = {FONT_KERN_PAIR: FONT_KERN_VALUE}
+    kern = table__k_e_r_n()
+    kern.version = 0
+    kern.kernTables = [subtable]
+    fb.font["kern"] = kern
+
+    # head.created and head.modified default to the wall clock, so they have to be pinned for the
+    # same reason the DXF timestamps are: CI regenerates and diffs.
+    head = fb.font["head"]
+    head.created = head.modified = 0
+
+    directory = FIXTURES_DIR / "fonts"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "test-font.ttf"
+    fb.save(path)
+    return path
+
+
 def Main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("names", nargs="*", help="Fixtures to write; default is all of them.")
@@ -277,6 +377,10 @@ def Main():
             paths.append(_Write(name, builder, subdir="exploded", transform=_Explode))
         for path in paths:
             print(f"{path.relative_to(FIXTURES_DIR.parent.parent)}  {path.stat().st_size:>7} B")
+
+    if not args.names:
+        path = _WriteFont()
+        print(f"{path.relative_to(FIXTURES_DIR.parent.parent)}  {path.stat().st_size:>7} B")
 
 
 if __name__ == "__main__":

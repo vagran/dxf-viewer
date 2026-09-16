@@ -38,6 +38,32 @@ Two subdirectories hold the same drawings built differently, for the comparisons
 Only the top-level `*.dxf` files get scene dumps; the tests that read the subdirectories look for
 them by name.
 
+## The test font
+
+`fonts/test-font.ttf` is generated too, not donated. A real TTF would be hundreds of kilobytes,
+would raise a licensing question for a published package, and — the point — would have outlines
+nobody could check by hand. This one is under 1 KB and every glyph is a rectangle with known
+coordinates, so the numbers in `test/unit/font.test.mjs` can be read against the generator.
+
+It declares 1000 units/em, and `TextRenderer` scales by `100 / (unitsPerEm * 72)`, so every
+measurement in the tests is *font units / 720*.
+
+| Glyph | Shape | Why |
+|---|---|---|
+| `A` | 800×800 box, advance 1000 | the simple case |
+| `B` | the same box with a 400×400 hole | hole triangulation — it must come out a ring, not a filled box |
+| `I` | 200×800 box, advance 400 | a different advance, so layout cannot ignore advance widths |
+| space | no outline, advance 500 | |
+| `Z` | *absent* | the missing-glyph path and `hasMissingChars` |
+
+One kerning pair is declared, `A` followed by `B`, at −120 units.
+
+**Contour winding matters and is easy to get backwards.** TrueType fills by non-zero winding with
+clockwise outer contours, and three.js's `ShapePath.toShapes` uses exactly that to tell an outer
+contour from a hole. Reversing them does not fail — it silently swaps the two, and `B` comes out as
+a small solid box instead of a ring. The first draft of this font had it backwards and still
+produced plausible-looking output; the triangle count is what caught it.
+
 ## Rules
 
 - **Keep coordinates within [-100, 100].** Scene vertices are float32, whose absolute error at that
