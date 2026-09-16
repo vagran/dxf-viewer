@@ -71,16 +71,49 @@ def _Normalize(text):
     return _WRITE_TIME_RE.sub(rf"\g<1>{_FIXED_JULIAN_DATE}", text)
 
 
-def _Write(name, builder):
+# Offset applied to the translated/ variants. Far outside the range where float32 holds integers
+# exactly, which is the case the scene origin scheme exists to handle -- survey coordinates in the
+# millions. These variants are therefore the one place the [-100, 100] rule does not apply; they
+# get no exact goldens, only the invariance comparison.
+_TRANSLATION = (1_000_000.0, 500_000.0)
+
+
+def _Write(name, builder, subdir=None, transform=None):
     doc = ezdxf.new("R2000", setup=False)
     for var in ("$TDCREATE", "$TDUCREATE", "$TDUPDATE", "$TDUUPDATE"):
         doc.header[var] = _FIXED_JULIAN_DATE
     builder(doc, doc.modelspace())
+    if transform is not None:
+        transform(doc, doc.modelspace())
     buffer = io.StringIO()
     doc.write(buffer)
-    path = FIXTURES_DIR / f"{name}.dxf"
+    directory = FIXTURES_DIR if subdir is None else FIXTURES_DIR / subdir
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.dxf"
     path.write_text(_Normalize(buffer.getvalue()), encoding="utf-8", newline="")
     return path
+
+
+def _Translate(doc, msp):
+    """Shift every entity, so the drawing sits far from the origin."""
+    dx, dy = _TRANSLATION
+    for entity in list(msp):
+        entity.translate(dx, dy, 0)
+
+
+def _Explode(doc, msp):
+    """Replace every INSERT with copies of the block's entities, placed in modelspace.
+
+    This removes blocks from the drawing entirely, which is what makes the result an independent
+    check on DxfScene's block handling rather than another route through it.
+    """
+    for insert in list(msp.query("INSERT")):
+        insert.explode()
+
+
+# Fixtures whose geometry arrives through an INSERT, and can therefore also be produced with no
+# blocks at all.
+_EXPLODABLE = ("block-flattened", "block-instanced")
 
 
 # --------------------------------------------------------------------------------------------
@@ -138,6 +171,20 @@ def _PatternHatch(doc, msp):
     # silently overwrites whatever add_hatch was given.
     hatch.set_pattern_fill("ANSI31", color=3, scale=2.0)
     hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+
+
+@Fixture("pattern-hatch-concave")
+def _PatternHatchConcave(doc, msp):
+    """Pattern HATCH over an L-shaped boundary.
+
+    The notch is the point: a clipping bug that emits segments outside the loop shows up here and
+    not on a convex boundary, where "between the two extreme crossings" happens to be right.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=5, scale=2.0)
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 8), (8, 8), (8, 20), (0, 20)],
+                                  is_closed=True,
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
 
 
@@ -199,8 +246,12 @@ def Main():
         sys.exit(f"Unknown fixture(s): {', '.join(sorted(unknown))}")
 
     for name, builder in selected:
-        path = _Write(name, builder)
-        print(f"{path.relative_to(FIXTURES_DIR.parent.parent)}  {path.stat().st_size:>7} B")
+        paths = [_Write(name, builder),
+                 _Write(name, builder, subdir="translated", transform=_Translate)]
+        if name in _EXPLODABLE:
+            paths.append(_Write(name, builder, subdir="exploded", transform=_Explode))
+        for path in paths:
+            print(f"{path.relative_to(FIXTURES_DIR.parent.parent)}  {path.stat().st_size:>7} B")
 
 
 if __name__ == "__main__":

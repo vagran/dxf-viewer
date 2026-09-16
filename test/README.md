@@ -27,6 +27,11 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 - **`scene.test.mjs`** — builds every drawing in `fixtures/` and compares a canonical dump of the
   result against `expected/<name>.dump`. This is the test that covers what the library is actually
   for; everything above it is hygiene.
+- **`invariants.test.mjs`** — properties that need no expected output: a translated drawing
+  produces the same geometry shifted, a drawing with its blocks exploded produces the same geometry
+  as one with blocks, hatch lines stay inside their boundary, and a polyline over 0x10000 vertices
+  chunks correctly. Two of these work by building the same drawing two ways and requiring the
+  results to agree, so neither side has to be known correct in advance.
 - **`validate.test.mjs`** — runs `ValidateScene` over every fixture, and separately proves that
   `ValidateScene` can fail, by corrupting a scene seven different ways and requiring each one to be
   caught. Without that second half a validator that checks nothing would look identical to one that
