@@ -77,7 +77,27 @@ produced plausible-looking output; the triangle count is what caught it.
   `_Write` pin them. CI regenerates and runs `git diff --exit-code`, so anything else that varies
   will show up there. `ezdxf` is pinned in `requirements.txt` for the same reason.
 - **Audit new fixtures** — `ezdxf.readfile(path).audit()` should report nothing, so a malformed
-  file is never enshrined as expected behavior.
+  file is never enshrined as expected behavior. The exception is a fixture whose *point* is to be
+  malformed, which is what `postprocess` exists for: see below.
+
+## Deliberately malformed fixtures
+
+ezdxf will not write a broken file, so a fixture that exists to make a parser guard fire has to
+edit the finished text. `Fixture(name, postprocess=fn)` hands the generated DXF to `fn` before it
+is written. Use it only when ezdxf cannot express the thing — every well-formed construct belongs
+in the builder, where it is readable.
+
+There is one such fixture: **`polyline-no-seqend`**, an old-style POLYLINE with neither VERTEX
+entities nor the SEQEND that should close it. `test-data/sample-files/sheets (cn).dxf` has five of
+them and AutoCAD renders it without complaint; `parsePolylineVertices` used to spin forever on the
+construct, so the fixture is the regression test for a hang rather than for geometry.
+
+The audit rule above is not merely waived for it — it is inapplicable. `ezdxf.readfile()` raises
+`DXFStructureError: Expected DXF entity LINE or SEQEND` and never gets as far as an audit, so
+**that fixture cannot be round-tripped through ezdxf at all** and the generator has to produce it
+by editing text. This is the ranking in the root CLAUDE.md showing up in practice: ezdxf is
+stricter here than the thing being modelled, and AutoCAD is the authority on what a viewer must
+tolerate.
 
 ## Known limits
 
