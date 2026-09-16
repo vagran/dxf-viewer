@@ -4,7 +4,8 @@
  *     npm run svg -- test/fixtures/dimension-linear.dxf
  *     npm run svg -- test-data/enterprise/turtle.dxf /tmp/turtle.svg
  *     npm run svg -- drawing.dxf out.svg --background=#fff
- *     npm run svg -- drawing.dxf out.svg --font=/path/Roboto.ttf --font=/path/NotoSans.ttf
+ *     npm run svg -- drawing.dxf out.svg --font /path/Roboto.ttf --font /path/NotoSans.ttf
+ *     npm run svg -- drawing.dxf out.svg --png          # also rasterize, to actually look at it
  *
  * This is a review and debugging aid, not a test: nothing here asserts anything, and no SVG is
  * committed. The scene dumps in test/expected/ say what the geometry *is*; they cannot tell you
@@ -27,6 +28,7 @@
  */
 import fs from "node:fs"
 import path from "node:path"
+import {execFileSync} from "node:child_process"
 
 import {BuildScene} from "./scene-dump.mjs"
 import {SceneReader, PrimitiveType} from "../src/SceneReader.js"
@@ -75,6 +77,11 @@ const USAGE = [
     "  --background <color>  SVG background, default #000000 (the viewer's clear color).",
     "  --no-invert           Literal colors, without the viewer's black/white inversion.",
     "  --no-text             Supply no fonts at all, so text produces no geometry.",
+    "  --stroke <width>      Line width in device pixels, default 1. Raise it for a raster:",
+    "                        a 1px line lands between pixels and antialiases to a dimmer",
+    "                        shade, which makes thin-line colors unreliable to judge by eye.",
+    "  --png                 Also write a PNG beside the SVG, via rsvg-convert.",
+    "  --width <px>          Raster width, default 1400. Implies --png.",
     "",
     "The output path is optional; it defaults to the input with a .svg extension.",
     "Both --opt=value and --opt value are accepted."
@@ -84,16 +91,23 @@ const USAGE = [
  * worth being strict about.
  */
 function ParseArgs(argv) {
-    const options = {background: "#000000", invert: true, fonts: [], noText: false, files: []}
+    const options = {background: "#000000", invert: true, fonts: [], noText: false,
+                     stroke: 1, png: false, width: 1400, files: []}
     const VALUE_OPTIONS = new Map([
         ["--font", value => options.fonts.push(value)],
-        ["--background", value => { options.background = value }]
+        ["--background", value => { options.background = value }],
+        ["--stroke", value => { options.stroke = Number(value) }],
+        ["--width", value => { options.width = Number(value); options.png = true }]
     ])
 
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i]
         if (arg === "--no-text") {
             options.noText = true
+            continue
+        }
+        if (arg === "--png") {
+            options.png = true
             continue
         }
         if (arg === "--no-invert") {
@@ -144,7 +158,7 @@ const N = value => {
  */
 const Y = y => N(-y)
 
-function BuildSvg(scene, {background, invert}) {
+function BuildSvg(scene, {background, invert, stroke}) {
     const reader = new SceneReader(scene)
     const backgroundLuminance = Luminance(parseInt(background.replace("#", ""), 16) || 0)
 
@@ -230,7 +244,7 @@ function BuildSvg(scene, {background, invert}) {
                 out.push(`<path d="${group.parts.join("")}" fill="${color}" stroke="none"/>`)
             } else {
                 out.push(`<path d="${group.parts.join("")}" fill="none" stroke="${color}" ` +
-                         `stroke-width="1" vector-effect="non-scaling-stroke"/>`)
+                         `stroke-width="${N(stroke)}" vector-effect="non-scaling-stroke"/>`)
             }
         }
         out.push("</g>")
@@ -273,6 +287,25 @@ fs.writeFileSync(output, svg)
 console.log(`${path.relative(process.cwd(), output)}  ${(svg.length / 1024).toFixed(1)} KiB`)
 console.log(`  ${counts.POLYLINE} polylines, ${counts.TRIANGLE} triangles, ${counts.POINT} points`)
 console.log(`  ${groups} path elements across ${layers} layer(s)`)
+
+if (options.png) {
+    /* rsvg-convert is a system tool, not a dependency of anything here; say so plainly rather
+     * than failing with an exec error. */
+    const pngPath = output.replace(/\.svg$/i, "") + ".png"
+    try {
+        execFileSync("rsvg-convert",
+                     ["-w", String(options.width), "-b", options.background, output,
+                      "-o", pngPath],
+                     {stdio: ["ignore", "ignore", "pipe"]})
+        console.log(`${path.relative(process.cwd(), pngPath)}  ` +
+                    `${(fs.statSync(pngPath).size / 1024).toFixed(1)} KiB`)
+    } catch (error) {
+        console.error(`Could not rasterize: ${error.message.trim().split("\n")[0]}`)
+        console.error("--png needs rsvg-convert on PATH (librsvg). The SVG above was still " +
+                      "written.")
+        process.exit(1)
+    }
+}
 if (counts.TRIANGLE > 0 && options.fonts.length === 0 && !options.noText) {
     console.log("  note: text rendered with the generated test font — every glyph is a " +
                 "rectangle. Pass --font=<path.ttf> to read it.")

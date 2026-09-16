@@ -82,8 +82,14 @@ npm run svg -- drawing.dxf --font /path/Roboto.ttf          # readable text; rep
 npm run svg -- drawing.dxf out.svg --background=#fff       # light background
 npm run svg -- drawing.dxf out.svg --no-invert             # literal colours
 npm run svg -- drawing.dxf out.svg --no-text               # skip text entirely
+npm run svg -- drawing.dxf out.svg --png --stroke 3        # rasterize too, via rsvg-convert
 npm run svg -- --help
 ```
+
+`--png` needs `rsvg-convert` on `PATH`; without it the SVG is still written and the failure says
+so. Raise `--stroke` when rasterizing: a 1-pixel line lands between pixels and antialiases to a
+dimmer shade, which makes thin-line *colours* unreliable to judge from a raster even though the
+geometry is fine.
 
 The output path is optional and defaults to the input with a `.svg` extension. Options take either
 `--opt value` or `--opt=value`.
@@ -112,6 +118,45 @@ Because it takes any path it works on `test-data/` as well as on fixtures — wh
 per-fixture SVG goldens never could, and the corpus is where the hard drawings are. Output is
 grouped into one path element per layer, colour and kind, which is what keeps a large drawing
 openable: `city.dxf`'s 155k primitives come out as 33 path elements.
+
+## Tools
+
+Two things in `tools/` that are for troubleshooting rather than testing — nothing in CI runs them.
+
+### `dxfq.py` — which files have X
+
+```bash
+npm run query -- 'count(e for e in msp if e.dxftype() == "SPLINE")'
+npm run query -- --raw 'sorted({hex(int(v) >> 24 & 0xFF) for c, v in pairs if c == 420})'
+npm run query -- --help
+```
+
+The expression is Python, evaluated once per file; whatever it returns prints beside the file name,
+and falsy results are skipped — so a predicate reads as a filter and a count reads as a ranking.
+Scans `fixtures/` plus `test-data/` if you have a corpus there, and skips directories that are not
+present, so it works in a fresh clone.
+
+Two modes. The default parses with **ezdxf** — ask what a drawing *means*, in entities, blocks,
+layers and header variables. `--raw` tokenizes into `(code, value)` pairs and interprets nothing —
+ask what is *literally in the file*, and it needs nothing but Python.
+
+**Prefer it to grepping DXF.** A DXF is alternating code/value lines in nested sections with either
+line ending, and grep sees none of that: `awk '/^ *420$/'` matches nothing at all in a CRLF file,
+so a scan like that answers confidently from part of the input. This pairs codes properly and
+normalizes line endings.
+
+### `ab.sh` — before and after
+
+```bash
+DXF_SMOKE_NO_TIMINGS=1 test/tools/ab.sh -- npm run smoke
+test/tools/ab.sh --paths "src/DxfScene.js" -- node test/smoke.mjs test/fixtures/circle-arc.dxf
+```
+
+Runs a command twice — once against the working tree, once against `HEAD` — and diffs the output.
+It reverts **source only** (`src` by default), so the measurement script stays as you just wrote
+it, which is what you want when the measurement is new and the behaviour is old. The stash is
+restored by an `EXIT`/`INT`/`TERM` trap, so a command that fails or is killed partway still leaves
+your tree as it was.
 
 ## Smoke sweep
 

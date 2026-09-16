@@ -63,6 +63,18 @@
             "problemMatcher": []
         },
         {
+            // Queries the DXF corpora - "which files have X". See test/tools/dxfq.py for the
+            // expression vocabulary; --raw needs nothing but Python.
+            "label": "query corpus",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": ["test/tools/dxfq.py", "${input:dxfQuery}"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Renders a DXF to SVG through SceneReader and writes it next to the input. A review
             // aid, not a test: see test/svg.mjs.
             "label": "svg",
@@ -127,6 +139,12 @@
         }
     ],
     "inputs": [
+        {
+            "id": "dxfQuery",
+            "type": "promptString",
+            "description": "Python expression, evaluated per DXF file",
+            "default": "sorted(types())"
+        },
         {
             "id": "dxfPath",
             "type": "promptString",
