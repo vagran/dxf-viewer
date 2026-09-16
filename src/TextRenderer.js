@@ -3,6 +3,7 @@ import {ShapePath} from "three/src/extras/core/ShapePath.js"
 import {ShapeUtils} from "three/src/extras/ShapeUtils.js"
 import {Matrix3, Vector2} from "three"
 import {MTextFormatParser} from "./MTextFormatParser.js"
+import {DefaultTextOptions} from "./TextRendererOptions.js"
 
 /** Regex for parsing special characters in text entities. */
 const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))/gi
@@ -230,16 +231,8 @@ export class TextRenderer {
 }
 
 
-TextRenderer.DefaultOptions = {
-    /** Number of segments for each curve in a glyph. Currently Three.js does not have more
-     * adequate angle-based or length-based tessellation option.
-     */
-    curveSubdivision: 2,
-    /** Character to use when the specified fonts does not contain necessary glyph. Several ones can
-     * be specified, the first one available is used.
-     */
-    fallbackChar: "\uFFFD?"
-}
+/** See TextRendererOptions.js for why these live in a separate module. */
+TextRenderer.DefaultOptions = DefaultTextOptions
 
 /** @typedef {Object} CharPath
  * @property advance {number}
