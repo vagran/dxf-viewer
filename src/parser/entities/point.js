@@ -3,33 +3,33 @@ import * as helpers from "../ParseHelpers.js"
 
 export default function EntityParser() {}
 
-EntityParser.ForEntityName = 'POINT';
+EntityParser.ForEntityName = "POINT"
 
 EntityParser.prototype.parseEntity = function(scanner, curr) {
-    var entity;
-    entity = { type: curr.value };
-    curr = scanner.next();
-    while(curr !== 'EOF') {
-        if(curr.code === 0) break;
+    var entity
+    entity = {type: curr.value}
+    curr = scanner.next()
+    while (curr !== "EOF") {
+        if (curr.code === 0) break
 
-        switch(curr.code) {
+        switch (curr.code) {
         case 10:
-            entity.position = helpers.parsePoint(scanner);
-            break;
+            entity.position = helpers.parsePoint(scanner)
+            break
         case 39:
-            entity.thickness = curr.value;
-            break;
+            entity.thickness = curr.value
+            break
         case 210:
-            entity.extrusionDirection = helpers.parsePoint(scanner);
-            break;
+            entity.extrusionDirection = helpers.parsePoint(scanner)
+            break
         case 100:
-            break;
+            break
         default: // check common entity attributes
-            helpers.checkCommonEntityProperties(entity, curr, scanner);
-            break;
+            helpers.checkCommonEntityProperties(entity, curr, scanner)
+            break
         }
-        curr = scanner.next();
+        curr = scanner.next()
     }
 
-    return entity;
-};
+    return entity
+}

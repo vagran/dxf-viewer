@@ -3,32 +3,32 @@ import * as helpers from "../ParseHelpers.js"
 
 export default function EntityParser() {}
 
-EntityParser.ForEntityName = 'LINE';
+EntityParser.ForEntityName = "LINE"
 
 EntityParser.prototype.parseEntity = function(scanner, curr) {
-    var entity = { type: curr.value, vertices: [] };
-    curr = scanner.next();
-    while(curr !== 'EOF') {
-        if(curr.code === 0) break;
+    var entity = {type: curr.value, vertices: []}
+    curr = scanner.next()
+    while (curr !== "EOF") {
+        if (curr.code === 0) break
 
-        switch(curr.code) {
+        switch (curr.code) {
         case 10: // X coordinate of point
-            entity.vertices.unshift(helpers.parsePoint(scanner));
-            break;
+            entity.vertices.unshift(helpers.parsePoint(scanner))
+            break
         case 11:
-            entity.vertices.push(helpers.parsePoint(scanner));
-            break;
+            entity.vertices.push(helpers.parsePoint(scanner))
+            break
         case 210:
-            entity.extrusionDirection = helpers.parsePoint(scanner);
-            break;
+            entity.extrusionDirection = helpers.parsePoint(scanner)
+            break
         case 100:
-            break;
+            break
         default:
-            helpers.checkCommonEntityProperties(entity, curr, scanner);
-            break;
+            helpers.checkCommonEntityProperties(entity, curr, scanner)
+            break
         }
 
-        curr = scanner.next();
+        curr = scanner.next()
     }
-    return entity;
-};
+    return entity
+}

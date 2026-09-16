@@ -1,102 +1,102 @@
 
 import * as helpers from "../ParseHelpers.js"
-import VertexParser from "./vertex.js";
+import VertexParser from "./vertex.js"
 
 export default function EntityParser() {}
 
-EntityParser.ForEntityName = 'POLYLINE';
+EntityParser.ForEntityName = "POLYLINE"
 
 EntityParser.prototype.parseEntity = function(scanner, curr) {
-    var entity = { type: curr.value, vertices: [] };
-    curr = scanner.next();
-    while(curr !== 'EOF') {
-        if(curr.code === 0) break;
+    var entity = {type: curr.value, vertices: []}
+    curr = scanner.next()
+    while (curr !== "EOF") {
+        if (curr.code === 0) break
 
-        switch(curr.code) {
+        switch (curr.code) {
         case 10: // always 0
-            break;
+            break
         case 20: // always 0
-            break;
+            break
         case 30: // elevation
-            break;
+            break
         case 39: // thickness
-            entity.thickness = curr.value;
-            break;
+            entity.thickness = curr.value
+            break
         case 40: // start width
-            break;
+            break
         case 41: // end width
-            break;
+            break
         case 70:
-            entity.shape = (curr.value & 1) !== 0;
-            entity.includesCurveFitVertices = (curr.value & 2) !== 0;
-            entity.includesSplineFitVertices = (curr.value & 4) !== 0;
-            entity.is3dPolyline = (curr.value & 8) !== 0;
-            entity.is3dPolygonMesh = (curr.value & 16) !== 0;
-            entity.is3dPolygonMeshClosed = (curr.value & 32) !== 0; // 32 = The polygon mesh is closed in the N direction
-            entity.isPolyfaceMesh = (curr.value & 64) !== 0;
-            entity.hasContinuousLinetypePattern = (curr.value & 128) !== 0;
-            break;
+            entity.shape = (curr.value & 1) !== 0
+            entity.includesCurveFitVertices = (curr.value & 2) !== 0
+            entity.includesSplineFitVertices = (curr.value & 4) !== 0
+            entity.is3dPolyline = (curr.value & 8) !== 0
+            entity.is3dPolygonMesh = (curr.value & 16) !== 0
+            entity.is3dPolygonMeshClosed = (curr.value & 32) !== 0 // 32 = The polygon mesh is closed in the N direction
+            entity.isPolyfaceMesh = (curr.value & 64) !== 0
+            entity.hasContinuousLinetypePattern = (curr.value & 128) !== 0
+            break
         case 71: // Polygon mesh M vertex count
-            break;
+            break
         case 72: // Polygon mesh N vertex count
-            break;
+            break
         case 73: // Smooth surface M density
-            break;
+            break
         case 74: // Smooth surface N density
-            break;
+            break
         case 75: // Curves and smooth surface type
-            break;
+            break
         case 210:
-            entity.extrusionDirection = helpers.parsePoint(scanner);
-            break;
+            entity.extrusionDirection = helpers.parsePoint(scanner)
+            break
         default:
-            helpers.checkCommonEntityProperties(entity, curr, scanner);
-            break;
+            helpers.checkCommonEntityProperties(entity, curr, scanner)
+            break
         }
-        curr = scanner.next();
+        curr = scanner.next()
     }
 
-    entity.vertices = parsePolylineVertices(scanner, curr);
+    entity.vertices = parsePolylineVertices(scanner, curr)
 
-    return entity;
-};
+    return entity
+}
 
 function parsePolylineVertices(scanner, curr) {
-    var vertexParser = new VertexParser();
+    var vertexParser = new VertexParser()
 
-    var vertices = [];
+    var vertices = []
     while (!scanner.isEOF()) {
         if (curr.code !== 0) {
             // The caller always leaves the scanner on an entity start group, so this
             // should not happen. Skip the group rather than spin forever on a bad file.
-            curr = scanner.next();
-            continue;
+            curr = scanner.next()
+            continue
         }
-        if (curr.value === 'VERTEX') {
-            vertices.push(vertexParser.parseEntity(scanner, curr));
-            curr = scanner.lastReadGroup;
-            continue;
+        if (curr.value === "VERTEX") {
+            vertices.push(vertexParser.parseEntity(scanner, curr))
+            curr = scanner.lastReadGroup
+            continue
         }
-        if (curr.value === 'SEQEND') {
-            parseSeqEnd(scanner, curr);
-            break;
+        if (curr.value === "SEQEND") {
+            parseSeqEnd(scanner, curr)
+            break
         }
         // Some files omit both the vertices and the SEQEND and start the next entity
         // right away. The vertex list just ends here; the entity group stays the last
         // read one so the caller resumes on it.
-        break;
+        break
     }
-    return vertices;
+    return vertices
 };
 
 function parseSeqEnd(scanner, curr) {
-    var entity = { type: curr.value };
-    curr = scanner.next();
-    while(curr != 'EOF') {
-        if (curr.code == 0) break;
-        helpers.checkCommonEntityProperties(entity, curr, scanner);
-        curr = scanner.next();
+    var entity = {type: curr.value}
+    curr = scanner.next()
+    while (curr != "EOF") {
+        if (curr.code == 0) break
+        helpers.checkCommonEntityProperties(entity, curr, scanner)
+        curr = scanner.next()
     }
 
-    return entity;
+    return entity
 };

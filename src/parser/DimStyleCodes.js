@@ -12,7 +12,7 @@ const codes = new Map([
     [177, "DIMCLRE"],
     [178, "DIMCLRT"],
     [271, "DIMDEC"],
-    [278 ,"DIMDSEP"],
+    [278, "DIMDSEP"],
     [281, "DIMSD1"],
     [282, "DIMSD2"],
     [3, "DIMPOST"],
@@ -27,7 +27,7 @@ const codes = new Map([
     [7, "DIMBLK2"],
     [75, "DIMSE1"],
     [76, "DIMSE2"],
-    [78, "DIMZIN"],
+    [78, "DIMZIN"]
 ])
 
 export default codes

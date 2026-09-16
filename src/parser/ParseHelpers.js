@@ -1,12 +1,12 @@
-import AUTO_CAD_COLOR_INDEX from "./AutoCadColorIndex.js";
-import ExtendedDataParser from "./ExtendedDataParser.js";
+import AUTO_CAD_COLOR_INDEX from "./AutoCadColorIndex.js"
+import ExtendedDataParser from "./ExtendedDataParser.js"
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
  * @return {Number} truecolor value as a number
  */
 export function getAcadColor(index) {
-    return AUTO_CAD_COLOR_INDEX[index];
+    return AUTO_CAD_COLOR_INDEX[index]
 }
 
 /**
@@ -15,33 +15,32 @@ export function getAcadColor(index) {
  * @param {*} scanner
  */
 export function parsePoint(scanner) {
-    var point = {};
+    var point = {}
 
     // Reread group for the first coordinate
-    scanner.rewind();
-    var curr = scanner.next();
+    scanner.rewind()
+    var curr = scanner.next()
 
-    var code = curr.code;
-    point.x = curr.value;
+    var code = curr.code
+    point.x = curr.value
 
-    code += 10;
-    curr = scanner.next();
-    if(curr.code !== code)
-        throw new Error('Expected code for point value to be ' + code +
-        ' but got ' + curr.code + '.');
-    point.y = curr.value;
+    code += 10
+    curr = scanner.next()
+    if (curr.code !== code)
+        throw new Error("Expected code for point value to be " + code +
+        " but got " + curr.code + ".")
+    point.y = curr.value
 
-    code += 10;
-    curr = scanner.next();
-    if(curr.code !== code)
-    {
+    code += 10
+    curr = scanner.next()
+    if (curr.code !== code) {
         // Only the x and y are specified. Don't read z.
-        scanner.rewind(); // Let the calling code advance off the point
-        return point;
+        scanner.rewind() // Let the calling code advance off the point
+        return point
     }
-    point.z = curr.value;
+    point.z = curr.value
 
-    return point;
+    return point
 }
 
 /** Some entities may contain embedded object which is started by group 101. All the rest data until
@@ -88,58 +87,58 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
         return true
     }
 
-    switch(curr.code) {
-        case 0:
-            entity.type = curr.value;
-            break;
-        case 5:
-            entity.handle = curr.value;
-            break;
-        case 6:
-            entity.lineType = curr.value;
-            break;
-        case 8: // Layer name
-            entity.layer = curr.value;
-            break;
-        case 48:
-            entity.lineTypeScale = curr.value;
-            break;
-        case 60:
-            entity.hidden = !!curr.value;
-            break;
-        case 62: // Acad Index Color. 0 inherits ByBlock. 256 inherits ByLayer. Default is bylayer
-            entity.colorIndex = curr.value;
-            entity.color = getAcadColor(Math.abs(curr.value));
-            break;
-        case 67:
-            entity.inPaperSpace = curr.value !== 0;
-            break;
-        case 100:
-            //ignore
-            break;
-        case 330:
-            entity.ownerHandle = curr.value;
-            break;
-        case 347:
-            entity.materialObjectHandle = curr.value;
-            break;
-        case 370:
-            //From https://www.woutware.com/Forum/Topic/955/lineweight?returnUrl=%2FForum%2FUserPosts%3FuserId%3D478262319
-            // An integer representing 100th of mm, must be one of the following values:
-            // 0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211.
-            // -3 = STANDARD, -2 = BYLAYER, -1 = BYBLOCK
-            entity.lineweight = curr.value;
-            break;
-        case 420: // TrueColor Color
-            // The high byte is a color method marker - 0xC2 means the low 24 bits are an RGB
-            // value - but files also write a bare RGB value with no marker at all. Both forms
-            // occur in the wild and both mean RGB, so keep the low 24 bits either way. Leaving
-            // the marker in place splits render batches, because the same visible color reached
-            // through group 62 and through here yields two different batching keys.
-            entity.color = curr.value & 0xffffff;
-            break;
-        default:
-            return false;
+    switch (curr.code) {
+    case 0:
+        entity.type = curr.value
+        break
+    case 5:
+        entity.handle = curr.value
+        break
+    case 6:
+        entity.lineType = curr.value
+        break
+    case 8: // Layer name
+        entity.layer = curr.value
+        break
+    case 48:
+        entity.lineTypeScale = curr.value
+        break
+    case 60:
+        entity.hidden = !!curr.value
+        break
+    case 62: // Acad Index Color. 0 inherits ByBlock. 256 inherits ByLayer. Default is bylayer
+        entity.colorIndex = curr.value
+        entity.color = getAcadColor(Math.abs(curr.value))
+        break
+    case 67:
+        entity.inPaperSpace = curr.value !== 0
+        break
+    case 100:
+        //ignore
+        break
+    case 330:
+        entity.ownerHandle = curr.value
+        break
+    case 347:
+        entity.materialObjectHandle = curr.value
+        break
+    case 370:
+        //From https://www.woutware.com/Forum/Topic/955/lineweight?returnUrl=%2FForum%2FUserPosts%3FuserId%3D478262319
+        // An integer representing 100th of mm, must be one of the following values:
+        // 0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211.
+        // -3 = STANDARD, -2 = BYLAYER, -1 = BYBLOCK
+        entity.lineweight = curr.value
+        break
+    case 420: // TrueColor Color
+        // The high byte is a color method marker - 0xC2 means the low 24 bits are an RGB
+        // value - but files also write a bare RGB value with no marker at all. Both forms
+        // occur in the wild and both mean RGB, so keep the low 24 bits either way. Leaving
+        // the marker in place splits render batches, because the same visible color reached
+        // through group 62 and through here yields two different batching keys.
+        entity.color = curr.value & 0xffffff
+        break
+    default:
+        return false
     }
-    return true;
+    return true
 }
