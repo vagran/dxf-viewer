@@ -81,8 +81,7 @@ produced plausible-looking output; the triangle count is what caught it.
 
 ## Known limits
 
-- **No text.** The dump harness supplies no font fetchers, so TEXT, MTEXT, ATTRIB and DIMENSION
-  produce no geometry. Text fixtures need fonts in the repo first.
+- **DIMENSION and ATTRIB are uncovered.** TEXT and MTEXT are, through the generated font above.
 - **ezdxf is not an oracle here.** Its own renderer models text and lineweights differently, so it
   can be used for a side-by-side sanity check but never for pixel or geometry equality. The goldens
   record what *this* library does; correctness is judged by reading them, and against

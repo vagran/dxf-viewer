@@ -29,6 +29,7 @@ import re
 import sys
 
 import ezdxf
+from ezdxf.enums import TextEntityAlignment
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
@@ -217,6 +218,56 @@ def _BlockInstanced(doc, msp):
     block.add_lwpolyline(points, close=False, dxfattribs={"color": 1})
     for i in range(8):
         msp.add_blockref("LONG", (0, i * 10))
+
+
+# The generated test font covers A, B, I and space only, so fixture text is spelled from those --
+# see test/fixtures/README.md. The glyphs' identity does not matter; their differing advance widths
+# (A and B are 1000 units, I is 400, space 500) are what make a layout mistake visible.
+
+@Fixture("text")
+def _Text(doc, msp):
+    """TEXT at several alignments and heights.
+
+    TEXT is always anchored at the left baseline in the file; the alignment codes re-place it, which
+    is why TextBlock has to choose between the insertion point and the alignment point.
+    """
+    msp.add_text("ABI", height=2, dxfattribs={"color": 1}).set_placement((0, 0))
+    msp.add_text("ABI", height=2, dxfattribs={"color": 3}).set_placement(
+        (0, 10), align=TextEntityAlignment.MIDDLE_CENTER)
+    msp.add_text("ABI", height=2, dxfattribs={"color": 5}).set_placement(
+        (0, 20), align=TextEntityAlignment.BOTTOM_RIGHT)
+    # Half height, so the glyph geometry scales rather than just moving.
+    msp.add_text("IB", height=1, dxfattribs={"color": 2}).set_placement((0, 30))
+
+
+@Fixture("text-rotated")
+def _TextRotated(doc, msp):
+    """A rotated TEXT, so the glyph transform is not just a translation."""
+    msp.add_text("AI", height=2, rotation=90, dxfattribs={"color": 1}).set_placement((0, 0))
+
+
+@Fixture("mtext")
+def _MText(doc, msp):
+    """MTEXT with a paragraph break and inline colour codes.
+
+    Most inline formatting is flattened by TextBox.FeedText. Paragraph breaks are honoured, and so
+    is colour -- but only at a paragraph boundary.
+    """
+    # A colour code at the start of a paragraph is applied; the same code in the middle of one is
+    # not, because TextBox tracks colour per paragraph rather than per span. Both are here so the
+    # golden shows the boundary rather than just one side of it.
+    msp.add_mtext("AB\\P\\C3;IB", dxfattribs={"char_height": 2, "color": 1, "insert": (0, 20)})
+    msp.add_mtext("A\\C3;B", dxfattribs={"char_height": 2, "color": 1, "insert": (0, 10)})
+
+
+@Fixture("text-missing-glyph")
+def _TextMissingGlyph(doc, msp):
+    """Text containing a character no loaded font covers.
+
+    Z is absent from the test font on purpose. The scene should still build, and report
+    hasMissingChars, which is what surfaces to the viewer as a `message` event.
+    """
+    msp.add_text("AZB", height=2, dxfattribs={"color": 1}).set_placement((0, 0))
 
 
 @Fixture("point-shape-in-block")

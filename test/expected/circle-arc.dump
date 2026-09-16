@@ -1,5 +1,6 @@
 origin (10, 0)
 bounds (-10, -10) (40, 10)
+hasMissingChars no
 layers 2
   "0" color=ffffff
   "Defpoints" color=ffffff
