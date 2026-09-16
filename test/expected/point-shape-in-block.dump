@@ -1,0 +1,44 @@
+origin (8.5, -1.5)
+bounds (8.5, -1.5) (30, 21.5)
+layers 3
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+  "MARKS" color=00ff00
+batches 15
+  LINES layer=- block="__point_shape" color=BYBLOCK lineType=0 vertices=8
+  INDEXED_LINES layer=- block="__point_shape" color=BYBLOCK lineType=0 chunks=1 vertices=48 indices=48
+  LINES layer="0" block="PT" color=BYBLOCK lineType=- vertices=8
+  LINES layer="0" block="PT" color=BYLAYER lineType=- vertices=8
+  LINES layer="0" block="PT" color=0000ff lineType=- vertices=8
+  INDEXED_LINES layer="0" block="PT" color=BYBLOCK lineType=- chunks=1 vertices=48 indices=48
+  INDEXED_LINES layer="0" block="PT" color=BYLAYER lineType=- chunks=1 vertices=48 indices=48
+  INDEXED_LINES layer="0" block="PT" color=0000ff lineType=- chunks=1 vertices=48 indices=48
+  POINT_INSTANCE layer="0" block="__point_shape" color=ff0000 lineType=0 vertices=2
+  LINES layer="MARKS" block=- color=0000ff lineType=0 vertices=16
+  LINES layer="MARKS" block=- color=00ff00 lineType=0 vertices=16
+  LINES layer="MARKS" block=- color=ff0000 lineType=0 vertices=16
+  INDEXED_LINES layer="MARKS" block=- color=0000ff lineType=0 chunks=1 vertices=96 indices=96
+  INDEXED_LINES layer="MARKS" block=- color=00ff00 lineType=0 chunks=1 vertices=96 indices=96
+  INDEXED_LINES layer="MARKS" block=- color=ff0000 lineType=0 chunks=1 vertices=96 indices=96
+primitives 21
+  POLYLINE layer="0" color=ff0000 (28.5, 0) (31.5, 0)
+  POLYLINE layer="0" color=ff0000 (30, 1.5) (30, -1.5)
+  POLYLINE layer="0" color=ff0000 (31, 0) (30.9659, 0.2588) (30.866, 0.5) (30.7071, 0.7071) (30.5, 0.866) (30.2588, 0.9659) (30, 1) (29.7412, 0.9659) (29.5, 0.866) (29.2929, 0.7071) (29.134, 0.5) (29.0341, 0.2588) (29, 0) (29.0341, -0.2588) (29.134, -0.5) (29.2929, -0.7071) (29.5, -0.866) (29.7412, -0.9659) (30, -1) (30.2588, -0.9659) (30.5, -0.866) (30.7071, -0.7071) (30.866, -0.5) (30.9659, -0.2588) (31, 0)
+  POLYLINE layer="MARKS" color=0000ff (16.5, 0) (19.5, 0)
+  POLYLINE layer="MARKS" color=0000ff (16.5, 20) (19.5, 20)
+  POLYLINE layer="MARKS" color=0000ff (18, 1.5) (18, -1.5)
+  POLYLINE layer="MARKS" color=0000ff (18, 21.5) (18, 18.5)
+  POLYLINE layer="MARKS" color=0000ff (19, 0) (18.9659, 0.2588) (18.866, 0.5) (18.7071, 0.7071) (18.5, 0.866) (18.2588, 0.9659) (18, 1) (17.7412, 0.9659) (17.5, 0.866) (17.2929, 0.7071) (17.134, 0.5) (17.0341, 0.2588) (17, 0) (17.0341, -0.2588) (17.134, -0.5) (17.2929, -0.7071) (17.5, -0.866) (17.7412, -0.9659) (18, -1) (18.2588, -0.9659) (18.5, -0.866) (18.7071, -0.7071) (18.866, -0.5) (18.9659, -0.2588) (19, 0)
+  POLYLINE layer="MARKS" color=0000ff (19, 20) (18.9659, 20.2588) (18.866, 20.5) (18.7071, 20.7071) (18.5, 20.866) (18.2588, 20.9659) (18, 21) (17.7412, 20.9659) (17.5, 20.866) (17.2929, 20.7071) (17.134, 20.5) (17.0341, 20.2588) (17, 20) (17.0341, 19.7412) (17.134, 19.5) (17.2929, 19.2929) (17.5, 19.134) (17.7412, 19.0341) (18, 19) (18.2588, 19.0341) (18.5, 19.134) (18.7071, 19.2929) (18.866, 19.5) (18.9659, 19.7412) (19, 20)
+  POLYLINE layer="MARKS" color=00ff00 (10, 1.5) (10, -1.5)
+  POLYLINE layer="MARKS" color=00ff00 (10, 21.5) (10, 18.5)
+  POLYLINE layer="MARKS" color=00ff00 (11, 0) (10.9659, 0.2588) (10.866, 0.5) (10.7071, 0.7071) (10.5, 0.866) (10.2588, 0.9659) (10, 1) (9.7412, 0.9659) (9.5, 0.866) (9.2929, 0.7071) (9.134, 0.5) (9.0341, 0.2588) (9, 0) (9.0341, -0.2588) (9.134, -0.5) (9.2929, -0.7071) (9.5, -0.866) (9.7412, -0.9659) (10, -1) (10.2588, -0.9659) (10.5, -0.866) (10.7071, -0.7071) (10.866, -0.5) (10.9659, -0.2588) (11, 0)
+  POLYLINE layer="MARKS" color=00ff00 (11, 20) (10.9659, 20.2588) (10.866, 20.5) (10.7071, 20.7071) (10.5, 20.866) (10.2588, 20.9659) (10, 21) (9.7412, 20.9659) (9.5, 20.866) (9.2929, 20.7071) (9.134, 20.5) (9.0341, 20.2588) (9, 20) (9.0341, 19.7412) (9.134, 19.5) (9.2929, 19.2929) (9.5, 19.134) (9.7412, 19.0341) (10, 19) (10.2588, 19.0341) (10.5, 19.134) (10.7071, 19.2929) (10.866, 19.5) (10.9659, 19.7412) (11, 20)
+  POLYLINE layer="MARKS" color=00ff00 (8.5, 0) (11.5, 0)
+  POLYLINE layer="MARKS" color=00ff00 (8.5, 20) (11.5, 20)
+  POLYLINE layer="MARKS" color=ff0000 (12.5, 0) (15.5, 0)
+  POLYLINE layer="MARKS" color=ff0000 (12.5, 20) (15.5, 20)
+  POLYLINE layer="MARKS" color=ff0000 (14, 1.5) (14, -1.5)
+  POLYLINE layer="MARKS" color=ff0000 (14, 21.5) (14, 18.5)
+  POLYLINE layer="MARKS" color=ff0000 (15, 0) (14.9659, 0.2588) (14.866, 0.5) (14.7071, 0.7071) (14.5, 0.866) (14.2588, 0.9659) (14, 1) (13.7412, 0.9659) (13.5, 0.866) (13.2929, 0.7071) (13.134, 0.5) (13.0341, 0.2588) (13, 0) (13.0341, -0.2588) (13.134, -0.5) (13.2929, -0.7071) (13.5, -0.866) (13.7412, -0.9659) (14, -1) (14.2588, -0.9659) (14.5, -0.866) (14.7071, -0.7071) (14.866, -0.5) (14.9659, -0.2588) (15, 0)
+  POLYLINE layer="MARKS" color=ff0000 (15, 20) (14.9659, 20.2588) (14.866, 20.5) (14.7071, 20.7071) (14.5, 20.866) (14.2588, 20.9659) (14, 21) (13.7412, 20.9659) (13.5, 20.866) (13.2929, 20.7071) (13.134, 20.5) (13.0341, 20.2588) (13, 20) (13.0341, 19.7412) (13.134, 19.5) (13.2929, 19.2929) (13.5, 19.134) (13.7412, 19.0341) (14, 19) (14.2588, 19.0341) (14.5, 19.134) (14.7071, 19.2929) (14.866, 19.5) (14.9659, 19.7412) (15, 20)

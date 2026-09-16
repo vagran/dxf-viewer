@@ -217,6 +217,31 @@ def _BlockInstanced(doc, msp):
         msp.add_blockref("LONG", (0, i * 10))
 
 
+@Fixture("point-shape-in-block")
+def _PointShapeInBlock(doc, msp):
+    """A shaped POINT inside a block definition, alongside one at top level.
+
+    $PDMODE 34 is a plus inside a circle, which makes points render as an instanced shape block
+    rather than as plain geometry. Instancing only ever happens at top level -- a nested INSERT is
+    flattened into its enclosing block definition -- so a point inside a block has to be emitted
+    inline too. The BYLAYER and BYBLOCK points are what make an unresolved colour reach the batch
+    key if it is not.
+    """
+    doc.header["$PDMODE"] = 34
+    doc.header["$PDSIZE"] = 2
+    doc.layers.add("MARKS", color=3)
+    block = doc.blocks.new(name="PT")
+    block.add_point((0, 0), dxfattribs={"color": 256})      # BYLAYER
+    block.add_point((4, 0), dxfattribs={"color": 0})        # BYBLOCK
+    block.add_point((8, 0), dxfattribs={"color": 5})        # explicit
+    # Two inserts, away from the origin, so the fixture shows all three symptoms at once: the
+    # marker has to appear once per insert (not once in total), at the insert's position (not the
+    # block-local one), in a resolved colour.
+    msp.add_blockref("PT", (10, 0), dxfattribs={"layer": "MARKS", "color": 1})
+    msp.add_blockref("PT", (10, 20), dxfattribs={"layer": "MARKS", "color": 1})
+    msp.add_point((30, 0), dxfattribs={"color": 1})
+
+
 @Fixture("layers-colors")
 def _LayersColors(doc, msp):
     """Color resolution: BYLAYER (256), BYBLOCK (0) outside any block, and explicit values."""
