@@ -15,6 +15,9 @@
  * small-coordinate for this reason; see test/fixtures/gen/generate.py.
  */
 import fs from "node:fs"
+import path from "node:path"
+import {fileURLToPath} from "node:url"
+import opentype from "opentype.js"
 
 import DxfParser from "../src/parser/DxfParser.js"
 import {DxfScene, ColorCode} from "../src/DxfScene.js"
@@ -24,15 +27,39 @@ import {BatchingKey} from "../src/BatchingKey.js"
 const GEOMETRY_TYPE_NAMES = Object.fromEntries(
     Object.entries(BatchingKey.GeometryType).map(([name, value]) => [value, name]))
 
+const testDir = path.dirname(fileURLToPath(import.meta.url))
+const FONT_PATH = path.join(testDir, "fixtures", "fonts", "test-font.ttf")
+
+/* Parsed once and reused: every fixture build would otherwise re-parse the same file. */
+let cachedFont = null
+
+/** @return {function(): Promise<{}>} A fetcher for the generated test font.
+ *
+ * The font covers A, B, I and space only, so fixture text is written from those. See
+ * test/fixtures/README.md for why it is generated rather than a real typeface.
+ */
+export function TestFontFetcher() {
+    return async () => {
+        if (cachedFont === null) {
+            const buffer = fs.readFileSync(FONT_PATH)
+            cachedFont = opentype.parse(buffer.buffer.slice(
+                buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+        }
+        return cachedFont
+    }
+}
+
 /** @return {Promise<{}>} The serialized scene for a DXF file.
  *
- * No font fetchers are supplied, so text entities produce no geometry. Fixtures that need text
- * are not covered by this harness.
+ * @param dxfPath {string}
+ * @param options {{sceneOptions?: {}, fonts?: Boolean}} `fonts` defaults to true, which supplies
+ *  the generated test font so text entities produce geometry. Pass false to reproduce the
+ *  font-less case, which is what the smoke sweep does.
  */
-export async function BuildScene(dxfPath, sceneOptions = undefined) {
+export async function BuildScene(dxfPath, {sceneOptions, fonts = true} = {}) {
     const dxf = new DxfParser().parseSync(fs.readFileSync(dxfPath, "utf-8"))
     const scene = new DxfScene(sceneOptions ? {sceneOptions} : undefined)
-    await scene.Build(dxf)
+    await scene.Build(dxf, fonts ? [TestFontFetcher()] : null)
     return scene.scene
 }
 
@@ -93,6 +120,8 @@ export function FormatDump(scene) {
     const bounds = reader.GetBounds()
     lines.push(bounds === null ? "bounds -" :
                `bounds ${Point([bounds.minX, bounds.minY])} ${Point([bounds.maxX, bounds.maxY])}`)
+
+    lines.push(`hasMissingChars ${scene.hasMissingChars ? "yes" : "no"}`)
 
     const layers = [...reader.GetLayers()]
     lines.push(`layers ${layers.length}`)

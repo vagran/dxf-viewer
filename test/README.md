@@ -45,6 +45,16 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 `consumer.ts` is an inventory of the public API, so a new public method or option belongs there in
 the same change that adds it.
 
+## Text
+
+`scene-dump.mjs` supplies the generated test font to every build, so TEXT and MTEXT fixtures
+produce real geometry. That font covers **A, B, I and space only**, which is why fixture text is
+spelled from those — the glyphs' identity does not matter, but their differing advance widths are
+what make a layout mistake visible. See [fixtures/README.md](fixtures/README.md).
+
+`BuildScene(path, {fonts: false})` reproduces the font-less case, which is what `smoke.mjs` does
+and why text is invisible to the corpus sweep.
+
 ## Scene dumps
 
 `scene-dump.mjs` builds a scene with `DxfScene` and walks it back out through `SceneReader`, which

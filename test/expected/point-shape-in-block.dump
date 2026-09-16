@@ -1,5 +1,6 @@
 origin (8.5, -1.5)
 bounds (8.5, -1.5) (30, 21.5)
+hasMissingChars no
 layers 3
   "0" color=ffffff
   "Defpoints" color=ffffff
