@@ -1,4 +1,4 @@
-# DXF viewer [![npm](https://img.shields.io/npm/v/dxf-viewer)](https://www.npmjs.com/package/dxf-viewer)
+# DXF viewer [![npm](https://img.shields.io/npm/v/dxf-viewer)](https://www.npmjs.com/package/dxf-viewer) [![CI](https://github.com/vagran/dxf-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/vagran/dxf-viewer/actions/workflows/ci.yml)
 
 *If you just need to view your DXF, [click here](https://vagran.github.io/dxf-viewer-example/).*
 
@@ -87,7 +87,9 @@ handle rendering in practice.
 ## Contributing
 
 Please refer to the [contribution guidelines](CONTRIBUTING.md) for details on how to make pull
-requests (PRs). The project also requires various example files for testing purposes. If you
+requests (PRs). There is an automated test suite — `npm install && npm test`, which needs no
+browser and no DXF files of your own; [test/README.md](test/README.md) describes what it covers
+and how to add to it. The project also requires various example files for testing purposes. If you
 encounter any issues with DXF rendering, it would be greatly appreciated if you could provide an
 example file that demonstrates the problem by attaching it to a created issue. Creating minimal
 examples in CAD software can also be very helpful. Additionally, creating examples in various
