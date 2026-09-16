@@ -1,4 +1,4 @@
-import { Pattern, RegisterPattern } from "../../Pattern.js"
+import {Pattern, RegisterPattern} from "../../Pattern.js"
 
 RegisterPattern(Pattern.ParsePatFile(`
 *BUBBLES-02,BUBBLES-02

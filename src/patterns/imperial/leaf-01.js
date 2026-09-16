@@ -1,4 +1,4 @@
-import { Pattern, RegisterPattern } from "../../Pattern.js"
+import {Pattern, RegisterPattern} from "../../Pattern.js"
 
 RegisterPattern(Pattern.ParsePatFile(`
 *LEAF-01,LEAF-01
