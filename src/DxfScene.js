@@ -2,6 +2,7 @@ import { DynamicBuffer, NativeType } from "./DynamicBuffer.js"
 import { BatchingKey } from "./BatchingKey.js"
 import { Matrix3, Vector2 } from "three"
 import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer.js"
+import { DefaultTextOptions } from "./TextRendererOptions.js"
 import { RBTree } from "./RBTree.js"
 import { MTextFormatParser } from "./MTextFormatParser.js"
 import dimStyleCodes from "./parser/DimStyleCodes.js"
@@ -2848,6 +2849,9 @@ DxfScene.DefaultOptions = {
     wireframeMesh: false,
     /** Suppress paper-space entities when true (only model-space is rendered). */
     suppressPaperSpace: false,
-    /** Text rendering options. */
-    textOptions: TextRenderer.DefaultOptions,
+    /** Text rendering options. Read from the leaf module rather than from
+     * TextRenderer.DefaultOptions, which is not yet initialized at this point when the module graph
+     * is entered through TextRenderer.js. See TextRendererOptions.js.
+     */
+    textOptions: DefaultTextOptions,
 }
