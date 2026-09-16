@@ -21,6 +21,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # CI cannot see test-data/, so this sweeps test/fixtures/ instead and proves little about
+      # geometry. It runs anyway to keep the script itself from rotting, since its real use is
+      # local against the corpus.
+      - run: npm run smoke
 
   typecheck:
     name: typecheck

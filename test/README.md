@@ -2,11 +2,12 @@
 
 ```bash
 npm install     # once
-npm test        # node --test test/
+npm test        # node --test; the whole suite
 npm run typecheck
+npm run smoke   # build every drawing available and report on it
 ```
 
-No browser and no DXF corpus is needed for either; both run in a few seconds.
+No browser and no DXF corpus is needed for any of them; they run in a few seconds.
 
 In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 `test (watch)`, `test (current file)` and `typecheck`.
@@ -26,6 +27,10 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 - **`scene.test.mjs`** — builds every drawing in `fixtures/` and compares a canonical dump of the
   result against `expected/<name>.dump`. This is the test that covers what the library is actually
   for; everything above it is hygiene.
+- **`validate.test.mjs`** — runs `ValidateScene` over every fixture, and separately proves that
+  `ValidateScene` can fail, by corrupting a scene seven different ways and requiring each one to be
+  caught. Without that second half a validator that checks nothing would look identical to one that
+  works.
 
 `consumer.ts` is an inventory of the public API, so a new public method or option belongs there in
 the same change that adds it.
@@ -47,3 +52,32 @@ DXF_UPDATE_GOLDENS=1 npm test
 Then **read the diff**. A golden regenerated without being read is worse than no test at all. The
 dumps are written to be checkable line by line against the generator function that produced the
 fixture — see [fixtures/README.md](fixtures/README.md).
+
+## Smoke sweep
+
+```bash
+npm run smoke                                  # everything available
+npm run smoke -- test-data/enterprise/city.dxf      # or an explicit list
+node --max-old-space-size=6144 test/smoke.mjs  # if the largest drawings run out of heap
+```
+
+Parses and builds each drawing, runs `ValidateScene` over the result, and reports timings, batch
+and layer counts, buffer sizes, unhandled entity types and any warning. Exits non-zero on a warning
+or a validation failure.
+
+Three properties are what make it worth being one command:
+
+- **Corpus-optional.** With `test-data/` present it sweeps all of it; without, it falls back to
+  `test/fixtures/` and still passes. The same command is correct for a contributor with no corpus
+  and for a checkout that has one. CI only ever sees the fixtures, because `test-data/` holds
+  customer and user-reported drawings that cannot be redistributed — the real value of this is
+  local.
+- **No goldens.** Everything it asserts is an invariant or a warning count, so adding a drawing
+  costs nothing. A file attached to a bug report is covered the moment it lands in `test-data/`.
+- **Stable, diffable output.** Run it before a change, run it after, `diff` the two. A moved batch
+  count on an unchanged drawing means the batching changed, which is the cheapest structural
+  regression signal there is.
+
+It drives `DxfParser` and `DxfScene` directly — the half of the pipeline with no DOM. It never
+constructs a `DxfViewer`, so nothing here checks materials, shaders or colors as rendered, and it
+supplies no fonts, so text layout is skipped. A drawing whose only problem is text looks clean.

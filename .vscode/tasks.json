@@ -63,6 +63,18 @@
             "problemMatcher": []
         },
         {
+            // Builds every drawing in test-data/ (or test/fixtures/ when it is absent) and reports
+            // warnings, validation failures and the numbers worth diffing across a change.
+            "label": "smoke",
+            "type": "process",
+            "command": "node",
+            "args": ["--max-old-space-size=6144", "test/smoke.mjs"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Accepts the current scene dumps as correct. Read the resulting diff before
             // committing it: a golden regenerated without being read is worse than no test.
             "label": "test (update goldens)",
