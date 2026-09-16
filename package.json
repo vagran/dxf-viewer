@@ -15,6 +15,10 @@
         "html5",
         "cad"
     ],
+    "scripts": {
+        "test": "node --test \"test/**/*.test.mjs\"",
+        "typecheck": "npm --prefix test/types install --no-package-lock --silent && tsc -p test/types"
+    },
     "files": [
         "src",
         "README.md",
@@ -29,6 +33,7 @@
         "earcut": "^3.0.0"
     },
     "devDependencies": {
-        "@types/three": "^0.161.2"
+        "@types/three": "^0.161.2",
+        "typescript": "^7.0.2"
     }
 }

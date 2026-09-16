@@ -1,0 +1,10 @@
+{
+    "name": "dxf-viewer-type-test",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Consumer-side typecheck fixture. See consumer.ts.",
+    "type": "module",
+    "dependencies": {
+        "dxf-viewer": "file:../.."
+    }
+}
