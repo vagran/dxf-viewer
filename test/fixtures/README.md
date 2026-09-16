@@ -22,6 +22,22 @@ is for, which a binary `.dxf` never can.
 The two corpora do different jobs and neither replaces the other: fixtures give exact expected
 output, `test-data/` gives real-world pathology.
 
+## Variants
+
+Two subdirectories hold the same drawings built differently, for the comparisons in
+`invariants.test.mjs`. Both are written by the same generator run.
+
+- **`translated/`** — every fixture shifted by (1000000, 500000). This is the one place the
+  coordinate rule below does not apply, deliberately: the point is to land far outside the range
+  where float32 holds integers exactly, which is what the scene origin scheme exists to handle.
+  These get no exact goldens, only the invariance comparison.
+- **`exploded/`** — the block fixtures with their INSERTs replaced by the block's entities, so the
+  drawing contains no blocks at all. That makes them an independent check on `DxfScene`'s block
+  handling rather than another route through it.
+
+Only the top-level `*.dxf` files get scene dumps; the tests that read the subdirectories look for
+them by name.
+
 ## Rules
 
 - **Keep coordinates within [-100, 100].** Scene vertices are float32, whose absolute error at that
