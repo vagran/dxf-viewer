@@ -20,7 +20,6 @@ import stylistic from "@stylistic/eslint-plugin"
 export default [
     {
         ignores: [
-            "src/OrbitControls.js",
             /* Untracked local context material, and the DXF corpus. */
             "local/**",
             "test-data/**",
