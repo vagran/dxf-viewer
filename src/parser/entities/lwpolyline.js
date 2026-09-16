@@ -10,7 +10,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         numberOfVertices = 0
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
         case 38:
@@ -30,7 +32,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.vertices = parseLWPolylineVertices(numberOfVertices, scanner)
             break
         case 43:
-            if (curr.value !== 0) entity.width = curr.value
+            if (curr.value !== 0) {
+                entity.width = curr.value
+            }
             break
         case 210:
             entity.extrusionDirection = helpers.parsePoint(scanner)
@@ -45,7 +49,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
 }
 
 function parseLWPolylineVertices(n, scanner) {
-    if (!n || n <= 0) throw Error("n must be greater than 0 vertices")
+    if (!n || n <= 0) {
+        throw Error("n must be greater than 0 vertices")
+    }
     var vertices = [], i
     var vertexIsStarted = false
     var vertexIsFinished = false
@@ -54,7 +60,9 @@ function parseLWPolylineVertices(n, scanner) {
     for (i = 0; i < n; i++) {
         var vertex = {}
         while (curr !== "EOF") {
-            if (curr.code === 0 || vertexIsFinished) break
+            if (curr.code === 0 || vertexIsFinished) {
+                break
+            }
 
             switch (curr.code) {
             case 10: // X
@@ -78,7 +86,9 @@ function parseLWPolylineVertices(n, scanner) {
                 vertex.endWidth = curr.value
                 break
             case 42: // bulge
-                if (curr.value != 0) vertex.bulge = curr.value
+                if (curr.value != 0) {
+                    vertex.bulge = curr.value
+                }
                 break
             case 91: // vertex identifier
                 vertex.id = curr.value

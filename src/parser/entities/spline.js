@@ -10,15 +10,21 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
     entity = {type: curr.value}
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
         case 10:
-            if (!entity.controlPoints) entity.controlPoints = []
+            if (!entity.controlPoints) {
+                entity.controlPoints = []
+            }
             entity.controlPoints.push(helpers.parsePoint(scanner))
             break
         case 11:
-            if (!entity.fitPoints) entity.fitPoints = []
+            if (!entity.fitPoints) {
+                entity.fitPoints = []
+            }
             entity.fitPoints.push(helpers.parsePoint(scanner))
             break
         case 12:
@@ -28,14 +34,24 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.endTangent = helpers.parsePoint(scanner)
             break
         case 40:
-            if (!entity.knotValues) entity.knotValues = []
+            if (!entity.knotValues) {
+                entity.knotValues = []
+            }
             entity.knotValues.push(curr.value)
             break
         case 70:
-            if ((curr.value & 1) != 0) entity.closed = true
-            if ((curr.value & 2) != 0) entity.periodic = true
-            if ((curr.value & 4) != 0) entity.rational = true
-            if ((curr.value & 8) != 0) entity.planar = true
+            if ((curr.value & 1) != 0) {
+                entity.closed = true
+            }
+            if ((curr.value & 2) != 0) {
+                entity.periodic = true
+            }
+            if ((curr.value & 4) != 0) {
+                entity.rational = true
+            }
+            if ((curr.value & 8) != 0) {
+                entity.planar = true
+            }
             if ((curr.value & 16) != 0) {
                 entity.planar = true
                 entity.linear = true

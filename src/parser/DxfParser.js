@@ -175,10 +175,14 @@ DxfParser.prototype._parse = function(dxfString) {
 
         while (true) {
             if (groupIs(0, "ENDSEC")) {
-                if (currVarName != null) header[currVarName] = currVarValue
+                if (currVarName != null) {
+                    header[currVarName] = currVarValue
+                }
                 break
             } else if (curr.code === 9) {
-                if (currVarName != null) header[currVarName] = currVarValue
+                if (currVarName != null) {
+                    header[currVarName] = currVarValue
+                }
                 currVarName = curr.value
                 // Filter here for particular variables we are interested in
             } else {
@@ -218,10 +222,11 @@ DxfParser.prototype._parse = function(dxfString) {
                 block = parseBlock()
                 log.debug("}")
                 ensureHandle(block)
-                if (!block.name)
+                if (!block.name) {
                     log.error('block with handle "' + block.handle + '" is missing a name.')
-                else
+                } else {
                     blocks[block.name] = block
+                }
             } else {
                 logUnhandledGroup(curr)
                 curr = scanner.next()
@@ -286,8 +291,9 @@ DxfParser.prototype._parse = function(dxfString) {
                 curr = scanner.next()
                 break
             case 0:
-                if (curr.value == "ENDBLK")
+                if (curr.value == "ENDBLK") {
                     break
+                }
                 block.entities = parseEntities(true)
                 break
             default:
@@ -311,8 +317,9 @@ DxfParser.prototype._parse = function(dxfString) {
         var tables = {}
         curr = scanner.next()
         while (curr.value !== "EOF") {
-            if (groupIs(0, "ENDSEC"))
+            if (groupIs(0, "ENDSEC")) {
                 break
+            }
 
             if (groupIs(0, "TABLE")) {
                 curr = scanner.next()
@@ -556,7 +563,9 @@ DxfParser.prototype._parse = function(dxfString) {
                 break
             case 73: // Number of elements for this line type (dots, dashes, spaces);
                 length = curr.value
-                if (length > 0) ltype.pattern = []
+                if (length > 0) {
+                    ltype.pattern = []
+                }
                 curr = scanner.next()
                 break
             case 40: // total pattern length
@@ -857,9 +866,10 @@ DxfParser.prototype._parse = function(dxfString) {
 
         code += 10
         curr = scanner.next()
-        if (curr.code != code)
+        if (curr.code != code) {
             throw new Error("Expected code for point value to be " + code +
             " but got " + curr.code + ".")
+        }
         point.y = curr.value
 
         code += 10

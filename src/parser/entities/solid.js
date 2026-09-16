@@ -11,7 +11,9 @@ EntityParser.prototype.parseEntity = function(scanner, currentGroup) {
     entity.points = []
     currentGroup = scanner.next()
     while (currentGroup !== "EOF") {
-        if (currentGroup.code === 0) break
+        if (currentGroup.code === 0) {
+            break
+        }
 
         switch (currentGroup.code) {
         case 10:

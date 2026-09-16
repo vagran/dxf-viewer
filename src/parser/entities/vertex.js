@@ -9,7 +9,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
     var entity = {type: curr.value}
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
         case 10:    // X
@@ -26,7 +28,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 41: // end width
             break
         case 42: // bulge
-            if (curr.value != 0) entity.bulge = curr.value
+            if (curr.value != 0) {
+                entity.bulge = curr.value
+            }
             break
         case 70: // flags
             entity.curveFittingVertex = (curr.value & 1) !== 0

@@ -44,17 +44,29 @@ function CloneScene(scene) {
 
 const CORRUPTIONS = [
     ["an index addressing past its chunk", "polyline",
-     scene => { new Uint16Array(scene.indices)[0] = 0xffff }],
+     scene => {
+         new Uint16Array(scene.indices)[0] = 0xffff
+     }],
     ["a non-finite coordinate", "polyline",
-     scene => { new Float32Array(scene.vertices)[2] = NaN }],
+     scene => {
+         new Float32Array(scene.vertices)[2] = NaN
+     }],
     ["a gap in the vertex buffer", "points",
-     scene => { scene.batches[0].verticesSize = 0 }],
+     scene => {
+         scene.batches[0].verticesSize = 0
+     }],
     ["two batches sharing vertices", "points",
-     scene => { scene.batches[1].verticesOffset = scene.batches[0].verticesOffset }],
+     scene => {
+         scene.batches[1].verticesOffset = scene.batches[0].verticesOffset
+     }],
     ["a duplicated batching key", "points",
-     scene => { scene.batches[1].key = {...scene.batches[0].key} }],
+     scene => {
+         scene.batches[1].key = {...scene.batches[0].key}
+     }],
     ["an unresolved color outside a block", "polyline",
-     scene => { scene.batches[0].key.color = -1 }],
+     scene => {
+         scene.batches[0].key.color = -1
+     }],
     ["a transform count that is not whole matrices", "block-instanced",
      scene => {
          const batch = scene.batches.find(b => b.transformsSize !== undefined)

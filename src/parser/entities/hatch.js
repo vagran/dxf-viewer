@@ -14,7 +14,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
 
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         while (numBoundaryLoops > 0) {
             const loop = ParseBoundaryLoop(curr, scanner)
@@ -49,7 +51,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             }
         }
 
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
 

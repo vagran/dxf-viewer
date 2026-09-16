@@ -23,10 +23,11 @@ export default function DxfArrayScanner(data) {
 DxfArrayScanner.prototype.next = function() {
     var group
     if (!this.hasNext()) {
-        if (!this._eof)
+        if (!this._eof) {
             throw new Error("Unexpected end of input: EOF group not read before end of file. Ended on code " + this._data[this._pointer])
-        else
+        } else {
             throw new Error("Cannot call 'next' after EOF group has been read")
+        }
     }
 
     group = {
@@ -43,7 +44,9 @@ DxfArrayScanner.prototype.next = function() {
 
     this._pointer++
 
-    if (group.code === 0 && group.value === "EOF") this._eof = true
+    if (group.code === 0 && group.value === "EOF") {
+        this._eof = true
+    }
 
     this.lastReadGroup = group
 
@@ -52,10 +55,11 @@ DxfArrayScanner.prototype.next = function() {
 
 DxfArrayScanner.prototype.peek = function() {
     if (!this.hasNext()) {
-        if (!this._eof)
+        if (!this._eof) {
             throw new Error("Unexpected end of input: EOF group not read before end of file. Ended on code " + this._data[this._pointer])
-        else
+        } else {
             throw new Error("Cannot call 'next' after EOF group has been read")
+        }
     }
 
     var group = {
@@ -111,29 +115,75 @@ DxfArrayScanner.prototype.isEOF = function() {
  * @returns {*}
  */
 function parseGroupValue(code, value) {
-    if (code <= 9) return value
-    if (code >= 10 && code <= 59) return parseFloat(value.trim())
-    if (code >= 60 && code <= 99) return parseInt(value.trim())
-    if (code >= 100 && code <= 109) return value
-    if (code >= 110 && code <= 149) return parseFloat(value.trim())
-    if (code >= 160 && code <= 179) return parseInt(value.trim())
-    if (code >= 210 && code <= 239) return parseFloat(value.trim())
-    if (code >= 270 && code <= 289) return parseInt(value.trim())
-    if (code >= 290 && code <= 299) return parseBoolean(value.trim())
-    if (code >= 300 && code <= 369) return value
-    if (code >= 370 && code <= 389) return parseInt(value.trim())
-    if (code >= 390 && code <= 399) return value
-    if (code >= 400 && code <= 409) return parseInt(value.trim())
-    if (code >= 410 && code <= 419) return value
-    if (code >= 420 && code <= 429) return parseInt(value.trim())
-    if (code >= 430 && code <= 439) return value
-    if (code >= 440 && code <= 459) return parseInt(value.trim())
-    if (code >= 460 && code <= 469) return parseFloat(value.trim())
-    if (code >= 470 && code <= 481) return value
-    if (code === 999) return value
-    if (code >= 1000 && code <= 1009) return value
-    if (code >= 1010 && code <= 1059) return parseFloat(value.trim())
-    if (code >= 1060 && code <= 1071) return parseInt(value.trim())
+    if (code <= 9) {
+        return value
+    }
+    if (code >= 10 && code <= 59) {
+        return parseFloat(value.trim())
+    }
+    if (code >= 60 && code <= 99) {
+        return parseInt(value.trim())
+    }
+    if (code >= 100 && code <= 109) {
+        return value
+    }
+    if (code >= 110 && code <= 149) {
+        return parseFloat(value.trim())
+    }
+    if (code >= 160 && code <= 179) {
+        return parseInt(value.trim())
+    }
+    if (code >= 210 && code <= 239) {
+        return parseFloat(value.trim())
+    }
+    if (code >= 270 && code <= 289) {
+        return parseInt(value.trim())
+    }
+    if (code >= 290 && code <= 299) {
+        return parseBoolean(value.trim())
+    }
+    if (code >= 300 && code <= 369) {
+        return value
+    }
+    if (code >= 370 && code <= 389) {
+        return parseInt(value.trim())
+    }
+    if (code >= 390 && code <= 399) {
+        return value
+    }
+    if (code >= 400 && code <= 409) {
+        return parseInt(value.trim())
+    }
+    if (code >= 410 && code <= 419) {
+        return value
+    }
+    if (code >= 420 && code <= 429) {
+        return parseInt(value.trim())
+    }
+    if (code >= 430 && code <= 439) {
+        return value
+    }
+    if (code >= 440 && code <= 459) {
+        return parseInt(value.trim())
+    }
+    if (code >= 460 && code <= 469) {
+        return parseFloat(value.trim())
+    }
+    if (code >= 470 && code <= 481) {
+        return value
+    }
+    if (code === 999) {
+        return value
+    }
+    if (code >= 1000 && code <= 1009) {
+        return value
+    }
+    if (code >= 1010 && code <= 1059) {
+        return parseFloat(value.trim())
+    }
+    if (code >= 1060 && code <= 1071) {
+        return parseInt(value.trim())
+    }
 
     console.log("WARNING: Group code does not have a defined type: %j", {code: code, value: value})
     return value
@@ -145,7 +195,11 @@ function parseGroupValue(code, value) {
  * @returns {boolean}
  */
 function parseBoolean(str) {
-    if (str === "0") return false
-    if (str === "1") return true
+    if (str === "0") {
+        return false
+    }
+    if (str === "1") {
+        return true
+    }
     throw TypeError("String '" + str + "' cannot be cast to Boolean type")
 }

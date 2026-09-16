@@ -10,7 +10,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
     var entity = {type: curr.value, vertices: []}
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
         switch (curr.code) {
         case 70: // 1 = Closed shape, 128 = plinegen?, 0 = default
             entity.shape = ((curr.value & 1) === 1)
@@ -39,7 +41,9 @@ function parse3dFaceVertices(scanner, curr) {
     for (i = 0; i <= verticesPer3dFace; i++) {
         var vertex = {}
         while (curr !== "EOF") {
-            if (curr.code === 0 || vertexIsFinished) break
+            if (curr.code === 0 || vertexIsFinished) {
+                break
+            }
 
             switch (curr.code) {
             case 10: // X0

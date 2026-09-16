@@ -12,8 +12,12 @@ import * as THREE from "three"
 
 export const OrbitControls = function(object, domElement) {
 
-    if (domElement === undefined) console.warn('THREE.OrbitControls: The second parameter "domElement" is now mandatory.')
-    if (domElement === document) console.error('THREE.OrbitControls: "document" should not be used as the target "domElement". Please use "renderer.domElement" instead.')
+    if (domElement === undefined) {
+        console.warn('THREE.OrbitControls: The second parameter "domElement" is now mandatory.')
+    }
+    if (domElement === document) {
+        console.error('THREE.OrbitControls: "document" should not be used as the target "domElement". Please use "renderer.domElement" instead.')
+    }
 
     this.object = object
     this.domElement = domElement
@@ -182,9 +186,17 @@ export const OrbitControls = function(object, domElement) {
 
             if (isFinite(min) && isFinite(max)) {
 
-                if (min < -Math.PI) min += twoPI; else if (min > Math.PI) min -= twoPI
+                if (min < -Math.PI) {
+                    min += twoPI
+                } else if (min > Math.PI) {
+                    min -= twoPI
+                }
 
-                if (max < -Math.PI) max += twoPI; else if (max > Math.PI) max -= twoPI
+                if (max < -Math.PI) {
+                    max += twoPI
+                } else if (max > Math.PI) {
+                    max -= twoPI
+                }
 
                 if (min <= max) {
 
@@ -702,17 +714,25 @@ export const OrbitControls = function(object, domElement) {
 
     function handleTouchStartDollyPan(event) {
 
-        if (scope.enableZoom) handleTouchStartDolly(event)
+        if (scope.enableZoom) {
+            handleTouchStartDolly(event)
+        }
 
-        if (scope.enablePan) handleTouchStartPan(event)
+        if (scope.enablePan) {
+            handleTouchStartPan(event)
+        }
 
     }
 
     function handleTouchStartDollyRotate(event) {
 
-        if (scope.enableZoom) handleTouchStartDolly(event)
+        if (scope.enableZoom) {
+            handleTouchStartDolly(event)
+        }
 
-        if (scope.enableRotate) handleTouchStartRotate(event)
+        if (scope.enableRotate) {
+            handleTouchStartRotate(event)
+        }
 
     }
 
@@ -786,17 +806,25 @@ export const OrbitControls = function(object, domElement) {
 
     function handleTouchMoveDollyPan(event) {
 
-        if (scope.enableZoom) handleTouchMoveDolly(event)
+        if (scope.enableZoom) {
+            handleTouchMoveDolly(event)
+        }
 
-        if (scope.enablePan) handleTouchMovePan(event)
+        if (scope.enablePan) {
+            handleTouchMovePan(event)
+        }
 
     }
 
     function handleTouchMoveDollyRotate(event) {
 
-        if (scope.enableZoom) handleTouchMoveDolly(event)
+        if (scope.enableZoom) {
+            handleTouchMoveDolly(event)
+        }
 
-        if (scope.enableRotate) handleTouchMoveRotate(event)
+        if (scope.enableRotate) {
+            handleTouchMoveRotate(event)
+        }
 
     }
 
@@ -812,7 +840,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onPointerDown(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         switch (event.pointerType) {
 
@@ -829,7 +859,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onPointerMove(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         switch (event.pointerType) {
 
@@ -898,7 +930,9 @@ export const OrbitControls = function(object, domElement) {
 
         case THREE.MOUSE.DOLLY:
 
-            if (scope.enableZoom === false) return
+            if (scope.enableZoom === false) {
+                return
+            }
 
             handleMouseDownDolly(event)
 
@@ -910,7 +944,9 @@ export const OrbitControls = function(object, domElement) {
 
             if (event.ctrlKey || event.metaKey || event.shiftKey) {
 
-                if (scope.enablePan === false) return
+                if (scope.enablePan === false) {
+                    return
+                }
 
                 handleMouseDownPan(event)
 
@@ -918,7 +954,9 @@ export const OrbitControls = function(object, domElement) {
 
             } else {
 
-                if (scope.enableRotate === false) return
+                if (scope.enableRotate === false) {
+                    return
+                }
 
                 handleMouseDownRotate(event)
 
@@ -932,14 +970,18 @@ export const OrbitControls = function(object, domElement) {
 
             if (event.ctrlKey || event.metaKey || event.shiftKey) {
 
-                if (scope.enableRotate === false) return
+                if (scope.enableRotate === false) {
+                    return
+                }
 
                 handleMouseDownRotate(event)
 
                 state = STATE.ROTATE
 
             } else {
-                if (scope.enablePan === false) return
+                if (scope.enablePan === false) {
+                    return
+                }
 
                 handleMouseDownPan(event)
 
@@ -968,7 +1010,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onMouseMove(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         event.preventDefault()
 
@@ -976,7 +1020,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.ROTATE:
 
-            if (scope.enableRotate === false) return
+            if (scope.enableRotate === false) {
+                return
+            }
 
             handleMouseMoveRotate(event)
 
@@ -984,7 +1030,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.DOLLY:
 
-            if (scope.enableZoom === false) return
+            if (scope.enableZoom === false) {
+                return
+            }
 
             handleMouseMoveDolly(event)
 
@@ -992,7 +1040,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.PAN:
 
-            if (scope.enablePan === false) return
+            if (scope.enablePan === false) {
+                return
+            }
 
             handleMouseMovePan(event)
 
@@ -1007,7 +1057,9 @@ export const OrbitControls = function(object, domElement) {
         scope.domElement.ownerDocument.removeEventListener("pointermove", onPointerMove)
         scope.domElement.ownerDocument.removeEventListener("pointerup", onPointerUp)
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         handleMouseUp(event)
 
@@ -1019,7 +1071,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onMouseWheel(event) {
 
-        if (scope.enabled === false || scope.enableZoom === false || (state !== STATE.NONE && state !== STATE.ROTATE)) return
+        if (scope.enabled === false || scope.enableZoom === false || (state !== STATE.NONE && state !== STATE.ROTATE)) {
+            return
+        }
 
         event.preventDefault()
         event.stopPropagation()
@@ -1034,7 +1088,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onKeyDown(event) {
 
-        if (scope.enabled === false || scope.enablePan === false) return
+        if (scope.enabled === false || scope.enablePan === false) {
+            return
+        }
 
         handleKeyDown(event)
 
@@ -1042,7 +1098,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onTouchStart(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         event.preventDefault() // prevent scrolling
 
@@ -1054,7 +1112,9 @@ export const OrbitControls = function(object, domElement) {
 
             case THREE.TOUCH.ROTATE:
 
-                if (scope.enableRotate === false) return
+                if (scope.enableRotate === false) {
+                    return
+                }
 
                 handleTouchStartRotate(event)
 
@@ -1064,7 +1124,9 @@ export const OrbitControls = function(object, domElement) {
 
             case THREE.TOUCH.PAN:
 
-                if (scope.enablePan === false) return
+                if (scope.enablePan === false) {
+                    return
+                }
 
                 handleTouchStartPan(event)
 
@@ -1086,7 +1148,9 @@ export const OrbitControls = function(object, domElement) {
 
             case THREE.TOUCH.DOLLY_PAN:
 
-                if (scope.enableZoom === false && scope.enablePan === false) return
+                if (scope.enableZoom === false && scope.enablePan === false) {
+                    return
+                }
 
                 handleTouchStartDollyPan(event)
 
@@ -1096,7 +1160,9 @@ export const OrbitControls = function(object, domElement) {
 
             case THREE.TOUCH.DOLLY_ROTATE:
 
-                if (scope.enableZoom === false && scope.enableRotate === false) return
+                if (scope.enableZoom === false && scope.enableRotate === false) {
+                    return
+                }
 
                 handleTouchStartDollyRotate(event)
 
@@ -1128,7 +1194,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onTouchMove(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         event.preventDefault() // prevent scrolling
         event.stopPropagation()
@@ -1137,7 +1205,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.TOUCH_ROTATE:
 
-            if (scope.enableRotate === false) return
+            if (scope.enableRotate === false) {
+                return
+            }
 
             handleTouchMoveRotate(event)
 
@@ -1147,7 +1217,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.TOUCH_PAN:
 
-            if (scope.enablePan === false) return
+            if (scope.enablePan === false) {
+                return
+            }
 
             handleTouchMovePan(event)
 
@@ -1157,7 +1229,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.TOUCH_DOLLY_PAN:
 
-            if (scope.enableZoom === false && scope.enablePan === false) return
+            if (scope.enableZoom === false && scope.enablePan === false) {
+                return
+            }
 
             handleTouchMoveDollyPan(event)
 
@@ -1167,7 +1241,9 @@ export const OrbitControls = function(object, domElement) {
 
         case STATE.TOUCH_DOLLY_ROTATE:
 
-            if (scope.enableZoom === false && scope.enableRotate === false) return
+            if (scope.enableZoom === false && scope.enableRotate === false) {
+                return
+            }
 
             handleTouchMoveDollyRotate(event)
 
@@ -1185,7 +1261,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onTouchEnd(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         handleTouchEnd(event)
 
@@ -1197,7 +1275,9 @@ export const OrbitControls = function(object, domElement) {
 
     function onContextMenu(event) {
 
-        if (scope.enabled === false) return
+        if (scope.enabled === false) {
+            return
+        }
 
         event.preventDefault()
 

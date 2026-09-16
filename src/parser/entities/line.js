@@ -9,7 +9,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
     var entity = {type: curr.value, vertices: []}
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
         case 10: // X coordinate of point

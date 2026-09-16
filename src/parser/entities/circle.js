@@ -10,7 +10,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
     entity = {type: curr.value}
     curr = scanner.next()
     while (curr !== "EOF") {
-        if (curr.code === 0) break
+        if (curr.code === 0) {
+            break
+        }
 
         switch (curr.code) {
         case 10: // X coordinate of point
@@ -24,10 +26,11 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             break
         case 51: // end angle
             endAngle = Math.PI / 180 * curr.value
-            if (endAngle < entity.startAngle)
+            if (endAngle < entity.startAngle) {
                 entity.angleLength = endAngle + 2 * Math.PI - entity.startAngle
-            else
+            } else {
                 entity.angleLength = endAngle - entity.startAngle
+            }
             entity.endAngle = endAngle
             break
         case 210:

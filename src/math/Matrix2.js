@@ -43,7 +43,9 @@ export class Matrix2 {
      * @returns {Matrix2 | undefined} inverse of this matrix
      */
     inverse(determinant = this.det()) {
-        if (determinant === 0) return undefined
+        if (determinant === 0) {
+            return undefined
+        }
 
         return new Matrix2(
             this.a11 / determinant, -this.a01 / determinant,
@@ -58,7 +60,9 @@ export class Matrix2 {
      * @returns {Vector2 | undefined}
      */
     solve(b) {
-        if (this.a00 * this.a11 === this.a10 * this.a01) return undefined
+        if (this.a00 * this.a11 === this.a10 * this.a01) {
+            return undefined
+        }
 
         if (Math.abs(this.a00) >= Math.abs(this.a10)) {
             const alpha = this.a10 / this.a00

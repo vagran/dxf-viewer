@@ -95,9 +95,15 @@ function ParseArgs(argv) {
                      stroke: 1, png: false, width: 1400, files: []}
     const VALUE_OPTIONS = new Map([
         ["--font", value => options.fonts.push(value)],
-        ["--background", value => { options.background = value }],
-        ["--stroke", value => { options.stroke = Number(value) }],
-        ["--width", value => { options.width = Number(value); options.png = true }]
+        ["--background", value => {
+            options.background = value
+        }],
+        ["--stroke", value => {
+            options.stroke = Number(value)
+        }],
+        ["--width", value => {
+            options.width = Number(value); options.png = true
+        }]
     ])
 
     for (let i = 0; i < argv.length; i++) {

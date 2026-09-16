@@ -3,11 +3,11 @@
  *     npm run format     rewrite files in place
  *     npm run lint       report without changing anything
  *
- * This is a formatter, not a code-quality gate: only @stylistic rules are enabled, so nothing here
- * ever comments on what the code does. ESLint is used instead of a reprinter (Prettier, dprint,
- * Biome) on purpose. All three reprint from the AST and therefore destroy two things this codebase
- * does everywhere: continuation lines aligned under the opening paren of a call, and switch cases
- * at the same indentation as the `switch`.
+ * This is a formatter, not a code-quality gate: the rules are @stylistic ones plus `curly`, the
+ * single core rule below, so nothing here ever comments on what the code does. ESLint is used
+ * instead of a reprinter (Prettier, dprint, Biome) on purpose. All three reprint from the AST and
+ * therefore destroy two things this codebase does everywhere: continuation lines aligned under the
+ * opening paren of a call, and switch cases at the same indentation as the `switch`.
  *
  * The flip side is that a rule set only normalizes what it is told to. Where the code has a choice
  * a reprinter would make for it — whether a call's arguments are aligned or indented, where a long
@@ -38,6 +38,12 @@ export default [
         plugins: {"@stylistic": stylistic},
 
         rules: {
+            /* Braces on every block, including one-statement `if` bodies. The only core (non-
+             * @stylistic) rule here: braces never change what the code does, so it stays within
+             * what this config is for.
+             */
+            curly: ["error", "all"],
+
             "@stylistic/semi": ["error", "never"],
             "@stylistic/quotes": ["error", "double", {avoidEscape: true}],
             "@stylistic/comma-dangle": ["error", "never"],
@@ -79,7 +85,12 @@ export default [
             "@stylistic/computed-property-spacing": ["error", "never"],
             "@stylistic/space-in-parens": ["error", "never"],
             "@stylistic/block-spacing": ["error", "always"],
-            "@stylistic/brace-style": ["error", "1tbs", {allowSingleLine: true}],
+            /* `allowSingleLine: false` is load-bearing next to `curly`, not a preference: a block
+             * is spread over its own lines, never `if (x) { break }`. Allowing the single-line
+             * form lets curly's fixer satisfy itself with it, which is the cheaper fix and not the
+             * shape wanted here.
+             */
+            "@stylistic/brace-style": ["error", "1tbs", {allowSingleLine: false}],
             "@stylistic/space-before-blocks": "error",
             "@stylistic/space-before-function-paren":
                 ["error", {anonymous: "never", named: "never", asyncArrow: "always"}],

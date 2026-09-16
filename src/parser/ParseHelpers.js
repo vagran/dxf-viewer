@@ -26,9 +26,10 @@ export function parsePoint(scanner) {
 
     code += 10
     curr = scanner.next()
-    if (curr.code !== code)
+    if (curr.code !== code) {
         throw new Error("Expected code for point value to be " + code +
         " but got " + curr.code + ".")
+    }
     point.y = curr.value
 
     code += 10
