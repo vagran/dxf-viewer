@@ -1,0 +1,112 @@
+/* Formatting rules for this repository.
+ *
+ *     npm run format     rewrite files in place
+ *     npm run lint       report without changing anything
+ *
+ * This is a formatter, not a code-quality gate: only @stylistic rules are enabled, so nothing here
+ * ever comments on what the code does. ESLint is used instead of a reprinter (Prettier, dprint,
+ * Biome) on purpose. All three reprint from the AST and therefore destroy two things this codebase
+ * does everywhere: continuation lines aligned under the opening paren of a call, and switch cases
+ * at the same indentation as the `switch`.
+ *
+ * The flip side is that a rule set only normalizes what it is told to. Where the code has a choice
+ * a reprinter would make for it — whether a call's arguments are aligned or indented, where a long
+ * boolean expression breaks — the rules below stay silent, and consistency there is still a matter
+ * of following the surrounding file.
+ */
+
+import stylistic from "@stylistic/eslint-plugin"
+
+export default [
+    {
+        ignores: [
+            "src/OrbitControls.js",
+            /* Untracked local context material, and the DXF corpus. */
+            "local/**",
+            "test-data/**",
+            /* TypeScript; would need a parser this config deliberately does not pull in. */
+            "test/types/**"
+        ]
+    },
+    {
+        files: ["src/**/*.js", "test/**/*.mjs", "*.mjs"],
+
+        languageOptions: {
+            ecmaVersion: "latest",
+            sourceType: "module"
+        },
+
+        plugins: {"@stylistic": stylistic},
+
+        rules: {
+            "@stylistic/semi": ["error", "never"],
+            "@stylistic/quotes": ["error", "double", {avoidEscape: true}],
+            "@stylistic/comma-dangle": ["error", "never"],
+            "@stylistic/linebreak-style": ["error", "unix"],
+            "@stylistic/eol-last": ["error", "always"],
+            "@stylistic/no-trailing-spaces": "error",
+            "@stylistic/no-multiple-empty-lines": ["error", {max: 2, maxEOF: 0}],
+            "@stylistic/no-mixed-spaces-and-tabs": "error",
+
+            /* Most of the "off" entries below do not disable indentation checking, they disable it
+             * for *continuation* lines of that construct only: the first line of the statement is
+             * still checked. That is what preserves the aligned-under-the-paren argument lists and
+             * hanging object literals this codebase is full of, while still catching a block that
+             * sits at the wrong level.
+             */
+            "@stylistic/indent": ["error", 4, {
+                /* Cases sit at the same level as the `switch`, as they do throughout DxfScene. */
+                SwitchCase: 0,
+                CallExpression: {arguments: "off"},
+                FunctionDeclaration: {parameters: "off"},
+                FunctionExpression: {parameters: "off"},
+                ObjectExpression: "off",
+                ArrayExpression: "off",
+                ImportDeclaration: "off",
+                MemberExpression: "off",
+                VariableDeclarator: "off",
+                flatTernaryExpressions: true,
+                /* Wrapped expressions are aligned by hand (operands lined up under the first
+                 * operand, `?`/`:` under the condition), which no offset rule can express.
+                 */
+                ignoredNodes: [
+                    "BinaryExpression", "LogicalExpression", "ConditionalExpression",
+                    "TemplateLiteral *"
+                ]
+            }],
+
+            "@stylistic/object-curly-spacing": ["error", "never"],
+            "@stylistic/array-bracket-spacing": ["error", "never"],
+            "@stylistic/computed-property-spacing": ["error", "never"],
+            "@stylistic/space-in-parens": ["error", "never"],
+            "@stylistic/block-spacing": ["error", "always"],
+            "@stylistic/brace-style": ["error", "1tbs", {allowSingleLine: true}],
+            "@stylistic/space-before-blocks": "error",
+            "@stylistic/space-before-function-paren":
+                ["error", {anonymous: "never", named: "never", asyncArrow: "always"}],
+            "@stylistic/function-call-spacing": ["error", "never"],
+            "@stylistic/keyword-spacing": "error",
+            "@stylistic/space-infix-ops": "error",
+            "@stylistic/space-unary-ops": "error",
+            "@stylistic/arrow-spacing": "error",
+            "@stylistic/comma-spacing": "error",
+            "@stylistic/comma-style": ["error", "last"],
+            "@stylistic/key-spacing": "error",
+            "@stylistic/semi-spacing": "error",
+            "@stylistic/switch-colon-spacing": "error",
+            "@stylistic/rest-spread-spacing": ["error", "never"],
+            "@stylistic/dot-location": ["error", "property"],
+            "@stylistic/no-whitespace-before-property": "error",
+            /* Not autofixable, and not worth failing a run over: a long string or a URL in a
+             * comment is sometimes the lesser evil. Reported so it stays visible.
+             */
+            "@stylistic/max-len": ["warn", {
+                code: 100,
+                ignoreUrls: true,
+                ignoreStrings: true,
+                ignoreTemplateLiterals: true,
+                ignoreRegExpLiterals: true
+            }]
+        }
+    }
+]

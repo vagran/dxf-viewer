@@ -7,7 +7,9 @@ recommendations:
     in your forked repository for a changeset. You can use Git rebase with squashing to squash
     several commits into one.
  3. Please follow the existing code's coding style and general approach so that your code does not
-    look very different from the surrounding code.
+    look very different from the surrounding code. Most of the mechanical part of that is
+    automated — `npm run format` rewrites your changes to match, and `npm run lint` reports without
+    writing. It is a formatter only: no rule in it has an opinion about the code itself.
  4. Run the automated checks before submitting. They need nothing but `npm install` in this
     repository — no browser, no dev server, and no DXF files of your own — and take a few seconds:
 
@@ -15,6 +17,7 @@ recommendations:
     npm install
     npm test            # unit tests, scene goldens, invariants
     npm run typecheck   # the published type declarations, as a consumer sees them
+    npm run lint        # formatting only; `npm run format` fixes what it reports
     ```
 
     Node 22 or newer is required for development; the library itself has no such requirement. The

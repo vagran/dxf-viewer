@@ -126,6 +126,41 @@
             "problemMatcher": []
         },
         {
+            // Reports formatting deviations without touching anything. Only @stylistic rules are
+            // enabled, so this never comments on the code itself. See eslint.config.mjs.
+            "label": "lint",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "lint"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$eslint-stylish"]
+        },
+        {
+            // Applies the same rules in place. Review the diff: src/parser/ and src/RBTree.js are
+            // forks, and formatting them is what makes their upstream diffs harder to read.
+            "label": "format",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "format"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$eslint-stylish"]
+        },
+        {
+            // Formats just the file in the active editor.
+            "label": "format (current file)",
+            "type": "process",
+            "command": "npx",
+            "args": ["eslint", "--fix", "${relativeFile}"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$eslint-stylish"]
+        },
+        {
             // Compiles test/types/consumer.ts against the published declarations. The $tsc matcher
             // turns the output into clickable diagnostics; paths are relative to the workspace.
             "label": "typecheck",
