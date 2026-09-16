@@ -73,6 +73,46 @@ Then **read the diff**. A golden regenerated without being read is worse than no
 dumps are written to be checkable line by line against the generator function that produced the
 fixture — see [fixtures/README.md](fixtures/README.md).
 
+## Looking at a drawing
+
+```bash
+npm run svg -- test/fixtures/dimension-linear.dxf          # writes ...-linear.svg next to it
+npm run svg -- test-data/enterprise/turtle.dxf /tmp/t.svg  # or an explicit output path
+npm run svg -- drawing.dxf --font /path/Roboto.ttf          # readable text; repeat for fallbacks
+npm run svg -- drawing.dxf out.svg --background=#fff       # light background
+npm run svg -- drawing.dxf out.svg --no-invert             # literal colours
+npm run svg -- drawing.dxf out.svg --no-text               # skip text entirely
+npm run svg -- --help
+```
+
+The output path is optional and defaults to the input with a `.svg` extension. Options take either
+`--opt value` or `--opt=value`.
+
+**Pass `--font` if you want to read the text.** Without it the generated test font is used, in
+which every glyph is a rectangle by design — right for asserting layout, useless for looking at.
+Repeat the option to build a fallback chain: the library moves to the next font only for a
+character the earlier ones have no glyph for, which is how CJK coverage is added. On
+`test-data/enterprise/korean.dxf`, Roboto alone yields 82,729 text triangles and the example
+project's four-font chain yields 107,253 — the difference is the Korean glyphs Roboto has not got.
+
+A review and debugging aid, **not a test** — nothing is asserted and no SVG is committed. The
+scene dumps say what the geometry *is*; they cannot say whether a drawing *looks* right, and that
+is the gap this fills, without starting the example project and without a GPU.
+
+It renders the same primitives the dumps are built from, through `SceneReader`, so it shows what
+the library decided to draw rather than a second opinion about the file. Anything `SceneReader`
+cannot see is invisible here too: line widths, line types and paper space, none of which the
+library implements.
+
+By default it reproduces the viewer's own `blackWhiteInversion`, so black and white geometry are
+both visible on the dark background the viewer uses. `colorCorrection`, off by default in the
+viewer, is not reproduced.
+
+Because it takes any path it works on `test-data/` as well as on fixtures — which committed
+per-fixture SVG goldens never could, and the corpus is where the hard drawings are. Output is
+grouped into one path element per layer, colour and kind, which is what keeps a large drawing
+openable: `city.dxf`'s 155k primitives come out as 33 path elements.
+
 ## Smoke sweep
 
 ```bash

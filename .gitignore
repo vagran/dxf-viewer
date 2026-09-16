@@ -7,3 +7,5 @@ test-data/
 scratch/
 dist/
 .venv/
+# Renders from `npm run svg`, which writes next to its input by default.
+test/**/*.svg

@@ -19,6 +19,7 @@
     "scripts": {
         "test": "node --test \"test/**/*.test.mjs\"",
         "smoke": "node test/smoke.mjs",
+        "svg": "node --max-old-space-size=6144 test/svg.mjs",
         "typecheck": "npm --prefix test/types install --no-package-lock --silent && tsc -p test/types"
     },
     "files": [
