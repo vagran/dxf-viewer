@@ -61,7 +61,7 @@ export const OrbitControls = function(object, domElement) {
     this.enablePan = true
     this.panSpeed = 1.0
     this.screenSpacePanning = true // if false, pan orthogonal to world-space direction camera.up
-    this.keyPanSpeed = 7.0	// pixels moved per arrow key push
+    this.keyPanSpeed = 7.0    // pixels moved per arrow key push
 
     // Set to true to automatically rotate around the target
     // If auto-rotate is enabled, you must call controls.update() in your animation loop
@@ -193,8 +193,8 @@ export const OrbitControls = function(object, domElement) {
                 } else {
 
                     spherical.theta = (spherical.theta > (min + max) / 2) ?
-						Math.max(min, spherical.theta) :
-						Math.min(max, spherical.theta)
+                        Math.max(min, spherical.theta) :
+                        Math.min(max, spherical.theta)
 
                 }
 
@@ -254,8 +254,8 @@ export const OrbitControls = function(object, domElement) {
             // using small-angle approximation cos(x/2) = 1 - x^2 / 8
 
             if (zoomChanged ||
-				lastPosition.distanceToSquared(scope.object.position) > EPS ||
-				8 * (1 - lastQuaternion.dot(scope.object.quaternion)) > EPS) {
+                lastPosition.distanceToSquared(scope.object.position) > EPS ||
+                8 * (1 - lastQuaternion.dot(scope.object.quaternion)) > EPS) {
 
                 scope.dispatchEvent(changeEvent)
 
@@ -309,14 +309,14 @@ export const OrbitControls = function(object, domElement) {
     var endEvent = {type: "end"}
 
     var STATE = {
-		NONE: -1,
-		ROTATE: 0,
-		DOLLY: 1,
-		PAN: 2,
-		TOUCH_ROTATE: 3,
-		TOUCH_PAN: 4,
-		TOUCH_DOLLY_PAN: 5,
-		TOUCH_DOLLY_ROTATE: 6
+        NONE: -1,
+        ROTATE: 0,
+        DOLLY: 1,
+        PAN: 2,
+        TOUCH_ROTATE: 3,
+        TOUCH_PAN: 4,
+        TOUCH_DOLLY_PAN: 5,
+        TOUCH_DOLLY_ROTATE: 6
     }
 
     var state = STATE.NONE
@@ -435,9 +435,9 @@ export const OrbitControls = function(object, domElement) {
 
                 // orthographic
                 panLeft(deltaX * (scope.object.right - scope.object.left) / scope.object.zoom /
-					element.clientWidth / window.devicePixelRatio, scope.object.matrix)
+                    element.clientWidth / window.devicePixelRatio, scope.object.matrix)
                 panUp(deltaY * (scope.object.top - scope.object.bottom) / scope.object.zoom /
-					element.clientHeight / window.devicePixelRatio, scope.object.matrix)
+                    element.clientHeight / window.devicePixelRatio, scope.object.matrix)
 
             } else {
 
@@ -573,7 +573,7 @@ export const OrbitControls = function(object, domElement) {
         panEnd.set(event.clientX, event.clientY)
 
         panDelta.subVectors(panEnd, panStart)
-			.multiplyScalar(scope.panSpeed * window.devicePixelRatio)
+            .multiplyScalar(scope.panSpeed * window.devicePixelRatio)
 
         pan(panDelta.x, panDelta.y)
 
@@ -593,8 +593,8 @@ export const OrbitControls = function(object, domElement) {
 
         const canvasRect = scope.domElement.getBoundingClientRect()
         const zoomCenter = new THREE.Vector2(
-			(event.clientX - canvasRect.left) * window.devicePixelRatio,
-			(event.clientY - canvasRect.top) * window.devicePixelRatio)
+            (event.clientX - canvasRect.left) * window.devicePixelRatio,
+            (event.clientY - canvasRect.top) * window.devicePixelRatio)
 
         if (event.deltaY < 0) {
 
@@ -687,9 +687,9 @@ export const OrbitControls = function(object, domElement) {
     function handleTouchStartDolly(event) {
         const canvasRect = scope.domElement.getBoundingClientRect()
         dollyCenter.set(
-			(event.touches[0].clientX + event.touches[1].clientX) / 2 - canvasRect.left,
-			(event.touches[0].clientY + event.touches[1].clientY) / 2 - canvasRect.top)
-			.multiplyScalar(window.devicePixelRatio)
+            (event.touches[0].clientX + event.touches[1].clientX) / 2 - canvasRect.left,
+            (event.touches[0].clientY + event.touches[1].clientY) / 2 - canvasRect.top)
+            .multiplyScalar(window.devicePixelRatio)
 
         var dx = event.touches[0].pageX - event.touches[1].pageX
         var dy = event.touches[0].pageY - event.touches[1].pageY
@@ -759,7 +759,7 @@ export const OrbitControls = function(object, domElement) {
         }
 
         panDelta.subVectors(panEnd, panStart)
-			.multiplyScalar(scope.panSpeed * window.devicePixelRatio)
+            .multiplyScalar(scope.panSpeed * window.devicePixelRatio)
 
         pan(panDelta.x, panDelta.y)
 
@@ -821,7 +821,7 @@ export const OrbitControls = function(object, domElement) {
             onMouseDown(event)
             break
 
-			// TODO touch
+            // TODO touch
 
         }
 
@@ -838,7 +838,7 @@ export const OrbitControls = function(object, domElement) {
             onMouseMove(event)
             break
 
-			// TODO touch
+            // TODO touch
 
         }
 
@@ -853,7 +853,7 @@ export const OrbitControls = function(object, domElement) {
             onMouseUp(event)
             break
 
-			// TODO touch
+            // TODO touch
 
         }
 
@@ -867,103 +867,102 @@ export const OrbitControls = function(object, domElement) {
         // Manually set the focus since calling preventDefault above
         // prevents the browser from setting it automatically.
 
-		scope.domElement.focus ? scope.domElement.focus() : window.focus()
+        scope.domElement.focus ? scope.domElement.focus() : window.focus()
 
-		var mouseAction
+        var mouseAction
 
-		switch (event.button) {
+        switch (event.button) {
 
-		case 0:
+        case 0:
 
-		    mouseAction = scope.mouseButtons.LEFT
-		    break
+            mouseAction = scope.mouseButtons.LEFT
+            break
 
-		case 1:
+        case 1:
 
-		    mouseAction = scope.mouseButtons.MIDDLE
-		    break
+            mouseAction = scope.mouseButtons.MIDDLE
+            break
 
-		case 2:
+        case 2:
 
-		    mouseAction = scope.mouseButtons.RIGHT
-		    break
+            mouseAction = scope.mouseButtons.RIGHT
+            break
 
-		default:
+        default:
 
-		    mouseAction = -1
+            mouseAction = -1
 
-		}
+        }
 
-		switch (mouseAction) {
+        switch (mouseAction) {
 
-		case THREE.MOUSE.DOLLY:
+        case THREE.MOUSE.DOLLY:
 
-		    if (scope.enableZoom === false) return
+            if (scope.enableZoom === false) return
 
-		    handleMouseDownDolly(event)
+            handleMouseDownDolly(event)
 
-		    state = STATE.DOLLY
+            state = STATE.DOLLY
 
-		    break
+            break
 
-		case THREE.MOUSE.ROTATE:
+        case THREE.MOUSE.ROTATE:
 
-		    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            if (event.ctrlKey || event.metaKey || event.shiftKey) {
 
-		        if (scope.enablePan === false) return
+                if (scope.enablePan === false) return
 
-		        handleMouseDownPan(event)
+                handleMouseDownPan(event)
 
-		        state = STATE.PAN
+                state = STATE.PAN
 
-		    } else {
+            } else {
 
-		        if (scope.enableRotate === false) return
+                if (scope.enableRotate === false) return
 
-		        handleMouseDownRotate(event)
+                handleMouseDownRotate(event)
 
-		        state = STATE.ROTATE
+                state = STATE.ROTATE
 
-		    }
+            }
 
-		    break
+            break
 
-		case THREE.MOUSE.PAN:
+        case THREE.MOUSE.PAN:
 
-		    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+            if (event.ctrlKey || event.metaKey || event.shiftKey) {
 
-		        if (scope.enableRotate === false) return
+                if (scope.enableRotate === false) return
 
-		        handleMouseDownRotate(event)
+                handleMouseDownRotate(event)
 
-		        state = STATE.ROTATE
+                state = STATE.ROTATE
 
-		    } else {
+            } else {
+                if (scope.enablePan === false) return
 
-		        if (scope.enablePan === false) return
+                handleMouseDownPan(event)
 
-		        handleMouseDownPan(event)
+                state = STATE.PAN
 
-		        state = STATE.PAN
+            }
 
-		    }
+            break
 
-		    break
+        default:
 
-		default:
+            state = STATE.NONE
 
-		    state = STATE.NONE
+        }
 
-		}
+        if (state !== STATE.NONE) {
 
-		if (state !== STATE.NONE) {
+            scope.domElement.ownerDocument.addEventListener("pointermove", onPointerMove)
+            scope.domElement.ownerDocument.addEventListener("pointerup", onPointerUp)
 
-		    scope.domElement.ownerDocument.addEventListener("pointermove", onPointerMove)
-		    scope.domElement.ownerDocument.addEventListener("pointerup", onPointerUp)
+            scope.dispatchEvent(startEvent)
 
-		    scope.dispatchEvent(startEvent)
-
-		}
+        }
 
     }
 
