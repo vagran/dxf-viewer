@@ -53,14 +53,7 @@ test("copying a bounded number of elements", () => {
     assert.deepStrictEqual([...destination], [1, 2, 0, 0])
 })
 
-/* CopyTo documents srcOffset as an element count, and every other offset in the class is one. It
- * is passed straight to the TypedArray-over-ArrayBuffer constructor, whose second argument is a
- * *byte* offset -- so it reads from the wrong place when srcOffset is a multiple of the element
- * size, and throws outright when it is not. Every call site in the library uses the default of 0,
- * which is why this is harmless today.
- */
-test("copy starting from an offset within the source",
-     {todo: "CopyTo passes srcOffset to the TypedArray constructor, which takes bytes"}, () => {
+test("copy starting from an offset within the source", () => {
     const buffer = new DynamicBuffer(NativeType.FLOAT32)
     for (const value of [1, 2, 3, 4]) {
         buffer.Push(value)
@@ -68,6 +61,40 @@ test("copy starting from an offset within the source",
     const destination = new Float32Array(2)
     buffer.CopyTo(destination, 0, 2, 2)
     assert.deepStrictEqual([...destination], [3, 4])
+})
+
+test("an offset that is not a whole number of bytes is still an element count", () => {
+    /* One element of an Int8Array is one byte and one element of a Float64Array is eight, so an
+     * implementation confusing the two units agrees with this one only for Int8Array.
+     */
+    const buffer = new DynamicBuffer(NativeType.FLOAT64)
+    for (const value of [10, 20, 30, 40, 50]) {
+        buffer.Push(value)
+    }
+    const destination = new Float64Array(3)
+    buffer.CopyTo(destination, 0, 1, 3)
+    assert.deepStrictEqual([...destination], [20, 30, 40])
+})
+
+test("an offset with no size copies through to the end", () => {
+    const buffer = new DynamicBuffer(NativeType.INT32)
+    for (const value of [1, 2, 3, 4, 5]) {
+        buffer.Push(value)
+    }
+    const destination = new Int32Array(3)
+    buffer.CopyTo(destination, 0, 2)
+    assert.deepStrictEqual([...destination], [3, 4, 5])
+})
+
+test("a copy never reaches into the unused capacity", () => {
+    const buffer = new DynamicBuffer(NativeType.INT32, 64)
+    for (const value of [7, 8]) {
+        buffer.Push(value)
+    }
+    const destination = new Int32Array(4).fill(-1)
+    buffer.CopyTo(destination, 0)
+    assert.deepStrictEqual([...destination], [7, 8, -1, -1],
+                           "only the two pushed values, not the spare capacity")
 })
 
 test("NativeArray maps each supported type to its typed array", () => {
