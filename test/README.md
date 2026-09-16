@@ -27,6 +27,11 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 - **`scene.test.mjs`** — builds every drawing in `fixtures/` and compares a canonical dump of the
   result against `expected/<name>.dump`. This is the test that covers what the library is actually
   for; everything above it is hygiene.
+- **`unit/`** — one file per area, over the modules that are pure functions: `math` (Matrix2 and
+  the segment intersection helpers), `buffer` (DynamicBuffer), `batching-key` (the comparator, and
+  the prefix-contiguity that batch lookup depends on), `text-format` (the `%%`-code substitution
+  and the MTEXT inline format parser), `pattern` (`.pat` parsing and the name registry) and `hatch`
+  (`ClipLine`). No fixtures and no DXF: these take numbers and strings.
 - **`invariants.test.mjs`** — properties that need no expected output: a translated drawing
   produces the same geometry shifted, a drawing with its blocks exploded produces the same geometry
   as one with blocks, hatch lines stay inside their boundary, and a polyline over 0x10000 vertices

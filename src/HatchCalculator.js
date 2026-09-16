@@ -293,7 +293,9 @@ export class HatchCalculator {
      *
      * @param {[Vector2, Vector2]} line Line segment defined by start and end points. Assuming start
      *  and end points lie out of the boundary loops specified in the constructor.
-     * @returns {[Vector2, Vector2][]} clipped line segments
+     * @returns {[number, number][]} Parameter ranges along the input line which are inside the
+     *  boundary, ordered and non-overlapping. Zero is the start point and one is the end point, so
+     *  the caller scales them back out along the line vector.
      */
     ClipLine(line) {
         return new ClipCalculator(this.boundaryLoops, this.style, line).Calculate()
