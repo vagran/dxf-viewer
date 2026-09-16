@@ -270,6 +270,57 @@ def _TextMissingGlyph(doc, msp):
     msp.add_text("AZB", height=2, dxfattribs={"color": 1}).set_placement((0, 0))
 
 
+@Fixture("dimension-linear")
+def _DimensionLinear(doc, msp):
+    """A horizontal linear DIMENSION with no pre-rendered block.
+
+    Without a geometry block the viewer has to synthesize the lines, arrowheads and text itself
+    through LinearDimension, which is the path with no other coverage.
+    """
+    msp.add_linear_dim(base=(0, 5), p1=(0, 0), p2=(10, 0), dxfattribs={"color": 1})
+
+
+@Fixture("dimension-aligned")
+def _DimensionAligned(doc, msp):
+    """An aligned DIMENSION, the other type LinearDimension synthesizes (type 1 rather than 0)."""
+    msp.add_aligned_dim(p1=(0, 0), p2=(8, 6), distance=3, dxfattribs={"color": 3})
+
+
+@Fixture("dimension-degenerate")
+def _DimensionDegenerate(doc, msp):
+    """A DIMENSION whose two measurement points coincide.
+
+    LinearDimension sets isValid false for this. Left unguarded it draws garbage -- two coincident
+    extension lines, a zero-length dimension line and a pair of arrowheads pointing opposite ways
+    from the same point -- so the guard has to actually fire.
+
+    The second, valid dimension is here so the fixture shows the guard is selective rather than
+    just producing an empty scene.
+    """
+    msp.add_linear_dim(base=(0, 5), p1=(4, 0), p2=(4, 0), dxfattribs={"color": 1})
+    msp.add_linear_dim(base=(0, 20), p1=(0, 15), p2=(10, 15), dxfattribs={"color": 3})
+
+
+@Fixture("attrib")
+def _Attrib(doc, msp):
+    """An INSERT carrying an ATTRIB, plus the ATTDEF in the block definition.
+
+    ATTRIB text takes its layer and colour from the owning INSERT rather than from itself, which is
+    the part worth pinning.
+    """
+    block = doc.blocks.new(name="TAGGED")
+    block.add_lwpolyline([(0, 0), (6, 0), (6, 4), (0, 4)], close=True, dxfattribs={"color": 5})
+    block.add_attdef(tag="LABEL", text="AB", height=2, insert=(0, 5))
+    insert = msp.add_blockref("TAGGED", (0, 0), dxfattribs={"color": 3})
+    insert.add_auto_attribs({"LABEL": "AB"})
+    # ezdxf leaves an ATTRIB owned by the layout's block record. AutoCAD points it at the owning
+    # INSERT -- all 188 ATTRIBs in test-data/AEC Plan Elev Sample.dxf do -- and that handle is how
+    # the viewer finds the INSERT to inherit layer and colour from. Without this the fixture would
+    # quietly exercise the fallback instead of the inheritance.
+    for attrib in insert.attribs:
+        attrib.dxf.owner = insert.dxf.handle
+
+
 @Fixture("point-shape-in-block")
 def _PointShapeInBlock(doc, msp):
     """A shaped POINT inside a block definition, alongside one at top level.
@@ -375,12 +426,32 @@ def _WriteFont():
     glyphs["space"] = TTGlyphPen(None).glyph()
     glyphs[".notdef"] = TTGlyphPen(None).glyph()
 
-    order = [".notdef", "space", "A", "B", "I"]
-    advances = {".notdef": 500, "space": 500, "A": 1000, "B": 1000, "I": 400}
+    # Digits, a decimal point and a minus, so DIMENSION fixtures can render their own measurement
+    # text. All identical boxes: what matters for layout is the advance, not legibility.
+    digit_names = {str(d): f"digit{d}" for d in range(10)}
+    for name in digit_names.values():
+        pen = TTGlyphPen(None)
+        _Rect(pen, 100, 0, 500, 800)
+        glyphs[name] = pen.glyph()
+    pen = TTGlyphPen(None)
+    _Rect(pen, 100, 0, 200, 100)
+    glyphs["period"] = pen.glyph()
+    pen = TTGlyphPen(None)
+    _Rect(pen, 100, 300, 500, 400)
+    glyphs["hyphen"] = pen.glyph()
+
+    order = ([".notdef", "space", "A", "B", "I"] +
+             [digit_names[str(d)] for d in range(10)] + ["period", "hyphen"])
+    advances = {".notdef": 500, "space": 500, "A": 1000, "B": 1000, "I": 400,
+                "period": 300, "hyphen": 600}
+    for name in digit_names.values():
+        advances[name] = 600
 
     fb = FontBuilder(FONT_UNITS_PER_EM, isTTF=True)
     fb.setupGlyphOrder(order)
-    fb.setupCharacterMap({0x20: "space", 0x41: "A", 0x42: "B", 0x49: "I"})
+    fb.setupCharacterMap({0x20: "space", 0x41: "A", 0x42: "B", 0x49: "I",
+                          0x2E: "period", 0x2D: "hyphen",
+                          **{0x30 + d: digit_names[str(d)] for d in range(10)}})
     fb.setupGlyf(glyphs)
     fb.setupHorizontalMetrics({name: (advances[name], 100) for name in order})
     fb.setupHorizontalHeader(ascent=800, descent=-200)

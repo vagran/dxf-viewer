@@ -81,7 +81,12 @@ produced plausible-looking output; the triangle count is what caught it.
 
 ## Known limits
 
-- **DIMENSION and ATTRIB are uncovered.** TEXT and MTEXT are, through the generated font above.
+- **Only linear and aligned DIMENSION types are covered**, because only those two are synthesized
+  at all. Radial, angular and ordinate dimensions are unimplemented.
+- **ATTRIB ownership has to be set by hand.** ezdxf leaves an ATTRIB owned by the layout's block
+  record; AutoCAD points it at the owning INSERT, which is how the viewer finds the entity to
+  inherit layer and colour from. The `attrib` generator fixes the owner up explicitly — without it
+  the fixture silently exercises the fallback instead.
 - **ezdxf is not an oracle here.** Its own renderer models text and lineweights differently, so it
   can be used for a side-by-side sanity check but never for pixel or geometry equality. The goldens
   record what *this* library does; correctness is judged by reading them, and against
