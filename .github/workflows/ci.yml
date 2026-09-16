@@ -35,3 +35,21 @@ jobs:
       # Installs the package into test/types as a consumer would, then compiles
       # test/types/consumer.ts against the published declarations.
       - run: npm run typecheck
+
+  fixtures:
+    name: fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the interpreter the committed fixtures were generated with. ezdxf itself is
+          # pinned in requirements.txt.
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: test/fixtures/requirements.txt
+      - run: pip install -r test/fixtures/requirements.txt
+      - run: python test/fixtures/gen/generate.py
+      # Regenerating must be a no-op. A diff here means the committed fixtures and the generator
+      # that is supposed to produce them have drifted apart.
+      - run: git diff --exit-code test/fixtures

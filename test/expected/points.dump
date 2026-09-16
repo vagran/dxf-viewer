@@ -1,0 +1,17 @@
+origin (0, 0)
+bounds (0, 0) (40, 0)
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 5
+  POINTS layer="0" block=- color=0000ff lineType=0 vertices=2
+  POINTS layer="0" block=- color=00ff00 lineType=0 vertices=2
+  POINTS layer="0" block=- color=00ffff lineType=0 vertices=2
+  POINTS layer="0" block=- color=ff0000 lineType=0 vertices=2
+  POINTS layer="0" block=- color=ffff00 lineType=0 vertices=2
+primitives 5
+  POINT layer="0" color=0000ff (40, 0)
+  POINT layer="0" color=00ff00 (20, 0)
+  POINT layer="0" color=00ffff (30, 0)
+  POINT layer="0" color=ff0000 (0, 0)
+  POINT layer="0" color=ffff00 (10, 0)
