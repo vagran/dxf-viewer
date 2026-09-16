@@ -51,10 +51,15 @@ _FIXED_JULIAN_DATE = 2451544.5
 _REGISTRY = []
 
 
-def Fixture(name):
-    """Registers a fixture builder. The function receives the document and its modelspace."""
+def Fixture(name, postprocess=None):
+    """Registers a fixture builder. The function receives the document and its modelspace.
+
+    `postprocess` rewrites the finished DXF text. ezdxf will not write a malformed file, so a
+    fixture that has to be malformed -- one that exists to make a parser guard fire -- edits the
+    output afterwards. Use it only for that; anything ezdxf can express belongs in the builder.
+    """
     def Register(fn):
-        _REGISTRY.append((name, fn))
+        _REGISTRY.append((name, fn, postprocess))
         return fn
     return Register
 
@@ -81,7 +86,7 @@ def _Normalize(text):
 _TRANSLATION = (1_000_000.0, 500_000.0)
 
 
-def _Write(name, builder, subdir=None, transform=None):
+def _Write(name, builder, subdir=None, transform=None, postprocess=None):
     doc = ezdxf.new("R2000", setup=False)
     for var in ("$TDCREATE", "$TDUCREATE", "$TDUPDATE", "$TDUUPDATE"):
         doc.header[var] = _FIXED_JULIAN_DATE
@@ -93,7 +98,10 @@ def _Write(name, builder, subdir=None, transform=None):
     directory = FIXTURES_DIR if subdir is None else FIXTURES_DIR / subdir
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.dxf"
-    path.write_text(_Normalize(buffer.getvalue()), encoding="utf-8", newline="")
+    text = _Normalize(buffer.getvalue())
+    if postprocess is not None:
+        text = postprocess(text)
+    path.write_text(text, encoding="utf-8", newline="")
     return path
 
 
@@ -138,6 +146,45 @@ def _Polyline(doc, msp):
                        dxfattribs={"color": 1})
     msp.add_lwpolyline([(20, 0), (30, 0), (30, 10), (20, 10)], close=True,
                        dxfattribs={"color": 3})
+
+
+def _DropSeqEnd(text):
+    """Deletes every SEQEND entity, leaving the POLYLINE before it unterminated.
+
+    A DXF writer always closes a POLYLINE with SEQEND, so this cannot be built with ezdxf -- but
+    real files do omit it. See the fixture below for why that matters.
+    """
+    lines = text.split("\n")
+    out = []
+    i = 0
+    while i + 1 < len(lines):
+        if lines[i].strip() == "0" and lines[i + 1] == "SEQEND":
+            i += 2
+            while i + 1 < len(lines) and lines[i].strip() != "0":
+                i += 2
+            continue
+        out.append(lines[i])
+        out.append(lines[i + 1])
+        i += 2
+    out.extend(lines[i:])
+    return "\n".join(out)
+
+
+@Fixture("polyline-no-seqend", postprocess=_DropSeqEnd)
+def _PolylineNoSeqEnd(doc, msp):
+    """An old-style POLYLINE with no VERTEX entities and no SEQEND, between two LINEs.
+
+    test-data/sample-files/sheets (cn).dxf contains five of these, and they used to hang the
+    parser outright: parsePolylineVertices looped until it saw VERTEX or SEQEND and advanced the
+    scanner in neither case, so a POLYLINE followed straight by the next entity spun forever.
+    AutoCAD tolerates the file, so the vertex list simply ends.
+
+    The two LINEs are the actual assertion. The first proves the entity before survives; the
+    second proves parsing resumes on the group the polyline stopped at, rather than swallowing it.
+    """
+    msp.add_line((0, 0), (10, 0), dxfattribs={"color": 1})
+    msp.add_polyline2d([], dxfattribs={"color": 3})
+    msp.add_line((0, 10), (10, 10), dxfattribs={"color": 5})
 
 
 @Fixture("circle-arc")
@@ -508,16 +555,18 @@ def Main():
     parser.add_argument("names", nargs="*", help="Fixtures to write; default is all of them.")
     args = parser.parse_args()
 
-    selected = [(n, f) for n, f in _REGISTRY if not args.names or n in args.names]
-    unknown = set(args.names) - {n for n, _ in _REGISTRY}
+    selected = [e for e in _REGISTRY if not args.names or e[0] in args.names]
+    unknown = set(args.names) - {n for n, _, _ in _REGISTRY}
     if unknown:
         sys.exit(f"Unknown fixture(s): {', '.join(sorted(unknown))}")
 
-    for name, builder in selected:
-        paths = [_Write(name, builder),
-                 _Write(name, builder, subdir="translated", transform=_Translate)]
+    for name, builder, postprocess in selected:
+        paths = [_Write(name, builder, postprocess=postprocess),
+                 _Write(name, builder, subdir="translated", transform=_Translate,
+                        postprocess=postprocess)]
         if name in _EXPLODABLE:
-            paths.append(_Write(name, builder, subdir="exploded", transform=_Explode))
+            paths.append(_Write(name, builder, subdir="exploded", transform=_Explode,
+                                postprocess=postprocess))
         for path in paths:
             print(f"{path.relative_to(FIXTURES_DIR.parent.parent)}  {path.stat().st_size:>7} B")
 

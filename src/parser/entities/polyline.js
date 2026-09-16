@@ -66,15 +66,25 @@ function parsePolylineVertices(scanner, curr) {
 
     var vertices = [];
     while (!scanner.isEOF()) {
-        if (curr.code === 0) {
-            if (curr.value === 'VERTEX') {
-                vertices.push(vertexParser.parseEntity(scanner, curr));
-                curr = scanner.lastReadGroup;
-            } else if (curr.value === 'SEQEND') {
-                parseSeqEnd(scanner, curr);
-                break;
-            }
+        if (curr.code !== 0) {
+            // The caller always leaves the scanner on an entity start group, so this
+            // should not happen. Skip the group rather than spin forever on a bad file.
+            curr = scanner.next();
+            continue;
         }
+        if (curr.value === 'VERTEX') {
+            vertices.push(vertexParser.parseEntity(scanner, curr));
+            curr = scanner.lastReadGroup;
+            continue;
+        }
+        if (curr.value === 'SEQEND') {
+            parseSeqEnd(scanner, curr);
+            break;
+        }
+        // Some files omit both the vertices and the SEQEND and start the next entity
+        // right away. The vertex list just ends here; the entity group stays the last
+        // read one so the caller resumes on it.
+        break;
     }
     return vertices;
 };
