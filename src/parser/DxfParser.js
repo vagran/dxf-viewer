@@ -614,7 +614,9 @@ DxfParser.prototype._parse = function(dxfString) {
                     curr = scanner.next();
                     break;
                 case 420: // TrueColor Color
-                    layer.color = curr.value;
+                    // Mask off the color method marker in the high byte, as for entities - see
+                    // the 420 case in ParseHelpers.checkCommonEntityProperties.
+                    layer.color = curr.value & 0xffffff;
                     curr = scanner.next();
                     break;
                 case 0:

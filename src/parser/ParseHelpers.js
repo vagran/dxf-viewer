@@ -131,7 +131,12 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
             entity.lineweight = curr.value;
             break;
         case 420: // TrueColor Color
-            entity.color = curr.value;
+            // The high byte is a color method marker - 0xC2 means the low 24 bits are an RGB
+            // value - but files also write a bare RGB value with no marker at all. Both forms
+            // occur in the wild and both mean RGB, so keep the low 24 bits either way. Leaving
+            // the marker in place splits render batches, because the same visible color reached
+            // through group 62 and through here yields two different batching keys.
+            entity.color = curr.value & 0xffffff;
             break;
         default:
             return false;
