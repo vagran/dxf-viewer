@@ -1,3 +1,6 @@
 # Pinned: the fixtures are committed and CI checks that regenerating them changes nothing, so a
-# different ezdxf version would fail that check rather than quietly produce different files.
+# different version of either would fail that check rather than quietly produce different files.
 ezdxf==1.4.4
+# A transitive dependency of ezdxf, but the font generator imports it directly, so it is named
+# here too rather than relied on by accident.
+fonttools==4.65.0
