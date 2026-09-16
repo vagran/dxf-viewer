@@ -81,6 +81,10 @@ produced plausible-looking output; the triangle count is what caught it.
 
 ## Known limits
 
+- **A dimension override needs `.commit()`.** ezdxf keeps `override={...}` on the object returned
+  by `add_linear_dim` and writes nothing to the file unless you commit or render it. `.commit()`
+  persists it as XDATA without generating a geometry block, which is what leaves the viewer to
+  synthesize the dimension.
 - **Only linear and aligned DIMENSION types are covered**, because only those two are synthesized
   at all. Radial, angular and ordinate dimensions are unimplemented.
 - **ATTRIB ownership has to be set by hand.** ezdxf leaves an ATTRIB owned by the layout's block

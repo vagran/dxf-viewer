@@ -1,0 +1,33 @@
+origin (0, 5)
+bounds (0, 0.625) (10, 23.2639)
+hasMissingChars no
+layers 3
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+  "DIMS" color=ffff00
+batches 6
+  LINES layer="0" block=- color=00ff00 lineType=0 vertices=8
+  LINES layer="0" block=- color=ff0000 lineType=0 vertices=4
+  INDEXED_TRIANGLES layer="0" block=- color=0000ff lineType=0 chunks=1 vertices=16 indices=12
+  INDEXED_TRIANGLES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=12 indices=6
+  LINES layer="DIMS" block=- color=ffff00 lineType=0 vertices=12
+  INDEXED_TRIANGLES layer="DIMS" block=- color=ffff00 lineType=0 chunks=1 vertices=28 indices=18
+primitives 18
+  POLYLINE layer="0" color=00ff00 (0, 0.625) (0, 6.25)
+  POLYLINE layer="0" color=00ff00 (10, 0.625) (10, 6.25)
+  POLYLINE layer="0" color=ff0000 (0, 5) (10, 5)
+  POLYLINE layer="DIMS" color=ffff00 (0, 15.625) (0, 21.25)
+  POLYLINE layer="DIMS" color=ffff00 (0, 20) (10, 20)
+  POLYLINE layer="DIMS" color=ffff00 (10, 15.625) (10, 21.25)
+  TRIANGLE layer="0" color=0000ff (3.6111, 8.2639) (3.6111, 5.4861) (5, 5.4861)
+  TRIANGLE layer="0" color=0000ff (5, 5.4861) (5, 8.2639) (3.6111, 8.2639)
+  TRIANGLE layer="0" color=0000ff (5.6944, 8.2639) (5.6944, 5.4861) (7.0833, 5.4861)
+  TRIANGLE layer="0" color=0000ff (7.0833, 5.4861) (7.0833, 8.2639) (5.6944, 8.2639)
+  TRIANGLE layer="0" color=ff0000 (0, 5) (2.5, 4.375) (2.5, 5.625)
+  TRIANGLE layer="0" color=ff0000 (10, 5) (7.5, 4.375) (7.5, 5.625)
+  TRIANGLE layer="DIMS" color=ffff00 (0, 20) (2.5, 19.375) (2.5, 20.625)
+  TRIANGLE layer="DIMS" color=ffff00 (10, 20) (7.5, 19.375) (7.5, 20.625)
+  TRIANGLE layer="DIMS" color=ffff00 (3.6111, 23.2639) (3.6111, 20.4861) (5, 20.4861)
+  TRIANGLE layer="DIMS" color=ffff00 (5, 20.4861) (5, 23.2639) (3.6111, 23.2639)
+  TRIANGLE layer="DIMS" color=ffff00 (5.6944, 23.2639) (5.6944, 20.4861) (7.0833, 20.4861)
+  TRIANGLE layer="DIMS" color=ffff00 (7.0833, 20.4861) (7.0833, 23.2639) (5.6944, 23.2639)
