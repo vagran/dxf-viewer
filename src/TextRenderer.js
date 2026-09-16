@@ -256,10 +256,18 @@ class CharShape {
             this.indices = []
             for (const shape of shapes) {
                 const shapePoints = shape.extractPoints(options.curveSubdivision)
-                /* Ensure proper vertices winding. */
+                /* Ensure proper vertices winding.
+                 *
+                 * The hole loop is unreachable as things stand, and is kept as a guard rather
+                 * than removed: toShapes(false) treats a contour as solid only when it is
+                 * clockwise, so a shape that has holes is always clockwise and this branch is not
+                 * entered. The two paths that do yield a counter-clockwise shape -- a single
+                 * subpath, and the "no solid contours" fallback -- both produce no holes at all.
+                 * Until that changed, the loop body read an undeclared `h` and would have thrown.
+                 */
                 if (!ShapeUtils.isClockWise(shapePoints.shape)) {
                     shapePoints.shape = shapePoints.shape.reverse()
-                    for (const hole of shapePoints.holes) {
+                    for (const [h, hole] of shapePoints.holes.entries()) {
                         if (ShapeUtils.isClockWise(hole)) {
                             shapePoints.holes[h] = hole.reverse()
                         }
@@ -376,7 +384,7 @@ class Font {
         if (i1 === 0) {
             return 0
         }
-        const i2 = this.data.charToGlyphIndex(c1)
+        const i2 = this.data.charToGlyphIndex(c2)
         if (i2 === 0) {
             return 0
         }
