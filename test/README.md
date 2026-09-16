@@ -170,13 +170,25 @@ Parses and builds each drawing, runs `ValidateScene` over the result, and report
 and layer counts, buffer sizes, unhandled entity types and any warning. Exits non-zero on a warning
 or a validation failure.
 
+A handful of fixtures exist to make a guard fire, so their warning *is* the assertion —
+`dimension-degenerate.dxf` has two coincident measurement points so `LinearDimension`'s validity
+check has something to reject. Those are listed in [`expected-warnings.mjs`](expected-warnings.mjs),
+keyed by repo-relative path, each entry matched as a substring of the message. A listed warning
+prints as `expected WARN` and does not fail the run; a listed warning that *stops* appearing prints
+as `MISSING expected warning` and does, since a guard that quietly stopped firing is the regression
+the fixture is there to catch. Leave handles out of the substring — they move when a fixture is
+regenerated — and do not expect a count: a dimension is decomposed twice, so its warnings come in
+pairs today.
+
 Three properties are what make it worth being one command:
 
-- **Corpus-optional.** With `test-data/` present it sweeps all of it; without, it falls back to
-  `test/fixtures/` and still passes. The same command is correct for a contributor with no corpus
-  and for a checkout that has one. CI only ever sees the fixtures, because `test-data/` holds
-  customer and user-reported drawings that cannot be redistributed — the real value of this is
-  local.
+- **Corpus-optional.** It sweeps `test/fixtures/` plus `test-data/` if there is one, skipping
+  whichever is absent, so the same command is correct for a contributor with no corpus and for a
+  checkout that has one. CI only ever sees the fixtures, because `test-data/` holds customer and
+  user-reported drawings that cannot be redistributed — the real value of this is local, but the
+  fixtures are swept locally too, so what CI runs is never a path nobody exercises before pushing.
+  They come first in the output, which makes a CI run a prefix of a local one and the two
+  directly diffable.
 - **No goldens.** Everything it asserts is an invariant or a warning count, so adding a drawing
   costs nothing. A file attached to a bug report is covered the moment it lands in `test-data/`.
 - **Stable, diffable output.** Run it before a change, run it after, `diff` the two. A moved batch
