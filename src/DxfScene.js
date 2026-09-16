@@ -7,6 +7,7 @@ import { RBTree } from "./RBTree.js"
 import { MTextFormatParser } from "./MTextFormatParser.js"
 import dimStyleCodes from "./parser/DimStyleCodes.js"
 import { LinearDimension } from "./LinearDimension.js"
+import colorTable from "./parser/AutoCadColorIndex.js"
 import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
 import { LookupPattern, Pattern } from "./Pattern.js"
 import "./patterns/index.js"
@@ -250,7 +251,9 @@ export class DxfScene {
 
             } else if (entity.type === "DIMENSION") {
                 ret = true
-                const dim = this._CreateLinearDimension(entity)
+                /* No block context: this pre-scan only wants the texts, and resolved colors are
+                 * discarded with the rest of the dimension. */
+                const dim = this._CreateLinearDimension(entity, null)
                 if (dim) {
                     for (const text of dim.GetTexts()) {
                         if (!await this.textRenderer.FetchFonts(text)) {
@@ -950,7 +953,7 @@ export class DxfScene {
      * @return {?LinearDimension} Dimension handler instance, null if not possible to create from
      * the provided entity.
      */
-    _CreateLinearDimension(entity) {
+    _CreateLinearDimension(entity, blockCtx = null) {
         const type = (entity.dimensionType || 0) & 0xf
         /* For now support linear dimensions only. */
         if ((type != 0 && type != 1) || !entity.linearOrAngularPoint1 ||
@@ -976,7 +979,11 @@ export class DxfScene {
 
         /* styleResolver */
         }, valueName => {
-            return this._GetDimStyleValue(valueName, entity, style)
+            const value = this._GetDimStyleValue(valueName, entity, style)
+            if (DIM_COLOR_VARS.has(valueName)) {
+                return this._ResolveDimStyleColor(value, entity, blockCtx)
+            }
+            return value
 
         /* textWidthCalculator */
         }, (text, fontSize) => {
@@ -989,6 +996,42 @@ export class DxfScene {
         }
 
         return dim
+    }
+
+    /** Resolve a DIMSTYLE color variable to an RGB value.
+     *
+     * DIMCLRD, DIMCLRE and DIMCLRT hold DXF *color numbers*, not colors: 0 is BYBLOCK, 256 is
+     * BYLAYER and 1..255 index the ACI table. They default to 0. Using one directly as an RGB
+     * value - which is what happened until 2026-09-16 - paints every synthesized dimension
+     * 0x000000, and would turn a DIMCLRD of 1 ("red") into 0x000001.
+     *
+     * A dimension's geometry lives in a block, so BYBLOCK means the DIMENSION entity's own color.
+     *
+     * @param value {?number} Raw variable value.
+     * @param entity {{}} The DIMENSION entity.
+     * @param blockCtx {?BlockContext}
+     * @return {number} RGB value, or a ColorCode sentinel when inside a block definition, exactly
+     *  as _GetEntityColor would return.
+     */
+    _ResolveDimStyleColor(value, entity, blockCtx) {
+        if (value === null || value === undefined || value === 0) {
+            /* BYBLOCK: the dimension's geometry takes the entity's color. */
+            return this._GetEntityColor(entity, blockCtx)
+        }
+        if (value === 256) {
+            const layerName = this._GetEntityLayer(entity, blockCtx)
+            const layer = layerName !== null ? this.layers.get(layerName) : null
+            if (layer) {
+                return layer.color
+            }
+            return blockCtx ? ColorCode.BY_LAYER : 0
+        }
+        const color = colorTable[value]
+        if (color === undefined) {
+            console.warn(`Unrecognized dimension style color index: ${value}`)
+            return this._GetEntityColor(entity, blockCtx)
+        }
+        return color
     }
 
     *_DecomposeDimension(entity, blockCtx) {
@@ -1013,7 +1056,7 @@ export class DxfScene {
          * https://ezdxf.readthedocs.io/en/stable/tables/dimstyle_table_entry.html
          */
 
-        const dim = this._CreateLinearDimension(entity)
+        const dim = this._CreateLinearDimension(entity, blockCtx)
         if (!dim) {
             return
         }
@@ -2871,6 +2914,9 @@ const PdMode = Object.freeze({
 
     SHAPE_MASK: 0xf0
 })
+
+/** DIMSTYLE variables holding a DXF color number rather than a plain value. */
+const DIM_COLOR_VARS = new Set(["DIMCLRD", "DIMCLRE", "DIMCLRT"])
 
 /** Special color values, used for block entities. Regular entity color is resolved instantly. */
 export const ColorCode = Object.freeze({

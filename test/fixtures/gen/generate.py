@@ -286,6 +286,27 @@ def _DimensionAligned(doc, msp):
     msp.add_aligned_dim(p1=(0, 0), p2=(8, 6), distance=3, dxfattribs={"color": 3})
 
 
+@Fixture("dimension-colors")
+def _DimensionColors(doc, msp):
+    """The three ways a DIMSTYLE colour variable resolves.
+
+    DIMCLRD, DIMCLRE and DIMCLRT are DXF colour *numbers*: 0 is BYBLOCK, 256 is BYLAYER and 1..255
+    index the ACI table. The overrides also arrive as XDATA, which is the first step of the
+    style-resolution precedence chain.
+    """
+    doc.layers.add("DIMS", color=2)
+    # commit() persists the overrides as XDATA without generating a geometry block, so the viewer
+    # still synthesizes the dimension. Without it ezdxf keeps them on the returned override object
+    # and the file carries no XDATA at all.
+    # Explicit ACI indices, a different one for each of the three parts.
+    msp.add_linear_dim(base=(0, 5), p1=(0, 0), p2=(10, 0), dxfattribs={"color": 7},
+                       override={"dimclrd": 1, "dimclre": 3, "dimclrt": 5}).commit()
+    # BYLAYER, on a layer that is yellow.
+    msp.add_linear_dim(base=(0, 20), p1=(0, 15), p2=(10, 15),
+                       dxfattribs={"color": 7, "layer": "DIMS"},
+                       override={"dimclrd": 256, "dimclre": 256, "dimclrt": 256}).commit()
+
+
 @Fixture("dimension-degenerate")
 def _DimensionDegenerate(doc, msp):
     """A DIMENSION whose two measurement points coincide.
