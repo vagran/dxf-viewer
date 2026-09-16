@@ -634,11 +634,20 @@ export class DxfScene {
         const isShaped = (this.pdMode & PdMode.SHAPE_MASK) !== 0
 
         if (isShaped) {
+            if (blockCtx) {
+                /* Instancing only ever happens at top level: a nested INSERT is flattened into its
+                 * enclosing block definition rather than instanced, and the point shape is no
+                 * different. Emitting it inline also keeps the deferred colour out of the batch
+                 * key -- an instance batch resolves BYLAYER/BYBLOCK, it cannot carry one.
+                 */
+                yield* this._GeneratePointShapeEntities(entity.position, layer, color, null, true)
+                return
+            }
             /* Shaped mark should be instanced. */
             const key = new BatchingKey(layer, POINT_SHAPE_BLOCK_NAME,
                                         BatchingKey.GeometryType.POINT_INSTANCE, color, 0)
             const batch = this._GetBatch(key)
-            batch.PushVertex(this._TransformVertex(entity.position))
+            batch.PushVertex(this._TransformVertex(entity.position, blockCtx))
             this._CreatePointShapeBlock()
             return
         }
@@ -737,44 +746,71 @@ export class DxfScene {
         this.pointShapeBlock.offset = new Vector2(0, 0)
         const blockCtx = this.pointShapeBlock.DefinitionContext()
 
-        const markType = this.pdMode & PdMode.MARK_MASK
-        if (markType !== PdMode.DOT && markType !== PdMode.NONE) {
-            const vertices = []
-            this._CreatePointMarker(vertices, markType)
-            const entity = new Entity({
-                type: Entity.Type.LINE_SEGMENTS,
-                vertices,
-                color: ColorCode.BY_BLOCK
-            })
+        /* The block is the shape itself, centred on zero; the dot is excluded because the
+         * instanced path draws it from the instance translations instead.
+         */
+        for (const entity of this._GeneratePointShapeEntities({x: 0, y: 0}, null,
+                                                              ColorCode.BY_BLOCK, 0, false)) {
             this._ProcessEntity(entity, blockCtx)
+        }
+    }
+
+    /** Geometry of one point display marker, as configured by $PDMODE and $PDSIZE.
+     *
+     * Shared by the two ways a marker is drawn: once at the origin for the instanced shape block,
+     * and inline at the point's own position when the point is inside a block definition.
+     *
+     * @param position {{x, y}} Centre of the marker.
+     * @param layer {?string}
+     * @param color {number}
+     * @param lineType {?number}
+     * @param includeDot {Boolean} False for the shape block, whose dot comes from the instance
+     *  translations instead -- that is what `scene.pointShapeHasDot` tells the renderer.
+     * @return {Generator<Entity>}
+     */
+    *_GeneratePointShapeEntities(position, layer, color, lineType, includeDot) {
+        const markType = this.pdMode & PdMode.MARK_MASK
+        if (markType === PdMode.DOT) {
+            if (includeDot) {
+                yield new Entity({
+                    type: Entity.Type.POINTS,
+                    vertices: [position],
+                    layer, color, lineType
+                })
+            }
+        } else if (markType !== PdMode.NONE) {
+            const vertices = []
+            this._CreatePointMarker(vertices, markType, position)
+            yield new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices, layer, color, lineType
+            })
         }
 
         if (this.pdMode & PdMode.SQUARE) {
             const r = this.pdSize * 0.5
-            const vertices = [
-                {x: -r, y: r},
-                {x: r, y: r},
-                {x: r, y: -r},
-                {x: -r, y: -r}
-            ]
-            const entity = new Entity({
-                type: Entity.Type.POLYLINE, vertices,
-                color: ColorCode.BY_BLOCK,
+            yield new Entity({
+                type: Entity.Type.POLYLINE,
+                vertices: [
+                    {x: position.x - r, y: position.y + r},
+                    {x: position.x + r, y: position.y + r},
+                    {x: position.x + r, y: position.y - r},
+                    {x: position.x - r, y: position.y - r}
+                ],
+                layer, color, lineType,
                 shape: true
             })
-            this._ProcessEntity(entity, blockCtx)
         }
         if (this.pdMode & PdMode.CIRCLE) {
             const vertices = []
-            this._GenerateArcVertices({vertices, center: {x: 0, y: 0},
+            this._GenerateArcVertices({vertices, center: position,
                                        radius: this.pdSize * 0.5,
                                        tessellationAngle: POINT_CIRCLE_TESSELLATION_ANGLE})
-            const entity = new Entity({
+            yield new Entity({
                 type: Entity.Type.POLYLINE, vertices,
-                color: ColorCode.BY_BLOCK,
+                layer, color, lineType,
                 shape: true
             })
-            this._ProcessEntity(entity, blockCtx)
         }
     }
 
