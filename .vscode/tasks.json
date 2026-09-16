@@ -1,6 +1,9 @@
 {
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
+    //
+    // The test tasks need nothing but `npm install` in this folder: no browser, no dev server and
+    // no DXF corpus. Add a task here whenever a new script lands in package.json.
     "version": "2.0.0",
     "tasks": [
         {
@@ -20,6 +23,56 @@
             "options": {
                 "cwd": "${workspaceFolder}"
             }
+        },
+        {
+            // Bound to "Tasks: Run Test Task", so it runs without picking from the list.
+            "label": "test",
+            "type": "process",
+            "command": "npm",
+            "args": ["test"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            // Re-runs on save. Node watches the files the tests touch, which includes src/.
+            "label": "test (watch)",
+            "type": "process",
+            "command": "node",
+            "args": ["--test", "--watch", "test/**/*.test.mjs"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            // The test file in the active editor, for when the whole suite is more than you want.
+            "label": "test (current file)",
+            "type": "process",
+            "command": "node",
+            "args": ["--test", "${relativeFile}"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            // Compiles test/types/consumer.ts against the published declarations. The $tsc matcher
+            // turns the output into clickable diagnostics; paths are relative to the workspace.
+            "label": "typecheck",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "typecheck"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": ["$tsc"]
         }
     ]
 }
