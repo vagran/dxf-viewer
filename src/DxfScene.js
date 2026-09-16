@@ -2759,20 +2759,20 @@ export class Entity {
                 if (count === 1 && this.shape) {
                     /* Both. */
                     vertices = (function*() {
-                        yield this.vertices[chunkOffset]
-                        yield this.vertices[0]
+                        yield _this.vertices[chunkOffset]
+                        yield _this.vertices[0]
                     })()
                 } else if (count === 1) {
                     /* Just last vertex. Take previous one to make a line. */
                     vertices = (function*() {
-                        yield this.vertices[chunkOffset - 1]
-                        yield this.vertices[chunkOffset]
+                        yield _this.vertices[chunkOffset - 1]
+                        yield _this.vertices[chunkOffset]
                     })()
                 } else {
                     /* Just shape-closing vertex. Take last one to make a line. */
                     vertices = (function*() {
-                        yield this.vertices[verticesCount - 1]
-                        yield this.vertices[0]
+                        yield _this.vertices[verticesCount - 1]
+                        yield _this.vertices[0]
                     })()
                 }
                 indices = _IterateLineIndices(2, false)
@@ -2781,7 +2781,7 @@ export class Entity {
                 /* Additional vertex to close the shape. */
                 vertices = (function*() {
                     yield* _this._IterateVertices(chunkOffset, count)
-                    yield this.vertices[0]
+                    yield _this.vertices[0]
                 })()
                 indices = _IterateLineIndices(count + 1, false)
                 chunkVerticesCount = count + 1
