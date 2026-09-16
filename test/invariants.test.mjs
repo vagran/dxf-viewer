@@ -193,28 +193,22 @@ for (const closed of [false, true]) {
     }))
 }
 
-/* Known defect, not yet fixed: the segment joining the last vertex of one chunk to the first of
- * the next is never emitted, so a polyline over 0x10000 vertices draws with one gap per chunk
- * boundary -- two chunks lose one segment, three lose two. A closed polyline of exactly 0x10000
- * vertices has the opposite problem and draws its closing segment twice.
- *
- * The one case that is right is an open polyline whose last chunk holds a single vertex: that
- * branch explicitly reaches back for the previous vertex, which is what every other branch is
- * missing.
- *
- * Marked todo rather than fixed here because the fix changes emitted geometry for every large
- * polyline, and belongs in its own change where the effect on the corpus can be seen.
+/* Sizes chosen around the chunk boundary, where the seam segment used to be dropped: one below,
+ * exactly on it, just over, and spanning three chunks. 0x10000 closed is its own case -- it used
+ * to emit the closing segment twice rather than lose one.
  */
 const CHUNK_SEAM_CASES = [
-    [0x10000 + 1, false], [0x10000 + 2, false], [2 * 0x10000 + 5, false],
-    [0x10000, true], [0x10000 + 1, true], [2 * 0x10000 + 5, true]
+    [0x10000 - 1, false], [0x10000, false], [0x10000 + 1, false], [0x10000 + 2, false],
+    [2 * 0x10000 + 5, false],
+    [0x10000 - 1, true], [0x10000, true], [0x10000 + 1, true], [0x10000 + 2, true],
+    [2 * 0x10000 + 5, true]
 ]
 
 for (const [vertexCount, closed] of CHUNK_SEAM_CASES) {
     test(`chunk seams keep every segment: ${vertexCount} vertices ` +
          `(${closed ? "closed" : "open"})`,
-         {todo: "segments are dropped at chunk boundaries"},
          () => WithChunkedPolyline(vertexCount, closed, scene => {
+        assert.deepStrictEqual(ValidateScene(scene), [])
         let segments = 0
         for (const primitive of new SceneReader(scene).ReadPrimitives()) {
             segments += primitive.vertices.length - 1

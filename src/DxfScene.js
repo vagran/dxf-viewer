@@ -2725,6 +2725,11 @@ export class Entity {
      *  * "vertices" - iterator for included vertices.
      *  * "indices" - iterator for indices.
      *  Closed shapes are handled properly.
+     *
+     * Consecutive chunks **overlap by one vertex**: the last vertex of a chunk is repeated as the
+     * first vertex of the next one. Without that overlap the segment spanning a chunk boundary
+     * belongs to no chunk at all, and a polyline longer than INDEXED_CHUNK_SIZE draws with a gap
+     * at every boundary.
      */
     *_IterateLineChunks() {
         const verticesCount = this.vertices.length
@@ -2732,72 +2737,69 @@ export class Entity {
             return
         }
         const _this = this
-        /* chunkOffset == verticesCount for shape closing vertex. */
-        for (let chunkOffset = 0; chunkOffset <= verticesCount; chunkOffset += INDEXED_CHUNK_SIZE) {
-            let count = verticesCount - chunkOffset
-            let isLast
-            if (count > INDEXED_CHUNK_SIZE) {
-                count = INDEXED_CHUNK_SIZE
-                isLast = false
-            } else {
-                isLast = true
-            }
-            if (isLast && this.shape && chunkOffset > 0 && count === INDEXED_CHUNK_SIZE) {
-                /* Corner case - required shape closing vertex does not fit into the chunk. Will
-                * require additional chunk.
-                */
-                isLast = false
-            }
-            if (chunkOffset === verticesCount && !this.shape) {
-                /* Shape is not closed and it is last closing vertex iteration. */
-                break
-            }
+        let chunkOffset = 0
+        let isClosingEmitted = false
+
+        while (chunkOffset < verticesCount - 1) {
+            const remaining = verticesCount - chunkOffset
+            const count = Math.min(INDEXED_CHUNK_SIZE, remaining)
+            const isLast = count === remaining
 
             let vertices, indices, chunkVerticesCount
-            if (count < 2) {
-                /* Either last vertex or last shape-closing vertex, or both. */
-                if (count === 1 && this.shape) {
-                    /* Both. */
-                    vertices = (function*() {
-                        yield _this.vertices[chunkOffset]
-                        yield _this.vertices[0]
-                    })()
-                } else if (count === 1) {
-                    /* Just last vertex. Take previous one to make a line. */
-                    vertices = (function*() {
-                        yield _this.vertices[chunkOffset - 1]
-                        yield _this.vertices[chunkOffset]
-                    })()
-                } else {
-                    /* Just shape-closing vertex. Take last one to make a line. */
-                    vertices = (function*() {
-                        yield _this.vertices[verticesCount - 1]
-                        yield _this.vertices[0]
-                    })()
-                }
-                indices = _IterateLineIndices(2, false)
-                chunkVerticesCount = 2
-            } else if (isLast && this.shape && chunkOffset > 0 && count < INDEXED_CHUNK_SIZE) {
-                /* Additional vertex to close the shape. */
+
+            if (isLast && this.shape && chunkOffset === 0) {
+                /* The whole shape fits in one chunk, so it is closed by an index pointing back at
+                 * its own first vertex and that vertex is not stored twice. This is the common
+                 * case by far - most closed polylines are small.
+                 */
+                vertices = this._IterateVertices(chunkOffset, count)
+                indices = _IterateLineIndices(count, true)
+                chunkVerticesCount = count
+                isClosingEmitted = true
+
+            } else if (isLast && this.shape && count < INDEXED_CHUNK_SIZE) {
+                /* The shape's first vertex lives in an earlier chunk and cannot be addressed from
+                 * here, so it is repeated to carry the closing segment. There is room for it.
+                 */
                 vertices = (function*() {
                     yield* _this._IterateVertices(chunkOffset, count)
                     yield _this.vertices[0]
                 })()
                 indices = _IterateLineIndices(count + 1, false)
                 chunkVerticesCount = count + 1
+                isClosingEmitted = true
+
             } else {
                 vertices = this._IterateVertices(chunkOffset, count)
-                indices = _IterateLineIndices(count,
-                                              isLast && chunkOffset === 0 && this.shape)
+                indices = _IterateLineIndices(count, false)
                 chunkVerticesCount = count
             }
+
             yield {
                 verticesCount: chunkVerticesCount,
                 vertices,
                 indices
             }
+
+            /* Step back one vertex, so the next chunk starts where this one ended. */
+            chunkOffset += count - 1
+        }
+
+        if (this.shape && !isClosingEmitted) {
+            /* Corner case - the closing vertex did not fit into the last chunk, so the closing
+             * segment gets a chunk of its own.
+             */
+            yield {
+                verticesCount: 2,
+                vertices: (function*() {
+                    yield _this.vertices[verticesCount - 1]
+                    yield _this.vertices[0]
+                })(),
+                indices: _IterateLineIndices(2, false)
+            }
         }
     }
+
 }
 
 Entity.Type = Object.freeze({

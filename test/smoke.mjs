@@ -20,7 +20,9 @@
  * bug report is covered the moment it lands in test-data/.
  *
  * The output is deliberately stable line for line: run it before a change, run it after, and
- * `diff` the two. A moved batch count on an unchanged drawing means the batching changed.
+ * `diff` the two. A moved batch count on an unchanged drawing means the batching changed. Timings
+ * are the one thing that varies between runs, so set DXF_SMOKE_NO_TIMINGS=1 to leave them out and
+ * get a diff with no noise in it at all.
  *
  * What this is NOT: it drives DxfParser and DxfScene directly, which is the half of the pipeline
  * with no DOM. It never constructs a DxfViewer, so nothing here checks materials, shaders or
@@ -123,6 +125,9 @@ async function ScanFile(file) {
     return {warnings, logs, stats, issues, error}
 }
 
+/* Timings are the only part of the output that changes between runs on an unchanged tree. */
+const noTimings = process.env.DXF_SMOKE_NO_TIMINGS === "1"
+
 const files = process.argv.length > 2 ? process.argv.slice(2) : DefaultFiles()
 if (files.length === 0) {
     console.log("No DXF files found. Expected test-data/ or test/fixtures/ to hold some.")
@@ -138,7 +143,10 @@ for (const file of files) {
         badFiles++
         continue
     }
-    console.log(`  parse ${Math.round(stats.parseMs)} ms, build ${Math.round(stats.buildMs)} ms`)
+    if (!noTimings) {
+        console.log(`  parse ${Math.round(stats.parseMs)} ms, ` +
+                    `build ${Math.round(stats.buildMs)} ms`)
+    }
     console.log(`  ${stats.batches} batches, ${stats.layers} layers, ` +
                 `${FormatBytes(stats.vertices)} vertices, ${FormatBytes(stats.indices)} indices, ` +
                 `${FormatBytes(stats.transforms)} transforms`)

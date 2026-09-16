@@ -81,7 +81,8 @@ Three properties are what make it worth being one command:
   costs nothing. A file attached to a bug report is covered the moment it lands in `test-data/`.
 - **Stable, diffable output.** Run it before a change, run it after, `diff` the two. A moved batch
   count on an unchanged drawing means the batching changed, which is the cheapest structural
-  regression signal there is.
+  regression signal there is. Timings are the only part that varies between runs, so
+  `DXF_SMOKE_NO_TIMINGS=1` drops them and leaves a diff with no noise in it.
 
 It drives `DxfParser` and `DxfScene` directly — the half of the pipeline with no DOM. It never
 constructs a `DxfViewer`, so nothing here checks materials, shaders or colors as rendered, and it
