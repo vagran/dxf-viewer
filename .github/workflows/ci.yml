@@ -26,6 +26,21 @@ jobs:
       # local against the corpus.
       - run: npm run smoke
 
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      # Formatting only — no rule here has an opinion about the code itself. Everything it
+      # reports except max-len is fixable with `npm run format`; an over-long line has to be
+      # broken by hand.
+      - run: npm run lint
+
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest

@@ -1251,161 +1251,192 @@ export class DxfScene {
             }) : new Matrix3()
 
             for (const line of pattern.lines) {
+                yield* this._DecomposeHatchPatternLine(line, calc, patTransform,
+                                                       pattern.offsetInLineSpace,
+                                                       {layer, color, transform})
+            }
+        }
+    }
 
-                let offsetX
-                let offsetY
-                if (pattern.offsetInLineSpace) {
-                    offsetX = line.offset.x
-                    offsetY = line.offset.y
+    /**
+     * Generate segments for one line of a hatch pattern. The pattern line defines a whole family
+     * of parallel lines, each one `offset` further than the previous one; this covers the part of
+     * the family which intersects the hatch bounding box.
+     * @param line {Object} Pattern line definition.
+     * @param calc {HatchCalculator}
+     * @param patTransform {Matrix3} Pattern transform, identity matrix when the pattern is taken
+     *  from the lines definition embedded into the HATCH entity.
+     * @param offsetInLineSpace {Boolean} Pattern offsets are already rotated by the line angle.
+     * @param renderParams {Object} `layer`, `color` and OCS `transform` for produced entities.
+     */
+    *_DecomposeHatchPatternLine(line, calc, patTransform, offsetInLineSpace, renderParams) {
+        let offsetX
+        let offsetY
+        if (offsetInLineSpace) {
+            offsetX = line.offset.x
+            offsetY = line.offset.y
+        } else {
+            const sin = Math.sin(-(line.angle ?? 0))
+            const cos = Math.cos(-(line.angle ?? 0))
+            offsetX = line.offset.x * cos - line.offset.y * sin
+            offsetY = line.offset.x * sin + line.offset.y * cos
+        }
+
+        /* Normalize offset so that Y is always non-negative. Inverting offset vector direction
+         * does not change lines positions.
+         */
+        if (offsetY < 0) {
+            offsetY = -offsetY
+            offsetX = -offsetX
+        }
+
+        const lineTransform = calc.GetLineTransform({
+            patTransform,
+            basePoint: line.base,
+            angle: line.angle ?? 0
+        })
+
+        const bbox = calc.GetBoundingBox(lineTransform)
+        const margin = (bbox.max.x - bbox.min.x) * 0.05
+
+        /* First determine range of line indices. Line with index 0 goes through base point
+         * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
+         * offset vectors added to the base point.
+         */
+        let minLineIdx, maxLineIdx
+        if (offsetY == 0) {
+            /* Degenerated to single line. */
+            minLineIdx = 0
+            maxLineIdx = 0
+        } else {
+            minLineIdx = Math.ceil(bbox.min.y / offsetY)
+            maxLineIdx = Math.floor(bbox.max.y / offsetY)
+        }
+
+        if (maxLineIdx - minLineIdx > MAX_HATCH_LINES) {
+            console.warn("Too many lines produced by hatching pattern")
+            return
+        }
+
+        let dashPatLength
+        if (line.dashes && line.dashes.length > 1) {
+            dashPatLength = 0
+            for (const dash of line.dashes) {
+                if (dash < 0) {
+                    dashPatLength -= dash
                 } else {
-                    const sin = Math.sin(-(line.angle ?? 0))
-                    const cos = Math.cos(-(line.angle ?? 0))
-                    offsetX = line.offset.x * cos - line.offset.y * sin
-                    offsetY = line.offset.x * sin + line.offset.y * cos
+                    dashPatLength += dash
                 }
+            }
+        } else {
+            dashPatLength = null
+        }
 
-                /* Normalize offset so that Y is always non-negative. Inverting offset vector
-                 * direction does not change lines positions.
-                 */
-                if (offsetY < 0) {
-                    offsetY = -offsetY
-                    offsetX = -offsetX
-                }
+        const ocsTransform = lineTransform.clone().invert()
 
-                const lineTransform = calc.GetLineTransform({
-                    patTransform,
-                    basePoint: line.base,
-                    angle: line.angle ?? 0
+        for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
+            yield* this._DecomposeHatchLine(line.dashes, calc, {
+                y: lineIdx * offsetY,
+                xBase: lineIdx * offsetX,
+                xStart: bbox.min.x - margin,
+                xEnd: bbox.max.x + margin,
+                ocsTransform,
+                dashPatLength
+            }, renderParams)
+        }
+    }
+
+    /**
+     * Generate segments for a single line of a hatch pattern line family, clipping it against the
+     * boundary loops and applying the dash pattern if there is one.
+     * @param dashes {?number[]} Dash pattern of the pattern line, negative values are spaces.
+     * @param calc {HatchCalculator}
+     * @param lineParams {Object} Position of the line in line space (`y`, `xBase`, `xStart`,
+     *  `xEnd`), `ocsTransform` back into OCS, and `dashPatLength` (null for a solid line).
+     * @param renderParams {Object} `layer`, `color` and OCS `transform` for produced entities.
+     */
+    *_DecomposeHatchLine(dashes, calc, {y, xBase, xStart, xEnd, ocsTransform, dashPatLength},
+                         {layer, color, transform}) {
+
+        const lineLength = xEnd - xStart
+        const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
+        const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
+        const lineVec = end.clone().sub(start)
+        const clippedSegments = calc.ClipLine([start, end])
+
+        function GetParam(x) {
+            return (x - xStart) / lineLength
+        }
+
+        function RenderSegment(seg) {
+            const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
+            const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
+            if (transform) {
+                p1.applyMatrix3(transform)
+                p2.applyMatrix3(transform)
+            }
+            if (seg[1] - seg[0] <= Number.EPSILON) {
+                return new Entity({
+                    type: Entity.Type.POINTS,
+                    vertices: [p1],
+                    layer, color
                 })
+            }
+            return new Entity({
+                type: Entity.Type.LINE_SEGMENTS,
+                vertices: [p1, p2],
+                layer, color
+            })
+        }
 
-                const bbox = calc.GetBoundingBox(lineTransform)
-                const margin = (bbox.max.x - bbox.min.x) * 0.05
-
-                /* First determine range of line indices. Line with index 0 goes through base point
-                 * (which is [0; 0] in line coordinates system). Line with index `n`` starts in `n`
-                 * offset vectors added to the base point.
-                 */
-                let minLineIdx, maxLineIdx
-                if (offsetY == 0) {
-                    /* Degenerated to single line. */
-                    minLineIdx = 0
-                    maxLineIdx = 0
-                } else {
-                    minLineIdx = Math.ceil(bbox.min.y / offsetY)
-                    maxLineIdx = Math.floor(bbox.max.y / offsetY)
+        /** Clip segment against `clippedSegments`. */
+        function *ClipSegment(segStart, segEnd) {
+            for (const seg of clippedSegments) {
+                if (seg[0] >= segEnd) {
+                    return
                 }
-
-                if (maxLineIdx - minLineIdx > MAX_HATCH_LINES) {
-                    console.warn("Too many lines produced by hatching pattern")
+                if (seg[1] <= segStart) {
                     continue
                 }
+                const _start = Math.max(segStart, seg[0])
+                const _end = Math.min(segEnd, seg[1])
+                yield [_start, _end]
+                segStart = _end
+            }
+        }
 
-                let dashPatLength
-                if (line.dashes && line.dashes.length > 1) {
-                    dashPatLength = 0
-                    for (const dash of line.dashes) {
-                        if (dash < 0) {
-                            dashPatLength -= dash
-                        } else {
-                            dashPatLength += dash
-                        }
-                    }
-                } else {
-                    dashPatLength = null
+        if (dashPatLength === null) {
+            /* Single solid line. */
+            for (const seg of clippedSegments) {
+                yield RenderSegment(seg)
+            }
+            return
+        }
+
+        /* Determine range for segment indices. One segment is one full sequence of dashes. */
+        const minSegIdx = Math.floor((xStart - xBase) / dashPatLength)
+        const maxSegIdx = Math.floor((xEnd - xBase) / dashPatLength)
+        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
+            console.warn("Too many segments produced by hatching pattern line")
+            return
+        }
+
+        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
+            let segStartParam = GetParam(xBase + segIdx * dashPatLength)
+
+            for (let dashLength of dashes) {
+                const isSpace = dashLength < 0
+                if (isSpace) {
+                    dashLength = -dashLength
                 }
-
-                const ocsTransform = lineTransform.clone().invert()
-
-                for (let lineIdx = minLineIdx; lineIdx <= maxLineIdx; lineIdx++) {
-                    const y = lineIdx * offsetY
-                    const xBase = lineIdx * offsetX
-
-                    const xStart = bbox.min.x - margin
-                    const xEnd = bbox.max.x + margin
-                    const lineLength = xEnd - xStart
-                    const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
-                    const end = new Vector2(xEnd, y).applyMatrix3(ocsTransform)
-                    const lineVec = end.clone().sub(start)
-                    const clippedSegments = calc.ClipLine([start, end])
-
-                    function GetParam(x) {
-                        return (x - xStart) / lineLength
-                    }
-
-                    function RenderSegment(seg) {
-                        const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
-                        const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
-                        if (transform) {
-                            p1.applyMatrix3(transform)
-                            p2.applyMatrix3(transform)
-                        }
-                        if (seg[1] - seg[0] <= Number.EPSILON) {
-                            return new Entity({
-                                type: Entity.Type.POINTS,
-                                vertices: [p1],
-                                layer, color
-                            })
-                        }
-                        return new Entity({
-                            type: Entity.Type.LINE_SEGMENTS,
-                            vertices: [p1, p2],
-                            layer, color
-                        })
-                    }
-
-                    /** Clip segment against `clippedSegments`. */
-                    function *ClipSegment(segStart, segEnd) {
-                        for (const seg of clippedSegments) {
-                            if (seg[0] >= segEnd) {
-                                return
-                            }
-                            if (seg[1] <= segStart) {
-                                continue
-                            }
-                            const _start = Math.max(segStart, seg[0])
-                            const _end = Math.min(segEnd, seg[1])
-                            yield [_start, _end]
-                            segStart = _end
-                        }
-                    }
-
-                    /* Determine range for segment indices. One segment is one full sequence of
-                     * dashes. In case there is no dashes (solid line), just use hatch bounds.
-                     */
-                    if (dashPatLength !== null) {
-                        let minSegIdx = Math.floor((xStart - xBase) / dashPatLength)
-                        let maxSegIdx = Math.floor((xEnd - xBase) / dashPatLength)
-                        if (maxSegIdx - minSegIdx >= MAX_HATCH_SEGMENTS) {
-                            console.warn("Too many segments produced by hatching pattern line")
-                            continue
-                        }
-
-                        for (let segIdx = minSegIdx; segIdx <= maxSegIdx; segIdx++) {
-                            let segStartParam = GetParam(xBase + segIdx * dashPatLength)
-
-                            for (let dashLength of line.dashes) {
-                                const isSpace = dashLength < 0
-                                if (isSpace) {
-                                    dashLength = -dashLength
-                                }
-                                const dashLengthParam = dashLength / lineLength
-                                if (!isSpace) {
-                                    for (const seg of ClipSegment(segStartParam,
-                                                                  segStartParam + dashLengthParam)) {
-                                        yield RenderSegment(seg)
-                                    }
-                                }
-                                segStartParam += dashLengthParam
-                            }
-                        }
-
-                    } else {
-                        /* Single solid line. */
-                        for (const seg of clippedSegments) {
-                            yield RenderSegment(seg)
-                        }
+                const dashLengthParam = dashLength / lineLength
+                if (!isSpace) {
+                    for (const seg of ClipSegment(segStartParam,
+                                                  segStartParam + dashLengthParam)) {
+                        yield RenderSegment(seg)
                     }
                 }
+                segStartParam += dashLengthParam
             }
         }
     }
@@ -2118,7 +2149,8 @@ export class DxfScene {
                 prev = v
             }
             if (entity.shape && verticesCount > 2) {
-                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1], blockCtx))
+                batch.PushVertex(this._TransformVertex(entity.vertices[verticesCount - 1],
+                                                       blockCtx))
                 batch.PushVertex(this._TransformVertex(entity.vertices[0], blockCtx))
             }
             return
@@ -2782,7 +2814,8 @@ export class Entity {
      * @param lineType {?number}
      * @param shape {Boolean} true if closed shape.
      */
-    constructor({type, vertices, indices = null, layer = null, color, lineType = 0, shape = false}) {
+    constructor({type, vertices, indices = null, layer = null, color, lineType = 0,
+                 shape = false}) {
         this.type = type
         this.vertices = vertices
         this.indices = indices

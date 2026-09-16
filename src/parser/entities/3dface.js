@@ -36,7 +36,8 @@ function parse3dFaceVertices(scanner, curr) {
         i
     var vertexIsStarted = false
     var vertexIsFinished = false
-    var verticesPer3dFace = 4 // there can be up to four vertices per face, although 3 is most used for TIN
+    // there can be up to four vertices per face, although 3 is most used for TIN
+    var verticesPer3dFace = 4
 
     for (i = 0; i <= verticesPer3dFace; i++) {
         var vertex = {}
@@ -70,8 +71,8 @@ function parse3dFaceVertices(scanner, curr) {
                 vertex.z = curr.value
                 break
             default:
-                // it is possible to have entity codes after the vertices.
-                // So if code is not accounted for return to entity parser where it might be accounted for
+                // it is possible to have entity codes after the vertices. So if code is not
+                // accounted for return to entity parser where it might be accounted for
                 return vertices
                 continue
             }

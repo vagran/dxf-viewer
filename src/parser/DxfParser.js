@@ -272,12 +272,16 @@ DxfParser.prototype._parse = function(dxfString) {
             case 70:
                 if (curr.value != 0) {
                     //if(curr.value & BLOCK_ANONYMOUS_FLAG) console.log('  Anonymous block');
-                    //if(curr.value & BLOCK_NON_CONSTANT_FLAG) console.log('  Non-constant attributes');
+                    //if(curr.value & BLOCK_NON_CONSTANT_FLAG)
+                    //    console.log('  Non-constant attributes');
                     //if(curr.value & BLOCK_XREF_FLAG) console.log('  Is xref');
                     //if(curr.value & BLOCK_XREF_OVERLAY_FLAG) console.log('  Is xref overlay');
-                    //if(curr.value & BLOCK_EXTERNALLY_DEPENDENT_FLAG) console.log('  Is externally dependent');
-                    //if(curr.value & BLOCK_RESOLVED_OR_DEPENDENT_FLAG) console.log('  Is resolved xref or dependent of an xref');
-                    //if(curr.value & BLOCK_REFERENCED_XREF) console.log('  This definition is a referenced xref');
+                    //if(curr.value & BLOCK_EXTERNALLY_DEPENDENT_FLAG)
+                    //    console.log('  Is externally dependent');
+                    //if(curr.value & BLOCK_RESOLVED_OR_DEPENDENT_FLAG)
+                    //    console.log('  Is resolved xref or dependent of an xref');
+                    //if(curr.value & BLOCK_REFERENCED_XREF)
+                    //    console.log('  This definition is a referenced xref');
                     block.type = curr.value
                 }
                 curr = scanner.next()
@@ -377,7 +381,8 @@ DxfParser.prototype._parse = function(dxfString) {
                 break
             case 0:
                 if (curr.value === tableDefinition.dxfSymbolName) {
-                    table[tableDefinition.tableRecordsProperty] = tableDefinition.parseTableRecords()
+                    table[tableDefinition.tableRecordsProperty] =
+                        tableDefinition.parseTableRecords()
                 } else {
                     logUnhandledGroup(curr)
                     curr = scanner.next()
@@ -406,7 +411,9 @@ DxfParser.prototype._parse = function(dxfString) {
     }
 
     var parseViewPortRecords = function() {
-        var viewPorts = [], // Multiple table entries may have the same name indicating a multiple viewport configuration
+        // Multiple table entries may have the same name indicating a multiple viewport
+        // configuration
+        var viewPorts = [],
             viewPort = {}
 
         log.debug("ViewPort {")
@@ -511,7 +518,8 @@ DxfParser.prototype._parse = function(dxfString) {
                 viewPort.ownerHandle = curr.value
                 curr = scanner.next()
                 break
-            case 63: // These are all ambient color. Perhaps should be a gradient when multiple are set.
+            // These are all ambient color. Perhaps should be a gradient when multiple are set.
+            case 63:
             case 421:
             case 431:
                 viewPort.ambientColor = curr.value
@@ -613,7 +621,8 @@ DxfParser.prototype._parse = function(dxfString) {
                 break
             case 62: // color, visibility
                 layer.visible = curr.value >= 0
-                // TODO 0 and 256 are BYBLOCK and BYLAYER respectively. Need to handle these values for layers?.
+                // TODO 0 and 256 are BYBLOCK and BYLAYER respectively. Need to handle these values
+                // for layers?.
                 layer.colorIndex = Math.abs(curr.value)
                 layer.color = getAcadColor(layer.colorIndex)
                 curr = scanner.next()
@@ -623,8 +632,8 @@ DxfParser.prototype._parse = function(dxfString) {
                 curr = scanner.next()
                 break
             case 420: // TrueColor Color
-                // Mask off the color method marker in the high byte, as for entities - see
-                // the 420 case in ParseHelpers.checkCommonEntityProperties.
+                // Mask off the color method marker in the high byte, as for entities - see the 420
+                // case in ParseHelpers.checkCommonEntityProperties.
                 layer.color = curr.value & 0xffffff
                 curr = scanner.next()
                 break
@@ -852,10 +861,9 @@ DxfParser.prototype._parse = function(dxfString) {
     }
 
     /**
-     * Parses a 2D or 3D point, returning it as an object with x, y, and
-     * (sometimes) z property if it is 3D. It is assumed the current group
-     * is x of the point being read in, and scanner.next() will return the
-     * y. The parser will determine if there is a z point automatically.
+     * Parses a 2D or 3D point, returning it as an object with x, y, and (sometimes) z property if
+     * it is 3D. It is assumed the current group is x of the point being read in, and scanner.next()
+     * will return the y. The parser will determine if there is a z point automatically.
      * @return {Object} The 2D or 3D point as an object with x, y[, z]
      */
     var parsePoint = function() {

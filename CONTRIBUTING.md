@@ -17,7 +17,7 @@ recommendations:
     npm install
     npm test            # unit tests, scene goldens, invariants
     npm run typecheck   # the published type declarations, as a consumer sees them
-    npm run lint        # formatting only; `npm run format` fixes what it reports
+    npm run lint        # formatting only; `npm run format` fixes all of it but over-long lines
     ```
 
     Node 22 or newer is required for development; the library itself has no such requirement. The

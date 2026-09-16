@@ -126,8 +126,8 @@ export function checkCommonEntityProperties(entity, curr, scanner) {
     case 370:
         //From https://www.woutware.com/Forum/Topic/955/lineweight?returnUrl=%2FForum%2FUserPosts%3FuserId%3D478262319
         // An integer representing 100th of mm, must be one of the following values:
-        // 0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211.
-        // -3 = STANDARD, -2 = BYLAYER, -1 = BYBLOCK
+        // 0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158,
+        // 200, 211. -3 = STANDARD, -2 = BYLAYER, -1 = BYBLOCK
         entity.lineweight = curr.value
         break
     case 420: // TrueColor Color

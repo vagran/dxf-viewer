@@ -107,10 +107,12 @@ export default [
             "@stylistic/rest-spread-spacing": ["error", "never"],
             "@stylistic/dot-location": ["error", "property"],
             "@stylistic/no-whitespace-before-property": "error",
-            /* Not autofixable, and not worth failing a run over: a long string or a URL in a
-             * comment is sometimes the lesser evil. Reported so it stays visible.
+            /* The one rule the fixer cannot satisfy: an over-long line has to be broken by hand,
+             * by rewrapping a comment, wrapping an expression, or decomposing code that has
+             * nested too deeply to fit. An error rather than a warning, because CI runs
+             * `npm run lint`. A long string or URL is exempt — those cannot always be broken.
              */
-            "@stylistic/max-len": ["warn", {
+            "@stylistic/max-len": ["error", {
                 code: 100,
                 ignoreUrls: true,
                 ignoreStrings: true,

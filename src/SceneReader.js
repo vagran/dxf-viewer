@@ -331,7 +331,8 @@ class BatchReader {
                 }
                 for (const v of vertices) {
                     const x = v[0] * transforms[o] + v[1] * transforms[o + 1] + transforms[o + 2]
-                    const y = v[0] * transforms[o + 3] + v[1] * transforms[o + 4] + transforms[o + 5]
+                    const y = v[0] * transforms[o + 3] + v[1] * transforms[o + 4] +
+                              transforms[o + 5]
                     v[0] = x
                     v[1] = y
                 }

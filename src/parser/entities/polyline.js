@@ -34,7 +34,8 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             entity.includesSplineFitVertices = (curr.value & 4) !== 0
             entity.is3dPolyline = (curr.value & 8) !== 0
             entity.is3dPolygonMesh = (curr.value & 16) !== 0
-            entity.is3dPolygonMeshClosed = (curr.value & 32) !== 0 // 32 = The polygon mesh is closed in the N direction
+            // 32 = The polygon mesh is closed in the N direction
+            entity.is3dPolygonMeshClosed = (curr.value & 32) !== 0
             entity.isPolyfaceMesh = (curr.value & 64) !== 0
             entity.hasContinuousLinetypePattern = (curr.value & 128) !== 0
             break

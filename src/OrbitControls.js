@@ -42,7 +42,8 @@ export const OrbitControls = function(object, domElement) {
     this.maxPolarAngle = Math.PI // radians
 
     // How far you can orbit horizontally, upper and lower limits.
-    // If set, the interval [ min, max ] must be a sub-interval of [ - 2 PI, 2 PI ], with ( max - min < 2 PI )
+    // If set, the interval [ min, max ] must be a sub-interval of [ - 2 PI, 2 PI ], with ( max -
+    // min < 2 PI )
     this.minAzimuthAngle = -Infinity // radians
     this.maxAzimuthAngle = Infinity // radians
 
@@ -76,7 +77,8 @@ export const OrbitControls = function(object, domElement) {
     this.keys = {LEFT: 37, UP: 38, RIGHT: 39, BOTTOM: 40}
 
     // Mouse buttons
-    this.mouseButtons = {LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN}
+    this.mouseButtons = {LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY,
+                         RIGHT: THREE.MOUSE.PAN}
 
     // Touch fingers
     this.touches = {ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN}
@@ -213,7 +215,8 @@ export const OrbitControls = function(object, domElement) {
             }
 
             // restrict phi to be between desired limits
-            spherical.phi = Math.max(scope.minPolarAngle, Math.min(scope.maxPolarAngle, spherical.phi))
+            spherical.phi = Math.max(scope.minPolarAngle,
+                                     Math.min(scope.maxPolarAngle, spherical.phi))
 
             spherical.makeSafe()
 
@@ -221,7 +224,8 @@ export const OrbitControls = function(object, domElement) {
             spherical.radius *= scale
 
             // restrict radius to be between desired limits
-            spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius))
+            spherical.radius = Math.max(scope.minDistance,
+                                        Math.min(scope.maxDistance, spherical.radius))
 
             // move target to panned location
 
@@ -477,7 +481,8 @@ export const OrbitControls = function(object, domElement) {
 
         } else if (scope.object.isOrthographicCamera) {
 
-            const newZoom = Math.max(scope.minZoom, Math.min(scope.maxZoom, scope.object.zoom * dollyScale))
+            const newZoom = Math.max(scope.minZoom,
+                                     Math.min(scope.maxZoom, scope.object.zoom * dollyScale))
             zoomPan(newZoom / scope.object.zoom, zoomCenter)
             scope.object.zoom = newZoom
             scope.object.updateProjectionMatrix()
@@ -1071,7 +1076,8 @@ export const OrbitControls = function(object, domElement) {
 
     function onMouseWheel(event) {
 
-        if (scope.enabled === false || scope.enableZoom === false || (state !== STATE.NONE && state !== STATE.ROTATE)) {
+        if (scope.enabled === false || scope.enableZoom === false ||
+            (state !== STATE.NONE && state !== STATE.ROTATE)) {
             return
         }
 
