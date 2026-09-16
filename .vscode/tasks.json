@@ -63,6 +63,18 @@
             "problemMatcher": []
         },
         {
+            // Renders a DXF to SVG through SceneReader and writes it next to the input. A review
+            // aid, not a test: see test/svg.mjs.
+            "label": "svg",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "svg", "--", "${input:dxfPath}", "--font", "test-data/fonts/Roboto-LightItalic.ttf"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Builds every drawing in test-data/ (or test/fixtures/ when it is absent) and reports
             // warnings, validation failures and the numbers worth diffing across a change.
             "label": "smoke",
@@ -112,6 +124,14 @@
                 "cwd": "${workspaceFolder}"
             },
             "problemMatcher": ["$tsc"]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "dxfPath",
+            "type": "promptString",
+            "description": "DXF file to render as SVG",
+            "default": "test/fixtures/dimension-linear.dxf"
         }
     ]
 }

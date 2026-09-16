@@ -30,36 +30,54 @@ const GEOMETRY_TYPE_NAMES = Object.fromEntries(
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const FONT_PATH = path.join(testDir, "fixtures", "fonts", "test-font.ttf")
 
-/* Parsed once and reused: every fixture build would otherwise re-parse the same file. */
-let cachedFont = null
+/* Parsed once per path and reused: every fixture build would otherwise re-parse the same file. */
+const fontCache = new Map()
+
+/** @param ttfPath {string} Path to a raw TTF.
+ * @return {function(): Promise<{}>} A font fetcher of the shape DxfScene.Build expects.
+ */
+export function FontFetcher(ttfPath) {
+    return async () => {
+        let font = fontCache.get(ttfPath)
+        if (font === undefined) {
+            const buffer = fs.readFileSync(ttfPath)
+            font = opentype.parse(buffer.buffer.slice(
+                buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+            fontCache.set(ttfPath, font)
+        }
+        return font
+    }
+}
 
 /** @return {function(): Promise<{}>} A fetcher for the generated test font.
  *
- * The font covers A, B, I and space only, so fixture text is written from those. See
- * test/fixtures/README.md for why it is generated rather than a real typeface.
+ * It covers A, B, I, space, the digits, a period and a hyphen, so fixture text is written from
+ * those. Every glyph is a rectangle — see test/fixtures/README.md for why it is generated rather
+ * than a real typeface.
  */
 export function TestFontFetcher() {
-    return async () => {
-        if (cachedFont === null) {
-            const buffer = fs.readFileSync(FONT_PATH)
-            cachedFont = opentype.parse(buffer.buffer.slice(
-                buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
-        }
-        return cachedFont
-    }
+    return FontFetcher(FONT_PATH)
 }
 
 /** @return {Promise<{}>} The serialized scene for a DXF file.
  *
  * @param dxfPath {string}
- * @param options {{sceneOptions?: {}, fonts?: Boolean}} `fonts` defaults to true, which supplies
- *  the generated test font so text entities produce geometry. Pass false to reproduce the
- *  font-less case, which is what the smoke sweep does.
+ * @param options {{sceneOptions?: {}, fonts?: Boolean|string[]}} `fonts` defaults to true, which
+ *  supplies the generated test font so text entities produce geometry. False reproduces the
+ *  font-less case, which is what the smoke sweep does. An array of TTF paths uses those instead,
+ *  in fallback order — the library moves to the next one only for a character the earlier fonts
+ *  have no glyph for.
  */
 export async function BuildScene(dxfPath, {sceneOptions, fonts = true} = {}) {
     const dxf = new DxfParser().parseSync(fs.readFileSync(dxfPath, "utf-8"))
     const scene = new DxfScene(sceneOptions ? {sceneOptions} : undefined)
-    await scene.Build(dxf, fonts ? [TestFontFetcher()] : null)
+    let fetchers = null
+    if (Array.isArray(fonts)) {
+        fetchers = fonts.map(FontFetcher)
+    } else if (fonts) {
+        fetchers = [TestFontFetcher()]
+    }
+    await scene.Build(dxf, fetchers)
     return scene.scene
 }
 
