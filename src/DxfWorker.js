@@ -123,7 +123,7 @@ export class DxfWorker {
 
     async _OnError(error) {
         console.error("DxfWorker worker error", error)
-        const requests = Array.from(this.requests.values)
+        const requests = Array.from(this.requests.values())
         this.requests.clear()
         requests.forEach(req => req.SetError(error))
     }
