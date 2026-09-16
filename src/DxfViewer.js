@@ -35,12 +35,12 @@ export class DxfViewer {
 
         this.scene = new three.Scene()
 
-       this.ownsRenderer = !options.renderer
-       this.renderer = options.renderer
+        this.ownsRenderer = !options.renderer
+        this.renderer = options.renderer
 
-       if(!this.renderer) {
-           try {
-               this.renderer = new three.WebGLRenderer({
+        if (!this.renderer) {
+            try {
+                this.renderer = new three.WebGLRenderer({
                    alpha: options.canvasAlpha,
                    premultipliedAlpha: options.canvasPremultipliedAlpha,
                    antialias: options.antialias,
@@ -60,7 +60,7 @@ export class DxfViewer {
         renderer.sortObjects = false
         renderer.setPixelRatio(window.devicePixelRatio)
 
-        const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2);
+        const camera = this.camera = new three.OrthographicCamera(-1, 1, 1, -1, 0.1, 2)
         camera.position.z = 1
         camera.position.x = 0
         camera.position.y = 0
@@ -123,8 +123,8 @@ export class DxfViewer {
     /**
      * @returns {three.WebGLRenderer | null} Returns the created Three.js renderer.
      */
-    GetRenderer(){
-        return this.renderer;
+    GetRenderer() {
+        return this.renderer
     }
 
     GetCanvas() {
@@ -322,7 +322,7 @@ export class DxfViewer {
         }
         this.simplePointMaterial = null
         this.simpleColorMaterial = null
-        if(this.ownsRenderer) {
+        if (this.ownsRenderer) {
             this.renderer.dispose()
         }
         this.renderer = null
@@ -451,7 +451,7 @@ export class DxfViewer {
     }
 
     _Emit(eventName, data = null) {
-        this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, { detail: data }))
+        this.canvas.dispatchEvent(new CustomEvent(EVENT_NAME_PREFIX + eventName, {detail: data}))
     }
 
     _Message(message, level = MessageLevel.INFO) {
@@ -534,7 +534,7 @@ export class DxfViewer {
         const src = this.simpleColorMaterial[instanceType]
         /* Should reuse compiled shaders. */
         const m = src.clone()
-        m.uniforms.color = { value: new three.Color(color) }
+        m.uniforms.color = {value: new three.Color(color)}
         return m
     }
 
@@ -580,8 +580,8 @@ export class DxfViewer {
         const src = this.simplePointMaterial[instanceType]
         /* Should reuse compiled shaders. */
         const m = src.clone()
-        m.uniforms.color = { value: new three.Color(color) }
-        m.uniforms.size = { value: size }
+        m.uniforms.color = {value: new three.Color(color)}
+        m.uniforms.size = {value: size}
         return m
     }
 
@@ -733,13 +733,13 @@ DxfViewer.DefaultOptions = {
      */
     fileEncoding: "utf-8",
     /**
-     * @type {three.WebGLRenderer | undefined | null} 
+     * @type {three.WebGLRenderer | undefined | null}
      * The Webgl renderer to use. If not specified, a new renderer will be created.
      */
     renderer: undefined
 }
 
-DxfViewer.SetupWorker = function () {
+DxfViewer.SetupWorker = function() {
     new DxfWorker(self, true)
 }
 
@@ -1029,23 +1029,23 @@ function HlsToRgb({h, l, s}) {
             if (t > 1) {
                 t -= 1
             }
-            if (t < 1/6) {
+            if (t < 1 / 6) {
                 return p + (q - p) * 6 * t
             }
-            if (t < 1/2) {
+            if (t < 1 / 2) {
                 return q
             }
-            if (t < 2/3) {
-                return p + (q - p) * (2/3 - t) * 6
+            if (t < 2 / 3) {
+                return p + (q - p) * (2 / 3 - t) * 6
             }
             return p
         }
 
         const q = l < 0.5 ? l * (1 + s) : l + s - l * s
         const p = 2 * l - q
-        r = hue2rgb(p, q, h + 1/3)
+        r = hue2rgb(p, q, h + 1 / 3)
         g = hue2rgb(p, q, h)
-        b = hue2rgb(p, q, h - 1/3)
+        b = hue2rgb(p, q, h - 1 / 3)
     }
 
     return (Math.min(Math.floor(SRgbColor(r) * 256), 255) << 16) |
@@ -1072,7 +1072,7 @@ function RgbToHls(color) {
         switch (max) {
         case r:
             h = (g - b) / d + (g < b ? 6 : 0)
-            break;
+            break
         case g:
             h = (b - r) / d + 2
             break

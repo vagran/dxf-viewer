@@ -1,5 +1,5 @@
-import { Vector2, Matrix3, Box2 } from "three"
-import { IntersectSegmentsParametric } from "./math/utils.js"
+import {Vector2, Matrix3, Box2} from "three"
+import {IntersectSegmentsParametric} from "./math/utils.js"
 
 export const HatchStyle = Object.freeze({
     ODD_PARITY: 0,
@@ -232,7 +232,7 @@ class ClipCalculator {
          * loop value, other decrements. When all values are zero, line is outside of any loop and
          * should not be rendered.
          */
-        const loopStack = new Array(this.loops.length).fill(0);
+        const loopStack = new Array(this.loops.length).fill(0)
 
         function IsOutside() {
             for (const n of loopStack) {

@@ -182,15 +182,15 @@ for (const closed of [false, true]) {
     const vertexCount = 0x10000 + 1
     test(`polyline of ${vertexCount} vertices splits into chunks (${closed ? "closed" : "open"})`,
          () => WithChunkedPolyline(vertexCount, closed, scene => {
-        assert.deepStrictEqual(ValidateScene(scene), [])
+             assert.deepStrictEqual(ValidateScene(scene), [])
 
-        const chunks = scene.batches.flatMap(batch => batch.chunks ?? [])
-        assert.ok(chunks.length >= 2, `expected more than one chunk, got ${chunks.length}`)
-        for (const chunk of chunks) {
-            assert.ok(chunk.verticesSize / 2 <= 0x10000,
+             const chunks = scene.batches.flatMap(batch => batch.chunks ?? [])
+             assert.ok(chunks.length >= 2, `expected more than one chunk, got ${chunks.length}`)
+             for (const chunk of chunks) {
+                 assert.ok(chunk.verticesSize / 2 <= 0x10000,
                       `chunk holds ${chunk.verticesSize / 2} vertices`)
-        }
-    }))
+             }
+         }))
 }
 
 /* Sizes chosen around the chunk boundary, where the seam segment used to be dropped: one below,
@@ -208,11 +208,11 @@ for (const [vertexCount, closed] of CHUNK_SEAM_CASES) {
     test(`chunk seams keep every segment: ${vertexCount} vertices ` +
          `(${closed ? "closed" : "open"})`,
          () => WithChunkedPolyline(vertexCount, closed, scene => {
-        assert.deepStrictEqual(ValidateScene(scene), [])
-        let segments = 0
-        for (const primitive of new SceneReader(scene).ReadPrimitives()) {
-            segments += primitive.vertices.length - 1
-        }
-        assert.strictEqual(segments, closed ? vertexCount : vertexCount - 1)
-    }))
+             assert.deepStrictEqual(ValidateScene(scene), [])
+             let segments = 0
+             for (const primitive of new SceneReader(scene).ReadPrimitives()) {
+                 segments += primitive.vertices.length - 1
+             }
+             assert.strictEqual(segments, closed ? vertexCount : vertexCount - 1)
+         }))
 }

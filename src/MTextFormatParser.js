@@ -112,7 +112,7 @@ export class MTextFormatParser {
             }
         }
 
-        for ( ;curPos < n; curPos++) {
+        for (;curPos < n; curPos++) {
             const c = text.charAt(curPos)
 
             switch (state) {

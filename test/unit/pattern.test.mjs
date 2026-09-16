@@ -77,11 +77,11 @@ test("isQcadDefault rejects anything else", () => {
 
 test("offsetInLineSpace defaults on, and is the difference between a .pat and an embedded pattern",
      () => {
-    assert.strictEqual(new Pattern([Line(0)]).offsetInLineSpace, true)
-    assert.strictEqual(new Pattern([Line(0)], "N", false).offsetInLineSpace, false)
-    assert.strictEqual(Pattern.ParsePatFile("*P\n0, 0, 0, 0, 1\n").offsetInLineSpace, true,
+         assert.strictEqual(new Pattern([Line(0)]).offsetInLineSpace, true)
+         assert.strictEqual(new Pattern([Line(0)], "N", false).offsetInLineSpace, false)
+         assert.strictEqual(Pattern.ParsePatFile("*P\n0, 0, 0, 0, 1\n").offsetInLineSpace, true,
                        "values from a .pat file are not pre-rotated")
-})
+     })
 
 test("a registered pattern is found again, case insensitively", () => {
     const pattern = new Pattern([Line(0)], "UnitTestPattern")

@@ -1,4 +1,4 @@
-import { Vector2 } from "three"
+import {Vector2} from "three"
 
 export class Matrix2 {
     /**
@@ -23,7 +23,7 @@ export class Matrix2 {
     multiply(v) {
         return new Vector2(
             this.a00 * v.x + this.a01 * v.y,
-            this.a10 * v.x + this.a11 * v.y,
+            this.a10 * v.x + this.a11 * v.y
         )
     }
 
@@ -47,14 +47,14 @@ export class Matrix2 {
 
         return new Matrix2(
             this.a11 / determinant, -this.a01 / determinant,
-            -this.a10 / determinant, this.a00 / determinant,
+            -this.a10 / determinant, this.a00 / determinant
         )
     }
 
     /**
      * Solve linear equation Ax = b using Gauss-Jordan reduction
      * where A is `this`. If it's singular, return `undefined`
-     * @param {Vector2} b 
+     * @param {Vector2} b
      * @returns {Vector2 | undefined}
      */
     solve(b) {

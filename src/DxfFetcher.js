@@ -17,7 +17,7 @@ export class DxfFetcher {
             throw new Error(`Failed to fetch DXF file: HTTP ${response.status} ` +
                             `${response.statusText}`)
         }
-        const totalSize = +response.headers.get('Content-Length')
+        const totalSize = +response.headers.get("Content-Length")
 
         const reader = response.body.getReader()
         let receivedSize = 0
@@ -25,7 +25,7 @@ export class DxfFetcher {
         // just accumulates chunks in a string buffer before parsing. Fix it later.
         let buffer = ""
         let decoder = new TextDecoder(this.encoding)
-        while(true) {
+        while (true) {
             const {done, value} = await reader.read()
             if (done) {
                 buffer += decoder.decode(new ArrayBuffer(0), {stream: false})

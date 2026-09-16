@@ -1,4 +1,4 @@
-import { Vector2 } from "three"
+import {Vector2} from "three"
 
 
 /** Find intersection points of two segments in a parametric form.

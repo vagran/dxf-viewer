@@ -1,5 +1,5 @@
 /** Key for materials. */
-import {BatchingKey, CompareValues} from "./BatchingKey.js";
+import {BatchingKey, CompareValues} from "./BatchingKey.js"
 
 export class MaterialKey {
     /**

@@ -35,7 +35,7 @@ export class DxfWorker {
     async Load(url, fonts, options, progressCbk) {
         if (this.worker) {
             return this._SendRequest(DxfWorker.WorkerMsg.LOAD,
-                                     { url, fonts, options: this._CloneOptions(options) },
+                                     {url, fonts, options: this._CloneOptions(options)},
                                      progressCbk)
         } else {
             return this._Load(url, fonts, options, progressCbk)
@@ -132,7 +132,7 @@ export class DxfWorker {
         const seq = this.reqSeq++
         const req = new DxfWorker.Request(seq, progressCbk)
         this.requests.set(seq, req)
-        this.worker.postMessage({ seq, type, data, signature: MSG_SIGNATURE})
+        this.worker.postMessage({seq, type, data, signature: MSG_SIGNATURE})
         return await req.GetResponse()
     }
 
@@ -159,7 +159,7 @@ export class DxfWorker {
         }
         const dxfScene = new DxfScene(options)
         await dxfScene.Build(dxf, fontFetchers)
-        return {scene: dxfScene.scene, dxf: options.retainParsedDxf === true ? dxf : undefined }
+        return {scene: dxfScene.scene, dxf: options.retainParsedDxf === true ? dxf : undefined}
     }
 
     _CreateFontFetchers(urls, progressCbk) {

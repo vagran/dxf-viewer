@@ -193,7 +193,7 @@ export class TextRenderer {
     *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
                  attachment, lineSpacing = 1, color, layer = null}) {
         if (!fontSize) {
-            fontSize = 1;
+            fontSize = 1
         }
         const box = new TextBox(fontSize, this._GetCharShape.bind(this))
         box.FeedText(formattedText)
@@ -349,20 +349,20 @@ class Font {
         for (const cmd of glyph.path.commands) {
             switch (cmd.type) {
 
-            case 'M':
+            case "M":
                 path.moveTo(cmd.x * scale, cmd.y * scale)
                 break
 
-            case 'L':
+            case "L":
                 path.lineTo(cmd.x * scale, cmd.y * scale)
                 break
 
-            case 'Q':
+            case "Q":
                 path.quadraticCurveTo(cmd.x1 * scale, cmd.y1 * scale,
                                       cmd.x * scale, cmd.y * scale)
                 break
 
-            case 'C':
+            case "C":
                 path.bezierCurveTo(cmd.x1 * scale, cmd.y1 * scale,
                                    cmd.x2 * scale, cmd.y2 * scale,
                                    cmd.x * scale, cmd.y * scale)
@@ -458,7 +458,7 @@ class TextBox {
         let curColor = null
 
         for (const item of FlattenItems(formattedText)) {
-            switch(item.type) {
+            switch (item.type) {
 
             case MTextFormatParser.EntityType.TEXT:
                 for (const c of item.content) {
@@ -617,7 +617,7 @@ class TextBox {
             for (const line of p.lines) {
                 for (let chunkIdx = line.startChunkIdx;
                      chunkIdx < line.startChunkIdx + line.numChunks;
-                     chunkIdx++) {
+                    chunkIdx++) {
 
                     const chunk = p.chunks[chunkIdx]
                     let x = chunk.position
@@ -1069,7 +1069,7 @@ class TextBlock {
                    vertices: glyph.vertices,
                    indices: glyph.shape.indices,
                    layer, color: this.color ?? color
-               })
+                })
             }
         }
     }

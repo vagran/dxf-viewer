@@ -222,7 +222,7 @@ function BuildSvg(scene, {background, invert, stroke}) {
 
     const out = []
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(" ")}" ` +
-             `width="1200" height="900" preserveAspectRatio="xMidYMid meet">`)
+             "width=\"1200\" height=\"900\" preserveAspectRatio=\"xMidYMid meet\">")
     out.push(`<rect x="${viewBox[0]}" y="${viewBox[1]}" width="${viewBox[2]}" ` +
              `height="${viewBox[3]}" fill="${Escape(background)}"/>`)
     for (const [layer, layerGroups] of [...byLayer].sort((a, b) => a[0].localeCompare(b[0]))) {

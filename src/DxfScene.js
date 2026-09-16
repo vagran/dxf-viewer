@@ -1,15 +1,15 @@
-import { DynamicBuffer, NativeType } from "./DynamicBuffer.js"
-import { BatchingKey } from "./BatchingKey.js"
-import { Matrix3, Vector2 } from "three"
-import { TextRenderer, ParseSpecialChars, HAlign, VAlign } from "./TextRenderer.js"
-import { DefaultTextOptions } from "./TextRendererOptions.js"
-import { RBTree } from "./RBTree.js"
-import { MTextFormatParser } from "./MTextFormatParser.js"
+import {DynamicBuffer, NativeType} from "./DynamicBuffer.js"
+import {BatchingKey} from "./BatchingKey.js"
+import {Matrix3, Vector2} from "three"
+import {TextRenderer, ParseSpecialChars, HAlign, VAlign} from "./TextRenderer.js"
+import {DefaultTextOptions} from "./TextRendererOptions.js"
+import {RBTree} from "./RBTree.js"
+import {MTextFormatParser} from "./MTextFormatParser.js"
 import dimStyleCodes from "./parser/DimStyleCodes.js"
-import { LinearDimension } from "./LinearDimension.js"
+import {LinearDimension} from "./LinearDimension.js"
 import colorTable from "./parser/AutoCadColorIndex.js"
-import { HatchCalculator, HatchStyle } from "./HatchCalculator.js"
-import { LookupPattern, Pattern } from "./Pattern.js"
+import {HatchCalculator, HatchStyle} from "./HatchCalculator.js"
+import {LookupPattern, Pattern} from "./Pattern.js"
 import "./patterns/index.js"
 import earcut from "earcut"
 
@@ -42,7 +42,7 @@ const DEFAULT_VARS = {
         //XXX should select value for imperial or metric units
         return 2.5 //XXX 0.18 for imperial
     },
-    DIMASZ: 2.5,//XXX 0.18 for imperial
+    DIMASZ: 2.5, //XXX 0.18 for imperial
     DIMCLRD: 0,
     DIMCLRE: 0,
     DIMCLRT: 0,
@@ -53,7 +53,7 @@ const DEFAULT_VARS = {
     DIMEXO: 0.625, // XXX 0.0625 for imperial
     DIMFXL: 1,
     DIMFXLON: false,
-    DIMGAP: 0.625,//XXX for imperial
+    DIMGAP: 0.625, //XXX for imperial
     DIMLFAC: 1,
     DIMRND: 0,
     DIMSAH: 0,
@@ -64,7 +64,7 @@ const DEFAULT_VARS = {
     DIMSE2: 0,
     DIMSOXD: false,
     DIMTSZ: 0,
-    DIMZIN: 8, //XXX 0 for imperial,
+    DIMZIN: 8 //XXX 0 for imperial,
 }
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
@@ -125,14 +125,14 @@ export class DxfScene {
         this.pdSize = this.vars.get("PDSIZE") ?? 0
         this.isMetric = (this.vars.get("MEASUREMENT") ?? 1) == 1
 
-        if(dxf.tables && dxf.tables.layer) {
+        if (dxf.tables && dxf.tables.layer) {
             for (const [, layer] of Object.entries(dxf.tables.layer.layers)) {
                 layer.displayName = ParseSpecialChars(layer.name)
                 this.layers.set(layer.name, layer)
             }
         }
 
-        if(dxf.tables && dxf.tables.dimstyle) {
+        if (dxf.tables && dxf.tables.dimstyle) {
             for (const [, style] of Object.entries(dxf.tables.dimstyle.dimStyles)) {
                 this.dimStyles.set(style.name, style)
             }
@@ -140,7 +140,7 @@ export class DxfScene {
 
         if (dxf.tables && dxf.tables.style) {
             for (const [, style] of Object.entries(dxf.tables.style.styles)) {
-                this.fontStyles.set(style.styleName, style);
+                this.fontStyles.set(style.styleName, style)
             }
         }
 
@@ -676,7 +676,7 @@ export class DxfScene {
 
     *_DecomposeAttribute(entity, blockCtx) {
         if (!this.textRenderer.canRender) {
-            return;
+            return
         }
 
         const insertEntity = this.inserts.get(entity.ownerHandle)
@@ -713,7 +713,7 @@ export class DxfScene {
             })
         }
 
-        switch(markType) {
+        switch (markType) {
         case PdMode.PLUS:
             PushVertex(0, 1.5)
             PushVertex(0, -1.5)
@@ -743,7 +743,7 @@ export class DxfScene {
         /* This mimics DXF block entity. */
         this.pointShapeBlock = new Block({
             name: POINT_SHAPE_BLOCK_NAME,
-            position: { x: 0, y: 0}
+            position: {x: 0, y: 0}
         })
         /* Fix block origin at zero. */
         this.pointShapeBlock.offset = new Vector2(0, 0)
@@ -1519,7 +1519,7 @@ export class DxfScene {
                             }
                         }
                         AddPoints(vertices, arcVertices)
-                        break;
+                        break
                     }
                     case 4:
                         /* Spline. */
@@ -1530,9 +1530,9 @@ export class DxfScene {
                             const pt = this._InterpolateSpline(i * step, edge.degreeOfSplineCurve,
                                                                controlPoints,
                                                                edge.knotValues)
-                            vertices.push(new Vector2(pt[0],pt[1]))
+                            vertices.push(new Vector2(pt[0], pt[1]))
                         }
-                        break;
+                        break
                     default:
                         console.warn("Unhandled hatch boundary loop edge type: " + edge.type)
                     }
@@ -1697,7 +1697,7 @@ export class DxfScene {
                              color,
                              lineType,
                              shape
-                         })
+        })
     }
 
     /** Mirror entity vertices if necessary in case of extrusionDirection with negative Z specified.
@@ -1789,7 +1789,7 @@ export class DxfScene {
                                      vertices, layer, color,
                                      lineType: curLineType,
                                      shape: isClosed
-                                 })
+                })
             } else {
                 yield* _this._GenerateShapedPolyline(vertices, layer, color, curLineType, isClosed)
             }
@@ -1992,7 +1992,7 @@ export class DxfScene {
         if (!weights) {
             // build weight vector of length [n]
             weights = []
-            for(i = 0; i < n; i++) {
+            for (i = 0; i < n; i++) {
                 weights[i] = 1
             }
         }
@@ -2000,7 +2000,7 @@ export class DxfScene {
         if (!knots) {
             // build knot vector of length [n + degree + 1]
             knots = []
-            for(i = 0; i < n + degree + 1; i++) {
+            for (i = 0; i < n + degree + 1; i++) {
                 knots[i] = i
             }
         } else {
@@ -2011,7 +2011,7 @@ export class DxfScene {
 
         const domain = [
             degree,
-            knots.length-1 - degree
+            knots.length - 1 - degree
         ]
 
         // remap t to the domain where the spline is defined
@@ -2046,10 +2046,10 @@ export class DxfScene {
         let alpha
         for (l = 1; l <= degree + 1; l++) {
             // build level l of the pyramid
-            for(i = s; i > s - degree - 1 + l; i--) {
+            for (i = s; i > s - degree - 1 + l; i--) {
                 alpha = (t - knots[i]) / (knots[i + degree + 1 - l] - knots[i])
                 // interpolate each component
-                for(j = 0; j < d + 1; j++) {
+                for (j = 0; j < d + 1; j++) {
                     v[i][j] = (1 - alpha) * v[i - 1][j] + alpha * v[i][j]
                 }
             }
@@ -2057,7 +2057,7 @@ export class DxfScene {
 
         // convert back to cartesian and return
         const result = []
-        for(i = 0; i < d; i++) {
+        for (i = 0; i < d; i++) {
             result[i] = v[s][i] / v[s][d]
         }
         return result
@@ -2284,13 +2284,13 @@ export class DxfScene {
             return blockCtx.TransformVertex(v)
         }
         this._UpdateBounds(v)
-        return { x: v.x - this.origin.x, y: v.y - this.origin.y }
+        return {x: v.x - this.origin.x, y: v.y - this.origin.y}
     }
 
     /** @param v {{x,y}} Vertex to extend bounding box with and set origin. */
     _UpdateBounds(v) {
         if (this.bounds === null) {
-            this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
+            this.bounds = {minX: v.x, maxX: v.x, minY: v.y, maxY: v.y}
         } else {
             if (v.x < this.bounds.minX) {
                 this.bounds.minX = v.x
@@ -2304,7 +2304,7 @@ export class DxfScene {
             }
         }
         if (this.origin === null) {
-            this.origin = { x: v.x, y: v.y }
+            this.origin = {x: v.x, y: v.y}
         }
     }
 
@@ -2446,7 +2446,7 @@ class RenderBatch {
                     chunkWriter.PushVertex(v)
                 }
                 const numIndices = chunk.indices.size
-                for (let i = 0; i < numIndices; i ++) {
+                for (let i = 0; i < numIndices; i++) {
                     chunkWriter.PushIndex(chunk.indices.Get(i))
                 }
                 chunkWriter.Finish()
@@ -2605,7 +2605,7 @@ class Block {
 
     UpdateBounds(v) {
         if (this.bounds === null) {
-            this.bounds = { minX: v.x, maxX: v.x, minY: v.y, maxY: v.y }
+            this.bounds = {minX: v.x, maxX: v.x, minY: v.y, maxY: v.y}
         } else {
             if (v.x < this.bounds.minX) {
                 this.bounds.minX = v.x
@@ -2937,5 +2937,5 @@ DxfScene.DefaultOptions = {
      * TextRenderer.DefaultOptions, which is not yet initialized at this point when the module graph
      * is entered through TextRenderer.js. See TextRendererOptions.js.
      */
-    textOptions: DefaultTextOptions,
+    textOptions: DefaultTextOptions
 }
