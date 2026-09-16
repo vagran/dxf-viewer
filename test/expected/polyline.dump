@@ -1,0 +1,11 @@
+origin (0, 0)
+bounds (0, 0) (30, 10)
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 2
+  INDEXED_LINES layer="0" block=- color=00ff00 lineType=0 chunks=1 vertices=8 indices=8
+  INDEXED_LINES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=8 indices=6
+primitives 2
+  POLYLINE layer="0" color=00ff00 (20, 0) (30, 0) (30, 10) (20, 10) (20, 0)
+  POLYLINE layer="0" color=ff0000 (0, 0) (10, 0) (10, 10) (0, 10)

@@ -63,6 +63,33 @@
             "problemMatcher": []
         },
         {
+            // Accepts the current scene dumps as correct. Read the resulting diff before
+            // committing it: a golden regenerated without being read is worse than no test.
+            "label": "test (update goldens)",
+            "type": "process",
+            "command": "npm",
+            "args": ["test"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "DXF_UPDATE_GOLDENS": "1"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            // Rewrites test/fixtures/*.dxf from their generator. Needs the venv; see
+            // test/fixtures/README.md.
+            "label": "fixtures (regenerate)",
+            "type": "process",
+            "command": "${workspaceFolder}/.venv/bin/python",
+            "args": ["test/fixtures/gen/generate.py"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Compiles test/types/consumer.ts against the published declarations. The $tsc matcher
             // turns the output into clickable diagnostics; paths are relative to the workspace.
             "label": "typecheck",
