@@ -38,10 +38,11 @@ export class Matrix2 {
     /**
      * Return inverse of this matrix. If inverse is not exists i.e.
      * this.det() === 0, return `undefined`.
-     * @param {number | undefined} - in case of pre computed determinant, you may pass it to parameter
+     * @param {number | undefined} determinant In case of pre computed determinant, you may pass it
+     *  to parameter.
      * @returns {Matrix2 | undefined} inverse of this matrix
      */
-    inverse(determinant = det()) {
+    inverse(determinant = this.det()) {
         if (determinant === 0) return undefined
 
         return new Matrix2(

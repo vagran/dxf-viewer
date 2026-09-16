@@ -44,8 +44,10 @@ export class DynamicBuffer {
         if (size === -1) {
             size = this.size - srcOffset
         }
-        const src = new (NativeArray(this.type))(this.buffer.buffer, srcOffset, size)
-        dstBuffer.set(src, dstOffset)
+        /* subarray() indexes in elements. Constructing a view over the underlying ArrayBuffer
+         * instead would take a *byte* offset, which is what this used to do with srcOffset.
+         */
+        dstBuffer.set(this.buffer.subarray(srcOffset, srcOffset + size), dstOffset)
     }
 
     _CheckGrow() {

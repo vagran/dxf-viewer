@@ -41,15 +41,12 @@ test("Matrix2 reports a singular matrix as not invertible", () => {
     assert.strictEqual(m.inverse(m.det()), undefined)
 })
 
-/* `inverse(determinant = det())` calls a bare `det()`, which is not in scope -- so the default
- * argument throws ReferenceError and the parameter can never actually be omitted. Matrix2 has no
- * callers in the library, which is why this has never surfaced.
- */
-test("Matrix2 computes its own determinant when none is given",
-     {todo: "inverse() has an unbound det() as its default argument"}, () => {
+test("Matrix2 computes its own determinant when none is given", () => {
     const m = new Matrix2(4, 7, 2, 6)
     const inverse = m.inverse()
     Close(inverse.a00, 0.6, "a00")
+    Close(inverse.a11, 0.4, "a11")
+    assert.strictEqual(new Matrix2(1, 2, 2, 4).inverse(), undefined, "singular, with no argument")
 })
 
 test("Matrix2 solves a linear system", () => {
