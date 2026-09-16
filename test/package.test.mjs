@@ -78,5 +78,5 @@ test("@types/three ships as a runtime dependency", () => {
 test("files list ships the sources and the type declarations", () => {
     assert.ok(pkg.files?.includes("src"), "`files` must include src/")
     assert.ok(fs.existsSync(path.join(srcDir, "index.d.ts")), "src/index.d.ts must exist")
-    assert.strictEqual(pkg.types ?? "src/index.d.ts", "src/index.d.ts")
+    assert.strictEqual(pkg.types, "src/index.d.ts", "`types` must name the declarations")
 })

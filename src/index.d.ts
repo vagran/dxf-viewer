@@ -1,3 +1,10 @@
+/* `three` ships no type declarations of its own, so the THREE.* types below come from
+ * `@types/three`, which is a regular dependency of this package for that reason. Without this
+ * import the declarations reference an unresolved namespace and fail to compile for consumers who
+ * have not set `skipLibCheck`.
+ */
+import type * as THREE from "three"
+
 /** See TextRenderer.DefaultOptions for default values and documentation. */
 export type TextRendererOptions = {
     curveSubdivision?: number,
@@ -50,14 +57,21 @@ export type LayerInfo = {
 export type EventName = "loaded" | "cleared" | "destroyed" | "resized" | "pointerdown" |
     "pointerup" | "viewChanged" | "message"
 
+/** A parsed DXF document. The bundled parser has no type model of its own, so its output is
+ * deliberately untyped here.
+ */
+export type ParsedDxf = any
+
 export declare class DxfViewer {
-    constructor(domContainer: HTMLElement, options: DxfViewerOptions | null)
+    constructor(domContainer: HTMLElement, options?: DxfViewerOptions | null)
     Clear(): void
     Destroy(): void
-    FitView(minX: number, maxX: number, minY: number, maxY: number, padding: number): void
+    FitView(minX: number, maxX: number, minY: number, maxY: number, padding?: number): void
     GetCamera(): THREE.OrthographicCamera
     GetCanvas(): HTMLCanvasElement
-    GetLayers(): Iterable<LayerInfo>
+    /** The parsed document, retained only when the `retainParsedDxf` option is set. */
+    GetDxf(): ParsedDxf
+    GetLayers(nonEmptyOnly?: boolean): Iterable<LayerInfo>
     GetOrigin(): THREE.Vector2
     GetBounds(): {maxX: number, maxY: number, minX: number, minY: number} | null
     GetRenderer(): THREE.WebGLRenderer | null
@@ -74,6 +88,26 @@ export declare class DxfViewer {
 
 export declare namespace DxfViewer {
     export function SetupWorker(): void
+
+    /** Severity of a `message` event. */
+    export const MessageLevel: {
+        readonly INFO: "info",
+        readonly WARN: "warn",
+        readonly ERROR: "error"
+    }
+
+    /** Default value for each member of DxfViewerOptions. */
+    export const DefaultOptions: DxfViewerOptions
+}
+
+/** Fetches and parses a DXF file. */
+export declare class DxfFetcher {
+    constructor(url: string, encoding?: string)
+    /** `totalSize` is null for the "parse" phase, and zero when the server sends no
+     * Content-Length.
+     */
+    Fetch(progressCbk?: ((phase: "fetch" | "parse", receivedSize: number,
+                          totalSize: number | null) => void) | null): Promise<ParsedDxf>
 }
 
 export type PatternLineDef = {
@@ -83,13 +117,14 @@ export type PatternLineDef = {
     dashes?: number[]
 }
 
-export class Pattern {
-    constructor(lines: PatternLineDef[], name: string | null)
+export declare class Pattern {
+    constructor(lines: PatternLineDef[], name?: string | null, offsetInLineSpace?: boolean)
 
-    static ParsePatFile(content: String): Pattern
+    readonly name: string | null
+
+    static ParsePatFile(content: string): Pattern
 }
 
-export function RegisterPattern(pattern: Pattern, isMetric: boolean): void
+export function RegisterPattern(pattern: Pattern, isMetric?: boolean): void
 
-/** @return {?Pattern} */
-export function LookupPattern(name: string, isMetric: boolean): Pattern | null
+export function LookupPattern(name: string, isMetric?: boolean): Pattern | null
