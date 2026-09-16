@@ -6,14 +6,16 @@
  *     npm run smoke -- test-data/enterprise/city.dxf # or an explicit list
  *     node --max-old-space-size=6144 test/smoke.mjs  # if the largest files run out of heap
  *
- * Exits non-zero if anything warned or failed validation, so it can gate a commit.
+ * Exits non-zero if anything warned or failed validation, so it can gate a commit. The exception
+ * is a drawing listed in expected-warnings.mjs, which exists to make a guard fire: its warning is
+ * expected, and its *absence* is what fails the run.
  *
- * **Corpus-optional by design.** With test-data/ present it sweeps all of it; without, it falls
- * back to test/fixtures/ and still passes. One command that is correct both for a contributor who
- * has no corpus and for a checkout that has one, so the instruction is a single line for everyone.
- * test-data/ holds customer and user-reported drawings that cannot be redistributed, so CI only
- * ever sees the fixtures — the real value of this is local, against the files that are actually
- * hard.
+ * **Corpus-optional by design.** It sweeps test/fixtures/ plus test-data/ if there is one, and
+ * skips whichever is absent. One command that is correct both for a contributor who has no corpus
+ * and for a checkout that has one, so the instruction is a single line for everyone. test-data/
+ * holds customer and user-reported drawings that cannot be redistributed, so CI only ever sees the
+ * fixtures — the real value of this is local, against the files that are actually hard, but the
+ * fixtures are swept locally too so a CI-only failure cannot hide there.
  *
  * **No goldens.** Everything asserted is either an invariant or a warning count, so adding a
  * drawing costs nothing: no expected output to generate, nothing to review. A file attached to a
@@ -36,29 +38,36 @@ import {fileURLToPath} from "node:url"
 import DxfParser from "../src/parser/DxfParser.js"
 import {DxfScene} from "../src/DxfScene.js"
 import {ValidateScene} from "./validate-scene.mjs"
+import {ExpectedWarnings} from "./expected-warnings.mjs"
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
-/** Prefer the real corpus; fall back to the fixtures so the command works in a bare checkout. */
+/** Every directory swept by default, in output order. Each one is optional: whichever are present
+ * are swept, so the same command is correct in a bare checkout and in one with a corpus.
+ *
+ * The fixtures come first so that what CI sees is a *prefix* of a local run, and the two outputs
+ * can be diffed directly.
+ */
+const DEFAULT_DIRS = ["test/fixtures", "test-data", path.join("test-data", "enterprise")]
+
+/** Sweep all of DEFAULT_DIRS rather than the first that exists. The fixtures are cheap — ~35 ms of
+ * parse and build against the corpus's seconds — and skipping them locally means the half of the
+ * sweep CI actually runs is the half nobody ever sees before pushing.
+ */
 function DefaultFiles() {
-    for (const dirs of [["test-data", path.join("test-data", "enterprise")], ["test/fixtures"]]) {
-        const files = []
-        for (const dir of dirs) {
-            const full = path.join(repoRoot, dir)
-            if (!fs.existsSync(full)) {
-                continue
-            }
-            for (const name of fs.readdirSync(full).sort()) {
-                if (name.toLowerCase().endsWith(".dxf")) {
-                    files.push(path.join(full, name))
-                }
-            }
+    const files = []
+    for (const dir of DEFAULT_DIRS) {
+        const full = path.join(repoRoot, dir)
+        if (!fs.existsSync(full)) {
+            continue
         }
-        if (files.length > 0) {
-            return files
+        for (const name of fs.readdirSync(full).sort()) {
+            if (name.toLowerCase().endsWith(".dxf")) {
+                files.push(path.join(full, name))
+            }
         }
     }
-    return []
+    return files
 }
 
 function FormatBytes(bytes) {
@@ -81,6 +90,29 @@ function GroupMessages(messages) {
         counts.set(key, (counts.get(key) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+}
+
+/** Split a file's warnings against its allowlist in expected-warnings.mjs.
+ *
+ * @param {string[]} warnings Messages captured while building.
+ * @param {string[]} expected Substrings this drawing is supposed to warn about.
+ * @return {{unexpected: string[], seen: string[], missing: string[]}} `missing` holds the
+ *      expected substrings that never matched, which is a regression in its own right.
+ */
+function PartitionWarnings(warnings, expected) {
+    const unexpected = []
+    const seen = []
+    const missing = new Set(expected)
+    for (const warning of warnings) {
+        const pattern = expected.find(p => warning.includes(p))
+        if (pattern === undefined) {
+            unexpected.push(warning)
+        } else {
+            seen.push(warning)
+            missing.delete(pattern)
+        }
+    }
+    return {unexpected, seen, missing: [...missing]}
 }
 
 async function ScanFile(file) {
@@ -130,7 +162,7 @@ const noTimings = process.env.DXF_SMOKE_NO_TIMINGS === "1"
 
 const files = process.argv.length > 2 ? process.argv.slice(2) : DefaultFiles()
 if (files.length === 0) {
-    console.log("No DXF files found. Expected test-data/ or test/fixtures/ to hold some.")
+    console.log(`No DXF files found. Expected some in ${DEFAULT_DIRS.join(", ")}.`)
     process.exit(1)
 }
 
@@ -160,13 +192,24 @@ for (const file of files) {
     for (const issue of issues) {
         console.log(`  INVALID: ${issue}`)
     }
-    if (warnings.length === 0 && issues.length === 0) {
+
+    const key = path.relative(repoRoot, file).split(path.sep).join("/")
+    const {unexpected, seen, missing} = PartitionWarnings(warnings, ExpectedWarnings[key] ?? [])
+    if (unexpected.length === 0 && issues.length === 0 && seen.length === 0 &&
+        missing.length === 0) {
         console.log("  no warnings")
     }
-    for (const [message, count] of GroupMessages(warnings)) {
+    for (const [message, count] of GroupMessages(unexpected)) {
         console.log(`  WARN x${count}: ${message}`)
     }
-    if (warnings.length > 0 || issues.length > 0) {
+    for (const [message, count] of GroupMessages(seen)) {
+        console.log(`  expected WARN x${count}: ${message}`)
+    }
+    /* The guard this drawing exists to exercise did not fire. */
+    for (const pattern of missing) {
+        console.log(`  MISSING expected warning: ${pattern}`)
+    }
+    if (unexpected.length > 0 || issues.length > 0 || missing.length > 0) {
         badFiles++
     }
 }
