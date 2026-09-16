@@ -111,5 +111,6 @@ export function RegisterPattern(pattern, isMetric = true) {
 
 /** @return {?Pattern} */
 export function LookupPattern(name, isMetric = true) {
-    return (isMetric ? patternsRegistryMetric : patternsRegistryImperial).get(name.toUpperCase())
+    return (isMetric ? patternsRegistryMetric : patternsRegistryImperial)
+        .get(name.toUpperCase()) ?? null
 }
