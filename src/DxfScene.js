@@ -983,7 +983,7 @@ export class DxfScene {
             return this.textRenderer.GetLineWidth(text, fontSize)
         })
 
-        if (!dim.IsValid) {
+        if (!dim.IsValid()) {
             console.warn("Invalid dimension geometry detected for " + entity.handle)
             return null
         }

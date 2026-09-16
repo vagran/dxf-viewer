@@ -1,0 +1,19 @@
+origin (-1.8, 2.4)
+bounds (-2.55, 0.5) (7.625, 9.4)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 2
+  LINES layer="0" block=- color=000000 lineType=0 vertices=12
+  INDEXED_TRIANGLES layer="0" block=- color=000000 lineType=0 chunks=1 vertices=28 indices=18
+primitives 9
+  POLYLINE layer="0" color=000000 (-0.375, 0.5) (-2.55, 3.4)
+  POLYLINE layer="0" color=000000 (-1.8, 2.4) (6.2, 8.4)
+  POLYLINE layer="0" color=000000 (7.625, 6.5) (5.45, 9.4)
+  TRIANGLE layer="0" color=000000 (-0.8694, 7.1778) (0.7972, 4.9556) (1.9083, 5.7889)
+  TRIANGLE layer="0" color=000000 (-1.8, 2.4) (0.575, 3.4) (-0.175, 4.4)
+  TRIANGLE layer="0" color=000000 (0.7972, 8.4278) (2.4639, 6.2056) (3.575, 7.0389)
+  TRIANGLE layer="0" color=000000 (1.9083, 5.7889) (0.2417, 8.0111) (-0.8694, 7.1778)
+  TRIANGLE layer="0" color=000000 (3.575, 7.0389) (1.9083, 9.2611) (0.7972, 8.4278)
+  TRIANGLE layer="0" color=000000 (6.2, 8.4) (4.575, 6.4) (3.825, 7.4)
