@@ -96,7 +96,41 @@ examples in CAD software can also be very helpful. Additionally, creating exampl
 proprietary CAD software to which I do not have access would be highly valuable. Since the entrance
 level to start coding in this project is quite high, it is often more useful to receive a detailed
 issue report with sample files rather than a pull request. Also issue pre-analysis is very welcome,
-if one could find or guess exact reason of the renderer incorrect behavior.
+if one could find or guess exact reason of the renderer incorrect behavior. A pull request that
+fixes a rendering bug is in practice read as a very good bug report rather than as something to
+merge as it stands — [CONTRIBUTING.md](CONTRIBUTING.md) explains what that means for you, and
+[A note on AI](#a-note-on-ai) explains how it came to be the default.
+
+## A note on AI
+
+Most pull requests this project receives are now written by an AI agent. That is simply how things
+are in 2026+, and nobody is thought less of for it — but it does change what a patch is worth on
+arrival, because a PR carries no sign of how much of it was checked before it was sent. A generated
+patch is fluent by construction: the problem statement is confident, the commit message is
+plausible, the reasoning reads well, and the tests it claims to have passed cannot be checked from
+here. In a project where "correct" means *matches what AutoCAD does, on a file nobody in this
+repository has ever seen*, none of that is evidence.
+
+This is not a no-AI project — quite the opposite. AI does a lot of the work here now, and it is part
+of how it still stays maintained for free by one person. What makes it work is everything around the
+model rather than the model itself: a chosen model rather than whichever one is at hand, a prepared
+context (the DXF specification, valuable other available DXF-related projects sources, notes on
+decisions already made), a local corpus of real drawings (most are proprietary and cannot be shared)
+that every change is swept across, an automated test suite with recorded expected output, tooling to
+diff a measurement before and after a change — and a maintainer who reads every line before it lands
+and is answerable for it.
+
+So the bar is not "no AI". The bar is evidence, and it is the same for everyone:
+
+ * Please say if a change was written with AI. It is not a problem, and it saves guesswork.
+ * Say what you actually verified, and how. *"Opened these three drawings, the fill is right now,
+   console clean"* is worth more than any amount of explanation.
+ * Attach the file. A drawing that reproduces the bug is the part of a report that cannot be
+   invented, and it is the part this project most needs.
+
+If you would rather not do the verification, that is completely fine — open an issue with the
+drawing instead. It is genuinely the more useful thing to receive. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -1,5 +1,41 @@
-Anyone can participate in `dxf-viewer` development, taking into account the following
-recommendations:
+Anyone can participate in `dxf-viewer` development. Please read the first section below before
+opening a pull request — it will most likely save you a lot of work.
+
+## An issue is usually worth more than a pull request
+
+The entrance level for coding in this project is high. What counts as correct rendering is decided
+by the many undocumented corners of the DXF format, and a change that looks obviously right on its
+own routinely breaks a different drawing elsewhere. Most of those drawings are user-reported and
+proprietary, so they live only on the maintainer's machine and there is no way for you to test
+against them.
+
+Because of that, **a pull request that fixes a rendering bug is in practice read as a very good bug
+report, not as something to merge as it stands.** The drawing you attach is reproduced here, the
+cause is established against the format reference, and the fix is usually written afresh so that it
+lands in the right module, matches the surrounding code and comes with a test the project can keep.
+Your patch is read carefully, and a good idea in it is taken and credited. Please just do not count
+on the diff itself going in.
+
+So if what you have is a rendering bug, the most valuable thing you can send is an **issue**
+containing:
+
+ * **A sample `.dxf` file** that shows the problem. This is by far the most useful part — the
+   project is only ever as good as the files it has been tested against. A minimal file made in CAD
+   software is ideal, a real one is fine too, and a file produced by a CAD application the
+   maintainer has no access to is especially valuable.
+ * **A clear scenario**: what you did, what you expected, what you got. Screenshots of both help,
+   and a reference rendering from [the Autodesk online viewer](https://viewer.autodesk.com) settles
+   most questions about which one is right.
+ * **Any analysis you have already done** — which entity, which group code, which part of the
+   pipeline. A guess at the cause is very welcome and is never held against you if it turns out to
+   be wrong.
+
+None of that requires you to build or run the project, and it is genuinely the more useful thing to
+receive.
+
+## If you do want to send a pull request
+
+It is welcome — please just take the following into account:
 
  1. Propose your changes in the form of pull requests into the `master` branch of this repository.
  2. The pull requests should preferably contain one commit with all the necessary changes. There
@@ -33,12 +69,17 @@ recommendations:
 
     For a quicker first look, `npm run svg -- your-drawing.dxf out.svg --font <some-font.ttf>`
     renders a drawing to SVG through the same code the viewer uses, without a browser.
- 6. If your change fixes a rendering bug or adds support for something, please add a test for it.
+ 6. **Say what you actually checked, and say if the change was written with AI.** Neither is held
+    against you — [A note on AI](README.md#a-note-on-ai) in the README explains why it is asked.
+    A line like *"opened these three drawings, the fill is right now, console clean"* says more
+    than any amount of explanation, and a description claiming tests that did not actually run
+    costs everyone a great deal of time.
+ 7. If your change fixes a rendering bug or adds support for something, please add a test for it.
     A small synthetic drawing plus its expected output is usually enough, and both are generated —
     see [test/fixtures/README.md](test/fixtures/README.md). A test that fails before your change
     and passes after it is the most useful thing you can put in a PR, and it is what keeps the fix
     from being undone later.
- 7. It would be nice if you provide some screenshots demonstrating the effects of your changes.
+ 8. It would be nice if you provide some screenshots demonstrating the effects of your changes.
     Also, providing test `.dxf` files is very welcome.
- 8. Feel free to add yourself to the `CONTRIBUTORS` file if you are adding a significant feature or
+ 9. Feel free to add yourself to the `CONTRIBUTORS` file if you are adding a significant feature or
     bug fix.
