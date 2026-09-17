@@ -1,4 +1,5 @@
 import {Vector2, Matrix3} from "three"
+import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
 import {ParseSpecialChars} from "./TextRenderer.js"
 
 /**
@@ -172,19 +173,19 @@ export class LinearDimension {
 
             let transform = new Matrix3().identity()
             if (tickSize > 0) {
-                transform.scale(tickSize, tickSize)
+                MatrixScale(transform, tickSize, tickSize)
             } else {
-                transform.scale(arrowSize, arrowSize)
+                MatrixScale(transform, arrowSize, arrowSize)
                 /* Tick is not flipped. */
                 if (flip) {
-                    transform.scale(-1, 1)
+                    MatrixScale(transform, -1, 1)
                 }
             }
 
             const angle = -this.vDim.angle()
-            transform.rotate(angle)
+            MatrixRotateCW(transform, angle)
 
-            transform.translate(dimPt.x, dimPt.y)
+            MatrixTranslate(transform, dimPt.x, dimPt.y)
 
             if (tickSize > 0) {
                 this._CreateTick(result, transform, dimColor)

@@ -1,5 +1,6 @@
 import {Vector2, Matrix3, Box2} from "three"
-import {IntersectSegmentsParametric} from "./math/utils.js"
+import {IntersectSegmentsParametric, MatrixRotateCW, MatrixScale,
+        MatrixTranslate} from "./math/utils.js"
 
 export const HatchStyle = Object.freeze({
     ODD_PARITY: 0,
@@ -310,11 +311,10 @@ export class HatchCalculator {
     GetPatternTransform({seedPoint, angle, scale}) {
         const m = new Matrix3().makeTranslation(-seedPoint.x, -seedPoint.y)
         if (angle) {
-            /* Matrix3.rotate() inverts angle sign. */
-            m.rotate(angle)
+            MatrixRotateCW(m, angle)
         }
         if ((scale ?? 1) != 1) {
-            m.scale(1 / scale, 1 / scale)
+            MatrixScale(m, 1 / scale, 1 / scale)
         }
         return m
     }
@@ -330,11 +330,10 @@ export class HatchCalculator {
     GetLineTransform({patTransform, basePoint, angle}) {
         const m = patTransform.clone()
         if (basePoint) {
-            m.translate(-basePoint.x, -basePoint.y)
+            MatrixTranslate(m, -basePoint.x, -basePoint.y)
         }
         if (angle) {
-            /* Matrix3.rotate() inverts angle sign. */
-            m.rotate(angle)
+            MatrixRotateCW(m, angle)
         }
         return m
     }

@@ -1,4 +1,4 @@
-import {Vector2} from "three"
+import {Matrix3, Vector2} from "three"
 
 
 /** Find intersection points of two segments in a parametric form.
@@ -56,4 +56,42 @@ export function IntersectSegments(a1, a2, b1, b2) {
         return null
     }
     return a2.clone().sub(a1).multiplyScalar(params[0]).add(a1)
+}
+
+
+/* Scratch matrix for the composition helpers below, reused to avoid allocating on every call.
+ * Safe to share: premultiply() reads it fully before writing its target, and no helper hands it
+ * out or retains it.
+ */
+const _m = new Matrix3()
+
+/** Compose a translation onto a matrix, in place.
+ * @param {Matrix3} m Matrix to transform.
+ * @param {number} tx
+ * @param {number} ty
+ * @return {Matrix3} The same matrix, for chaining.
+ */
+export function MatrixTranslate(m, tx, ty) {
+    return m.premultiply(_m.makeTranslation(tx, ty))
+}
+
+/** Compose a scaling onto a matrix, in place.
+ * @param {Matrix3} m Matrix to transform.
+ * @param {number} sx
+ * @param {number} sy
+ * @return {Matrix3} The same matrix, for chaining.
+ */
+export function MatrixScale(m, sx, sy) {
+    return m.premultiply(_m.makeScale(sx, sy))
+}
+
+/** Compose a clockwise rotation onto a matrix, in place. Note the direction: Matrix3.makeRotation()
+ * is counter-clockwise, so the angle is negated here. Callers throughout this project pass angles
+ * in the clockwise convention.
+ * @param {Matrix3} m Matrix to transform.
+ * @param {number} theta Rotation angle in radians, clockwise from +X direction.
+ * @return {Matrix3} The same matrix, for chaining.
+ */
+export function MatrixRotateCW(m, theta) {
+    return m.premultiply(_m.makeRotation(-theta))
 }

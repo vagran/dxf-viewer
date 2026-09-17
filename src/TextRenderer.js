@@ -2,6 +2,7 @@ import {Entity} from "./DxfScene.js"
 import {ShapePath} from "three/src/extras/core/ShapePath.js"
 import {ShapeUtils} from "three/src/extras/ShapeUtils.js"
 import {Matrix3, Vector2} from "three"
+import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
 import {MTextFormatParser} from "./MTextFormatParser.js"
 import {DefaultTextOptions} from "./TextRendererOptions.js"
 
@@ -605,8 +606,9 @@ class TextBox {
         }
 
         /* Transform for each chunk insertion point. */
-        const transform = new Matrix3().translate(-origin.x, -origin.y)
-            .rotate(-rotation * Math.PI / 180).translate(position.x, position.y)
+        const transform = new Matrix3().makeTranslation(-origin.x, -origin.y)
+        MatrixRotateCW(transform, -rotation * Math.PI / 180)
+        MatrixTranslate(transform, position.x, position.y)
 
         let y = -this.fontSize
         for (const p of this.paragraphs) {
@@ -1056,8 +1058,10 @@ class TextBlock {
             console.warn("Unrecognized vAlign value: " + vAlign)
         }
 
-        const transform = new Matrix3().translate(-origin.x, -origin.y).scale(scale.x, scale.y)
-            .rotate(rotation).translate(insertionPos.x, insertionPos.y)
+        const transform = new Matrix3().makeTranslation(-origin.x, -origin.y)
+        MatrixScale(transform, scale.x, scale.y)
+        MatrixRotateCW(transform, rotation)
+        MatrixTranslate(transform, insertionPos.x, insertionPos.y)
 
         for (const glyph of this.glyphs) {
             if (glyph.vertices) {

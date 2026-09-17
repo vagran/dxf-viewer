@@ -1,6 +1,7 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer.js"
 import {BatchingKey} from "./BatchingKey.js"
 import {Matrix3, Vector2} from "three"
+import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
 import {TextRenderer, ParseSpecialChars, HAlign, VAlign} from "./TextRenderer.js"
 import {DefaultTextOptions} from "./TextRendererOptions.js"
 import {RBTree} from "./RBTree.js"
@@ -1674,7 +1675,7 @@ export class DxfScene {
         this._UpdateBounds(new Vector2(bounds.minX, bounds.maxY).applyMatrix3(transform))
         this._UpdateBounds(new Vector2(bounds.maxX, bounds.minY).applyMatrix3(transform))
 
-        transform.translate(-this.origin.x, -this.origin.y)
+        MatrixTranslate(transform, -this.origin.x, -this.origin.y)
         //XXX grid instancing not supported yet
         if (block.flatten) {
             for (const batch of block.batches) {
@@ -2282,7 +2283,7 @@ export class DxfScene {
         if (entity.extrusionDirection.z > 0) {
             return null
         }
-        return new Matrix3().scale(-1, 1)
+        return new Matrix3().makeScale(-1, 1)
     }
 
     /** @return {RenderBatch} */
@@ -2699,22 +2700,22 @@ class BlockContext {
      * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
      */
     GetInsertionTransform(entity) {
-        const mInsert = new Matrix3().translate(-this.origin.x, -this.origin.y)
+        const mInsert = new Matrix3().makeTranslation(-this.origin.x, -this.origin.y)
         const yScale = entity.yScale || 1
         const xScale = entity.xScale || 1
         const rotation = -(entity.rotation || 0) * Math.PI / 180
         let x = entity.position.x
         const y = entity.position.y
-        mInsert.scale(xScale, yScale)
-        mInsert.rotate(rotation)
-        mInsert.translate(x, y)
+        MatrixScale(mInsert, xScale, yScale)
+        MatrixRotateCW(mInsert, rotation)
+        MatrixTranslate(mInsert, x, y)
         if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
-            mInsert.scale(-1, 1)
+            MatrixScale(mInsert, -1, 1)
         }
         if (this.type !== BlockContext.Type.INSTANTIATION) {
             return mInsert
         }
-        const mOffset = new Matrix3().translate(this.block.offset.x, this.block.offset.y)
+        const mOffset = new Matrix3().makeTranslation(this.block.offset.x, this.block.offset.y)
         return mInsert.multiply(mOffset)
     }
 
