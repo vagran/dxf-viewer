@@ -469,9 +469,9 @@ def _Attrib(doc, msp):
     insert = msp.add_blockref("TAGGED", (0, 0), dxfattribs={"color": 3})
     insert.add_auto_attribs({"LABEL": "AB"})
     # ezdxf leaves an ATTRIB owned by the layout's block record. AutoCAD points it at the owning
-    # INSERT -- all 188 ATTRIBs in test-data/AEC Plan Elev Sample.dxf do -- and that handle is how
-    # the viewer finds the INSERT to inherit layer and colour from. Without this the fixture would
-    # quietly exercise the fallback instead of the inheritance.
+    # INSERT -- all 188 ATTRIBs in sample-files/AEC Plan Elev Sample (dim,hatch,sheets).dxf do --
+    # and that handle is how the viewer finds the INSERT to inherit layer and colour from. Without
+    # this the fixture would quietly exercise the fallback instead of the inheritance.
     for attrib in insert.attribs:
         attrib.dxf.owner = insert.dxf.handle
 

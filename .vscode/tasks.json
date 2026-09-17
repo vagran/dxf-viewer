@@ -75,6 +75,30 @@
             "problemMatcher": []
         },
         {
+            // Rebuilds the content index of test-data/sample-files/ and reports what moved since
+            // the last run. Needs nothing but Python. See test/tools/dxfidx.py.
+            "label": "index corpus",
+            "type": "process",
+            "command": "python3",
+            "args": ["test/tools/dxfidx.py"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            // "Do we already have this drawing?" - takes the file itself, a sha256 prefix or a
+            // name. Drop an attachment from an issue in here before adding it to the corpus.
+            "label": "index corpus (find)",
+            "type": "process",
+            "command": "python3",
+            "args": ["test/tools/dxfidx.py", "find", "${input:corpusQuery}"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Renders a DXF to SVG through SceneReader and writes it next to the input. A review
             // aid, not a test: see test/svg.mjs.
             "label": "svg",
@@ -179,6 +203,11 @@
             "type": "promptString",
             "description": "Python expression, evaluated per DXF file",
             "default": "sorted(types())"
+        },
+        {
+            "id": "corpusQuery",
+            "type": "promptString",
+            "description": "A file to hash, a sha256 prefix, or part of a name or note"
         },
         {
             "id": "dxfPath",

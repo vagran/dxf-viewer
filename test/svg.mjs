@@ -2,7 +2,7 @@
 /** Renders a DXF to SVG, for looking at.
  *
  *     npm run svg -- test/fixtures/dimension-linear.dxf
- *     npm run svg -- test-data/enterprise/turtle.dxf /tmp/turtle.svg
+ *     npm run svg -- test-data/selected-samples/enterprise/turtle.dxf /tmp/turtle.svg
  *     npm run svg -- drawing.dxf out.svg --background=#fff
  *     npm run svg -- drawing.dxf out.svg --font /path/Roboto.ttf --font /path/NotoSans.ttf
  *     npm run svg -- drawing.dxf out.svg --png          # also rasterize, to actually look at it

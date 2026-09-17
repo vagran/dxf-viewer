@@ -81,7 +81,7 @@ fixture — see [fixtures/README.md](fixtures/README.md).
 
 ```bash
 npm run svg -- test/fixtures/dimension-linear.dxf          # writes ...-linear.svg next to it
-npm run svg -- test-data/enterprise/turtle.dxf /tmp/t.svg  # or an explicit output path
+npm run svg -- test-data/selected-samples/enterprise/turtle.dxf t.svg  # or an explicit path
 npm run svg -- drawing.dxf --font /path/Roboto.ttf          # readable text; repeat for fallbacks
 npm run svg -- drawing.dxf out.svg --background=#fff       # light background
 npm run svg -- drawing.dxf out.svg --no-invert             # literal colours
@@ -102,8 +102,8 @@ The output path is optional and defaults to the input with a `.svg` extension. O
 which every glyph is a rectangle by design — right for asserting layout, useless for looking at.
 Repeat the option to build a fallback chain: the library moves to the next font only for a
 character the earlier ones have no glyph for, which is how CJK coverage is added. On
-`test-data/enterprise/korean.dxf`, Roboto alone yields 82,729 text triangles and the example
-project's four-font chain yields 107,253 — the difference is the Korean glyphs Roboto has not got.
+`selected-samples/enterprise/korean.dxf`, Roboto alone yields 82,729 text triangles and the
+example project's four-font chain yields 107,253 — the difference is the Korean glyphs Roboto has not got.
 
 A review and debugging aid, **not a test** — nothing is asserted and no SVG is committed. The
 scene dumps say what the geometry *is*; they cannot say whether a drawing *looks* right, and that
@@ -125,7 +125,8 @@ openable: `city.dxf`'s 155k primitives come out as 33 path elements.
 
 ## Tools
 
-Two things in `tools/` that are for troubleshooting rather than testing — nothing in CI runs them.
+Three things in `tools/` that are for troubleshooting rather than testing — nothing in CI runs
+them.
 
 ### `dxfq.py` — which files have X
 
@@ -137,8 +138,10 @@ npm run query -- --help
 
 The expression is Python, evaluated once per file; whatever it returns prints beside the file name,
 and falsy results are skipped — so a predicate reads as a filter and a count reads as a ranking.
-Scans `fixtures/` plus `test-data/` if you have a corpus there, and skips directories that are not
-present, so it works in a fresh clone.
+Scans `fixtures/` plus `test-data/sample-files/` if you have a corpus there, and skips directories
+that are not present, so it works in a fresh clone. `test-data/selected-samples/` is deliberately
+not scanned: it is symlinks into `sample-files/`, which is scanned whole, so listing both would
+report every one of those drawings twice, under two names.
 
 Two modes. The default parses with **ezdxf** — ask what a drawing *means*, in entities, blocks,
 layers and header variables. `--raw` tokenizes into `(code, value)` pairs and interprets nothing —
@@ -162,11 +165,46 @@ it, which is what you want when the measurement is new and the behaviour is old.
 restored by an `EXIT`/`INT`/`TERM` trap, so a command that fails or is killed partway still leaves
 your tree as it was.
 
+### `dxfidx.py` — do we already have this drawing
+
+```bash
+npm run index                                   # rebuild; says what was added, moved, changed, gone
+npm run index -- find ~/Downloads/attached.dxf  # hashes it: is it in the corpus, under what name?
+npm run index -- find 47a62c99                  # or by sha256 prefix, or by part of a name
+npm run index -- dups                           # files with identical content
+npm run index -- note road.dxf "issue #142"     # provenance, kept across rebuilds
+```
+
+A content index of `test-data/sample-files/`, keyed by the sha256 of the bytes, written to
+`index.ndjson` at the root of that directory — one JSON object per line, sorted by path, so it
+greps line-wise and parses. Needs nothing but Python.
+
+Names are not an identity: a drawing attached to an issue arrives named whatever the reporter's
+CAD system called it, and the first run of this found two pairs of byte-identical files sitting
+in the corpus under unrelated names. `find` takes the downloaded file itself, so the check before
+adding anything is one command. `note` is the only hand-written field, and it follows the
+*content*, so a renamed file keeps its note.
+
+Hashing the whole 1.2 GB corpus takes about 3 seconds, so there is no incremental mode and nothing
+to invalidate — a rebuild is always the truth. The report after a rebuild distinguishes a path
+going away from its *content* going away, since deleting one of two identical files is only the
+first: a removal whose content survives elsewhere says where, and one whose content does not says
+that instead. A rename is reported as a single `moved` line only where the pairing is
+unambiguous — one path out, one path in; where several paths collapse onto one, each is listed
+with what became of its content rather than a guess about which was the rename.
+
+The index lives inside the corpus rather than in the repository because the drawings are user- and
+customer-supplied and cannot be redistributed, and because the notes have to travel with them.
+
+`$ACADVER` and `$FINGERPRINTGUID` are recorded alongside, read out of the head of each file.
+Treat the GUID as a *lineage* hint and never as a key: it survives a re-save, but sheets exported
+from one template share it, and eight drawings in `korean-site-epsg-5186/` do.
+
 ## Smoke sweep
 
 ```bash
 npm run smoke                                  # everything available
-npm run smoke -- test-data/enterprise/city.dxf      # or an explicit list
+npm run smoke -- test-data/selected-samples/enterprise/city.dxf      # or an explicit list
 node --max-old-space-size=6144 test/smoke.mjs  # if the largest drawings run out of heap
 ```
 
@@ -186,15 +224,17 @@ pairs today.
 
 Three properties are what make it worth being one command:
 
-- **Corpus-optional.** It sweeps `test/fixtures/` plus `test-data/` if there is one, skipping
-  whichever is absent, so the same command is correct for a contributor with no corpus and for a
-  checkout that has one. CI only ever sees the fixtures, because `test-data/` holds customer and
-  user-reported drawings that cannot be redistributed — the real value of this is local, but the
-  fixtures are swept locally too, so what CI runs is never a path nobody exercises before pushing.
+- **Corpus-optional.** It sweeps `test/fixtures/` plus `test-data/selected-samples/` and its
+  `enterprise/` subdirectory, skipping whichever is absent, so the same command is correct for a
+  contributor with no corpus and for a checkout that has one. CI only ever sees the fixtures,
+  because `test-data/` holds customer and user-reported drawings that cannot be redistributed — the
+  real value of this is local, but the fixtures are swept locally too, so what CI runs is never a
+  path nobody exercises before pushing.
   They come first in the output, which makes a CI run a prefix of a local one and the two
   directly diffable.
 - **No goldens.** Everything it asserts is an invariant or a warning count, so adding a drawing
-  costs nothing. A file attached to a bug report is covered the moment it lands in `test-data/`.
+  costs nothing. A file attached to a bug report is covered as soon as it is linked into
+  `test-data/selected-samples/`.
 - **Stable, diffable output.** Run it before a change, run it after, `diff` the two. A moved batch
   count on an unchanged drawing means the batching changed, which is the cheapest structural
   regression signal there is. Timings are the only part that varies between runs, so

@@ -23,6 +23,7 @@
         "smoke": "node test/smoke.mjs",
         "svg": "node --max-old-space-size=6144 test/svg.mjs",
         "query": "python3 test/tools/dxfq.py",
+        "index": "python3 test/tools/dxfidx.py",
         "typecheck": "npm --prefix test/types install --no-package-lock --silent && tsc -p test/types"
     },
     "files": [

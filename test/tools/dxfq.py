@@ -63,9 +63,9 @@ import time
 # test/tools/dxfq.py -> the repository root.
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
+# test-data/selected-samples/ is deliberately absent: it is symlinks into sample-files/, which is
+# scanned whole, so listing both would report the same drawing twice under two names.
 DEFAULT_DIRS = [
-    "test-data",
-    "test-data/enterprise",
     "test-data/sample-files",
     "test/fixtures",
 ]

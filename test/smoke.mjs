@@ -3,7 +3,7 @@
  * worth watching for regressions — no browser, no dev server, no clicking.
  *
  *     npm run smoke                                  # everything available
- *     npm run smoke -- test-data/enterprise/city.dxf # or an explicit list
+ *     npm run smoke -- test-data/selected-samples/enterprise/city.dxf   # or an explicit list
  *     node --max-old-space-size=6144 test/smoke.mjs  # if the largest files run out of heap
  *
  * Exits non-zero if anything warned or failed validation, so it can gate a commit. The exception
@@ -19,7 +19,7 @@
  *
  * **No goldens.** Everything asserted is either an invariant or a warning count, so adding a
  * drawing costs nothing: no expected output to generate, nothing to review. A file attached to a
- * bug report is covered the moment it lands in test-data/.
+ * bug report is covered as soon as it is linked into test-data/selected-samples/.
  *
  * The output is deliberately stable line for line: run it before a change, run it after, and
  * `diff` the two. A moved batch count on an unchanged drawing means the batching changed. Timings
@@ -47,8 +47,17 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
  *
  * The fixtures come first so that what CI sees is a *prefix* of a local run, and the two outputs
  * can be diffed directly.
+ *
+ * `selected-samples/` is a directory of symlinks into `test-data/sample-files/`, the working set
+ * picked out of a corpus far too large to sweep on every run. The links are read through, so a
+ * drawing is swept under the name the link carries. Its `enterprise/` subdirectory is listed
+ * separately because this sweep does not recurse.
  */
-const DEFAULT_DIRS = ["test/fixtures", "test-data", path.join("test-data", "enterprise")]
+const DEFAULT_DIRS = [
+    "test/fixtures",
+    path.join("test-data", "selected-samples"),
+    path.join("test-data", "selected-samples", "enterprise")
+]
 
 /** Sweep all of DEFAULT_DIRS rather than the first that exists. The fixtures are cheap — ~35 ms of
  * parse and build against the corpus's seconds — and skipping them locally means the half of the
