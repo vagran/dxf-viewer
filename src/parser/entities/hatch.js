@@ -223,12 +223,35 @@ function ParseBoundaryLoop(curr, scanner) {
                 e.degreeOfSplineCurve = curr.value
                 break
 
-            //XXX ignore some groups for now, mostly spline
+            /* Spline-only groups, none of which carry anything this renderer needs yet. Two
+             * rules, and an edge which breaks either of them ends the boundary path early and
+             * drops every path after it as well:
+             *
+             *  - A group the edge does not own has to end it rather than be skipped. 97 is the
+             *    ambiguous one: inside a spline edge it counts the fit data, but after the last
+             *    edge of a boundary path the same code counts that path's source objects.
+             *  - A group the edge does own has to be consumed, tangents included. A spline
+             *    writes 12 and 13 whenever it has fit data, and they follow the 11 pairs.
+             */
+            case 42:
             case 95:
             case 96:
-            case 40:
-            case 42:
             case 97:
+                if (!isSpline) {
+                    return e
+                }
+                break
+            case 12:
+                if (!isSpline) {
+                    return e
+                }
+                e.startTangent = helpers.parsePoint(scanner)
+                break
+            case 13:
+                if (!isSpline) {
+                    return e
+                }
+                e.endTangent = helpers.parsePoint(scanner)
                 break
             default:
                 return e

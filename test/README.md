@@ -32,10 +32,11 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
   the prefix-contiguity that batch lookup depends on), `text-format` (the `%%`-code substitution
   and the MTEXT inline format parser), `pattern` (`.pat` parsing and the name registry), `hatch`
   (`ClipLine`) and `font` (the generated test font's glyph geometry). No fixtures and no DXF: these
-  take numbers and strings. `parser-color` and `parser-layer` are the same idea one level up — they
-  splice group codes into a dozen lines of DXF text and read back what the parser made of them,
-  which is how a group whose *value* needs interpreting (a color method marker, a bit-coded flag)
-  gets pinned without a fixture.
+  take numbers and strings. `parser-color`, `parser-layer` and `parser-hatch` are the same idea one
+  level up — they splice group codes into a dozen lines of DXF text and read back what the parser
+  made of them, which is how a group whose *value* needs interpreting (a color method marker, a
+  bit-coded flag), or whose *meaning depends on where it sits* (group 97, which counts a boundary
+  path's source objects but a spline edge's fit data), gets pinned without a fixture.
 - **`invariants.test.mjs`** — properties that need no expected output: a translated drawing
   produces the same geometry shifted, a drawing with its blocks exploded produces the same geometry
   as one with blocks, hatch lines stay inside their boundary, and a polyline over 0x10000 vertices

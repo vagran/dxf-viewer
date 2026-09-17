@@ -268,6 +268,44 @@ def _SolidHatchIgnoreStyle(doc, msp):
             flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL if external else 0)
 
 
+@Fixture("solid-hatch-edge-paths")
+def _SolidHatchEdgePaths(doc, msp):
+    """Solid HATCH whose boundary paths are edge lists rather than polylines.
+
+    An edge path ends with group 97 -- the number of source boundary objects -- followed by a 330
+    handle per object, and 97 is also a spline edge's own "number of fit data". The edge parser
+    read it as the spline group in both places, which swallowed the end of the path and left every
+    path after it unparsed: a two-loop hatch came out with one loop, so the hole here would be
+    filled and the hatch on the other side of it missing entirely. Real files are full of these --
+    every associative hatch names the objects it was traced from.
+
+    Three paths, so the loss shows up as more than a missing hole, and one edge of each kind the
+    decomposer understands.
+    """
+    hatch = msp.add_hatch(color=2)
+    contour = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    for start, end in (((0, 0), (20, 0)), ((20, 0), (20, 20)), ((20, 20), (0, 20)),
+                       ((0, 20), (0, 0))):
+        contour.add_line(start, end)
+    contour.source_boundary_objects = ["ABC"]
+
+    hole = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
+    hole.add_line((5, 5), (15, 5))
+    hole.add_line((15, 5), (15, 10))
+    # A half circle closing the hole, so an arc edge (72 = 2) is covered too.
+    hole.add_arc((10, 10), radius=5, start_angle=0, end_angle=180)
+    hole.add_line((5, 10), (5, 5))
+    hole.source_boundary_objects = ["DEF"]
+
+    # A second area, disjoint from the first: this one is dropped outright when the path before it
+    # eats its own terminator.
+    other = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    for start, end in (((30, 0), (40, 0)), ((40, 0), (40, 10)), ((40, 10), (30, 10)),
+                       ((30, 10), (30, 0))):
+        other.add_line(start, end)
+    other.source_boundary_objects = ["012", "345"]
+
+
 @Fixture("pattern-hatch")
 def _PatternHatch(doc, msp):
     """Pattern HATCH, which goes through the hatch line clipping instead."""
