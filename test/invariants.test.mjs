@@ -216,3 +216,32 @@ for (const [vertexCount, closed] of CHUNK_SEAM_CASES) {
              assert.strictEqual(segments, closed ? vertexCount : vertexCount - 1)
          }))
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Diagnostics are reported once per entity.
+ *
+ * A drawing is walked more than once -- _FetchFonts() pre-scans for text before any geometry is
+ * processed -- and the pre-scan builds the same objects the geometry pass builds. A guard that
+ * fires on both walks reports one broken entity as two, which is noise in the console and in the
+ * smoke sweep, where the count is what a reader compares across a change.
+ * ------------------------------------------------------------------------------------------- */
+
+/** Collect everything written to console.warn while building. */
+async function CountWarnings(fixture, substring) {
+    const warn = console.warn
+    const messages = []
+    console.warn = (...args) => messages.push(args.join(" "))
+    try {
+        await BuildScene(path.join(fixturesDir, fixture))
+    } finally {
+        console.warn = warn
+    }
+    return messages.filter(message => message.includes(substring)).length
+}
+
+test("an unrenderable dimension is reported once, not once per pass", async () => {
+    /* One DIMENSION with coincident measurement points, so LinearDimension's validity check
+     * rejects it -- see test/fixtures/gen/generate.py. */
+    assert.strictEqual(
+        await CountWarnings("dimension-degenerate.dxf", "Invalid dimension geometry detected"), 1)
+})

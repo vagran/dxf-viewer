@@ -12,9 +12,9 @@
  *
  * Keys are repo-relative paths with forward slashes, so `test-data/` drawings can be listed too.
  * Each entry is matched as a **substring** of the warning message; leave the handle out, since
- * handles move when a fixture is regenerated. Count is deliberately not pinned — a dimension is
- * decomposed twice (once by `_FetchFonts()`), so its warnings come in pairs today and would not
- * if that were fixed.
+ * handles move when a fixture is regenerated. Count is deliberately not pinned: one entry stands
+ * for a guard firing, and a drawing may legitimately trip the same guard several times —
+ * `block-recursive.dxf` reports one cycle per block on it.
  */
 export const ExpectedWarnings = {
     "test/fixtures/block-recursive.dxf": [

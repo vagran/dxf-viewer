@@ -253,8 +253,10 @@ export class DxfScene {
             } else if (entity.type === "DIMENSION") {
                 ret = true
                 /* No block context: this pre-scan only wants the texts, and resolved colors are
-                 * discarded with the rest of the dimension. */
-                const dim = this._CreateLinearDimension(entity, null)
+                 * discarded with the rest of the dimension. Whether the geometry is renderable is
+                 * reported when it is rendered, not here.
+                 */
+                const dim = this._CreateLinearDimension(entity, null, false)
                 if (dim) {
                     for (const text of dim.GetTexts()) {
                         if (!await this.textRenderer.FetchFonts(text)) {
@@ -951,10 +953,15 @@ export class DxfScene {
     }
 
     /**
+     * @param entity
+     * @param blockCtx {?BlockContext}
+     * @param reportInvalid {Boolean} Warn about geometry which cannot be laid out. Only the call
+     *  which renders the dimension does, so that a dimension the font pre-scan also builds is not
+     *  reported twice.
      * @return {?LinearDimension} Dimension handler instance, null if not possible to create from
      * the provided entity.
      */
-    _CreateLinearDimension(entity, blockCtx = null) {
+    _CreateLinearDimension(entity, blockCtx = null, reportInvalid = true) {
         const type = (entity.dimensionType || 0) & 0xf
         /* For now support linear dimensions only. */
         if ((type != 0 && type != 1) || !entity.linearOrAngularPoint1 ||
@@ -992,7 +999,9 @@ export class DxfScene {
         })
 
         if (!dim.IsValid()) {
-            console.warn("Invalid dimension geometry detected for " + entity.handle)
+            if (reportInvalid) {
+                console.warn("Invalid dimension geometry detected for " + entity.handle)
+            }
             return null
         }
 
