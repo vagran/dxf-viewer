@@ -512,6 +512,24 @@ def _LayersColors(doc, msp):
     msp.add_line((0, 6), (10, 6), dxfattribs={"layer": "GREEN", "color": 0})
 
 
+@Fixture("layers-frozen")
+def _LayersFrozen(doc, msp):
+    """LAYER group 70, whose bits do not all mean "hidden".
+
+    Only bit 1 freezes a layer. Bit 2 is "frozen by default in new viewports", which describes
+    viewports the drawing does not have yet, and bit 4 is "locked", which prevents editing and
+    nothing else -- so three of these five lines have to reach the scene, on three visible layers.
+    """
+    doc.layers.add("FROZEN", color=1).dxf.flags = 1
+    doc.layers.add("VP_FROZEN", color=3).dxf.flags = 2
+    doc.layers.add("LOCKED", color=5).dxf.flags = 4
+    # Both bits together: the frozen one still wins.
+    doc.layers.add("FROZEN_VP", color=2).dxf.flags = 3
+    doc.layers.add("PLAIN", color=6).dxf.flags = 0
+    for i, layer in enumerate(("FROZEN", "VP_FROZEN", "LOCKED", "FROZEN_VP", "PLAIN")):
+        msp.add_line((0, 2 * i), (10, 2 * i), dxfattribs={"layer": layer, "color": 256})
+
+
 @Fixture("mesh-3dface")
 def _Mesh3dFace(doc, msp):
     """3DFACE, which decomposes into triangles rather than lines."""

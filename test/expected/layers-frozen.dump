@@ -1,0 +1,17 @@
+origin (0, 2)
+bounds (0, 2) (10, 8)
+hasMissingChars no
+layers 5
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+  "VP_FROZEN" color=00ff00
+  "LOCKED" color=0000ff
+  "PLAIN" color=ff00ff
+batches 3
+  LINES layer="LOCKED" block=- color=0000ff lineType=0 vertices=4
+  LINES layer="PLAIN" block=- color=ff00ff lineType=0 vertices=4
+  LINES layer="VP_FROZEN" block=- color=00ff00 lineType=0 vertices=4
+primitives 3
+  POLYLINE layer="LOCKED" color=0000ff (0, 4) (10, 4)
+  POLYLINE layer="PLAIN" color=ff00ff (0, 8) (10, 8)
+  POLYLINE layer="VP_FROZEN" color=00ff00 (0, 2) (10, 2)

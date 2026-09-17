@@ -627,8 +627,12 @@ DxfParser.prototype._parse = function(dxfString) {
                 layer.color = getAcadColor(layer.colorIndex)
                 curr = scanner.next()
                 break
-            case 70: // frozen layer
-                layer.frozen = ((curr.value & 1) !== 0 || (curr.value & 2) !== 0)
+            case 70: // standard flags
+                /* Bit 1 is the only one that hides the layer. Bit 2 is "frozen by default in new
+                 * viewports", which is a template for viewports the drawing does not have yet, and
+                 * bit 4 is "locked", which only prevents editing.
+                 */
+                layer.frozen = (curr.value & 1) !== 0
                 curr = scanner.next()
                 break
             case 420: // TrueColor Color
