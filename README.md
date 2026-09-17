@@ -10,6 +10,12 @@ The usage example is available here: https://github.com/vagran/dxf-viewer-exampl
 
 Deployed demo: https://vagran.github.io/dxf-viewer-example/
 
+Release preview: https://vagran.github.io/dxf-viewer-example-preview/ — the same demo running the
+current development code, ahead of the latest npm release. Worth opening before reporting a
+rendering problem, since the fix may already be in there. It is unreleased work by definition, so
+expect the occasional rough edge; no npm version corresponds to it, and the revision it was built
+from is shown in its toolbar — please quote that if you report something against it.
+
 ## Install
 
 ```bash

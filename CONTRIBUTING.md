@@ -16,8 +16,11 @@ lands in the right module, matches the surrounding code and comes with a test th
 Your patch is read carefully, and a good idea in it is taken and credited. Please just do not count
 on the diff itself going in.
 
-So if what you have is a rendering bug, the most valuable thing you can send is an **issue**
-containing:
+Before reporting a rendering bug, it is worth opening your drawing in the
+[release preview](https://vagran.github.io/dxf-viewer-example-preview/) — it runs the current
+development code rather than the latest npm release, so the problem may already be fixed there.
+
+If it is not, the most valuable thing you can send is an **issue** containing:
 
  * **A sample `.dxf` file** that shows the problem. This is by far the most useful part — the
    project is only ever as good as the files it has been tested against. A minimal file made in CAD
