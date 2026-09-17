@@ -1,0 +1,28 @@
+origin (0, 0)
+bounds (0, 0) (30, 8)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 15
+  LINES layer="0" block=- color=0000ff lineType=0 vertices=4
+  LINES layer="0" block=- color=00ff00 lineType=0 vertices=4
+  LINES layer="0" block=- color=00ffff lineType=0 vertices=4
+  LINES layer="0" block=- color=ff0000 lineType=0 vertices=4
+  LINES layer="0" block=- color=ffff00 lineType=0 vertices=4
+  LINES layer="0" block="A" color=0000ff lineType=0 vertices=4
+  LINES layer="0" block="A" color=00ff00 lineType=0 vertices=4
+  LINES layer="0" block="A" color=ff0000 lineType=0 vertices=4
+  LINES layer="0" block="A" color=ffff00 lineType=0 vertices=4
+  LINES layer="0" block="B" color=0000ff lineType=0 vertices=4
+  LINES layer="0" block="B" color=00ff00 lineType=0 vertices=4
+  LINES layer="0" block="C" color=0000ff lineType=0 vertices=4
+  LINES layer="0" block="C" color=00ff00 lineType=0 vertices=4
+  LINES layer="0" block="D" color=ffff00 lineType=0 vertices=4
+  LINES layer="0" block="E" color=00ffff lineType=0 vertices=4
+primitives 5
+  POLYLINE layer="0" color=0000ff (0, 4) (10, 4)
+  POLYLINE layer="0" color=00ff00 (0, 2) (10, 2)
+  POLYLINE layer="0" color=00ffff (20, 8) (30, 8)
+  POLYLINE layer="0" color=ff0000 (0, 0) (10, 0)
+  POLYLINE layer="0" color=ffff00 (0, 6) (10, 6)

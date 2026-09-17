@@ -322,6 +322,38 @@ def _BlockInstanced(doc, msp):
         msp.add_blockref("LONG", (0, i * 10))
 
 
+@Fixture("block-recursive")
+def _BlockRecursive(doc, msp):
+    """Blocks which reference each other in a cycle, which the viewer has to cut rather than follow.
+
+    AutoCAD refuses to create one of these and ezdxf audits it as an error, but the construct does
+    reach viewers, and expanding it is unbounded recursion -- a blown stack that loses the whole
+    drawing, not just the block.
+
+    Three shapes of cycle, because the obvious check catches only some of them. A nested block is
+    expanded with a context that keeps naming the *outermost* block, so comparing against that one
+    name sees A -> B -> A and A -> B -> C -> A but not a cycle further down the chain:
+
+      B -> C -> B   reached from A, closing below the block the expansion started from
+      D -> D        direct self-reference, reached through a nesting level
+      E -> E        direct self-reference of the block whose definition is being processed
+
+    Each block draws one line at its own height, so the golden shows exactly how far the expansion
+    got before each cycle was cut.
+    """
+    blocks = {name: doc.blocks.new(name=name) for name in ("A", "B", "C", "D", "E")}
+    for i, (name, color) in enumerate((("A", 1), ("B", 3), ("C", 5), ("D", 2), ("E", 4))):
+        blocks[name].add_line((0, i * 2), (10, i * 2), dxfattribs={"color": color})
+    blocks["A"].add_blockref("B", (0, 0))
+    blocks["A"].add_blockref("D", (0, 0))
+    blocks["B"].add_blockref("C", (0, 0))
+    blocks["C"].add_blockref("B", (0, 0))
+    blocks["D"].add_blockref("D", (0, 0))
+    blocks["E"].add_blockref("E", (0, 0))
+    msp.add_blockref("A", (0, 0))
+    msp.add_blockref("E", (20, 0))
+
+
 # The generated test font covers A, B, I and space only, so fixture text is spelled from those --
 # see test/fixtures/README.md. The glyphs' identity does not matter; their differing advance widths
 # (A and B are 1000 units, I is 400, space 500) are what make a layout mistake visible.

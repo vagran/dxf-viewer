@@ -17,6 +17,9 @@
  * if that were fixed.
  */
 export const ExpectedWarnings = {
+    "test/fixtures/block-recursive.dxf": [
+        "Recursive block reference"
+    ],
     "test/fixtures/dimension-degenerate.dxf": [
         "Invalid dimension geometry detected"
     ]

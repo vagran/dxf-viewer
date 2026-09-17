@@ -1649,9 +1649,9 @@ export class DxfScene {
      */
     _ProcessInsert(entity, blockCtx = null) {
         if (blockCtx) {
-            //XXX handle indirect recursion
-            if (blockCtx.name === entity.name) {
-                console.warn("Recursive block reference: " + blockCtx.name)
+            if (blockCtx.IsRecursiveReference(entity.name)) {
+                console.warn("Recursive block reference: " +
+                             blockCtx.DescribeBlockPath(entity.name))
                 return
             }
             /* Flatten nested blocks definition. */
@@ -2677,11 +2677,32 @@ class BlockContext {
         this.origin = this.block.data.position
         /* Transform to apply for block definition entities not including block offset. */
         this.transform = new Matrix3()
+        /* Names of the blocks being expanded, outermost first. A nested context keeps `block`
+         * pointing to the outermost block, so this is the only record of what is on the expansion
+         * path, and thus the only way to detect a reference cycle which does not include the
+         * outermost block.
+         */
+        this.blockPath = [this.name]
     }
 
     /** @return {string} Block name */
     get name() {
         return this.block.data.name
+    }
+
+    /** Check if instantiating the specified block would re-enter a block which is already being
+     * expanded, which would recurse indefinitely.
+     *
+     * @param blockName {string} Name of the block referenced by a nested `INSERT`.
+     * @return {Boolean} True if the reference closes a cycle.
+     */
+    IsRecursiveReference(blockName) {
+        return this.blockPath.includes(blockName)
+    }
+
+    /** @return {string} Block reference chain, for diagnostic messages. */
+    DescribeBlockPath(blockName) {
+        return this.blockPath.concat(blockName).join(" -> ")
     }
 
     /**
@@ -2747,6 +2768,7 @@ class BlockContext {
         const nestedTransform = nestedCtx.GetInsertionTransform(entity)
         const ctx = new BlockContext(this.block, BlockContext.Type.NESTED_DEFINITION)
         ctx.transform = new Matrix3().multiplyMatrices(this.transform, nestedTransform)
+        ctx.blockPath = this.blockPath.concat(block.data.name)
         return ctx
     }
 }

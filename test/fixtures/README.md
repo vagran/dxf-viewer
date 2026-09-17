@@ -78,21 +78,31 @@ produced plausible-looking output; the triangle count is what caught it.
   will show up there. `ezdxf` is pinned in `requirements.txt` for the same reason.
 - **Audit new fixtures** — `ezdxf.readfile(path).audit()` should report nothing, so a malformed
   file is never enshrined as expected behavior. The exception is a fixture whose *point* is to be
-  malformed, which is what `postprocess` exists for: see below.
+  malformed: see below.
 
 ## Deliberately malformed fixtures
 
-ezdxf will not write a broken file, so a fixture that exists to make a parser guard fire has to
-edit the finished text. `Fixture(name, postprocess=fn)` hands the generated DXF to `fn` before it
-is written. Use it only when ezdxf cannot express the thing — every well-formed construct belongs
-in the builder, where it is readable.
+Two fixtures exist to make a guard fire, and each is malformed in a different way — which decides
+how it has to be built.
 
-There is one such fixture: **`polyline-no-seqend`**, an old-style POLYLINE with neither VERTEX
-entities nor the SEQEND that should close it. `test-data/sample-files/sheets (cn).dxf` has five of
-them and AutoCAD renders it without complaint; `parsePolylineVertices` used to spin forever on the
-construct, so the fixture is the regression test for a hang rather than for geometry.
+**`block-recursive`** is written by ezdxf like any other fixture: blocks referencing each other in
+a cycle are a structure ezdxf will happily *write*, and only its auditor objects (`Invalid block
+reference cycle detected`, code 104, once per block on the cycle). So the builder stays readable
+and the audit rule is what gets waived. AutoCAD refuses to create such a drawing, but one that
+reaches a viewer is unbounded recursion, so the viewer has to cut the cycle instead of following
+it.
 
-The audit rule above is not merely waived for it — it is inapplicable. `ezdxf.readfile()` raises
+**`polyline-no-seqend`** cannot be built that way. ezdxf will not write a broken file, so a fixture
+whose construct it rejects has to edit the finished text: `Fixture(name, postprocess=fn)` hands the
+generated DXF to `fn` before it is written. Use it only when ezdxf cannot express the thing — every
+well-formed construct belongs in the builder.
+
+It is an old-style POLYLINE with neither VERTEX entities nor the SEQEND that should close it.
+`test-data/sample-files/sheets (cn).dxf` has five of them and AutoCAD renders it without
+complaint; `parsePolylineVertices` used to spin forever on the construct, so the fixture is the
+regression test for a hang rather than for geometry.
+
+For it the audit rule is not merely waived — it is inapplicable. `ezdxf.readfile()` raises
 `DXFStructureError: Expected DXF entity LINE or SEQEND` and never gets as far as an audit, so
 **that fixture cannot be round-tripped through ezdxf at all** and the generator has to produce it
 by editing text. This is the ranking in the root CLAUDE.md showing up in practice: ezdxf is
