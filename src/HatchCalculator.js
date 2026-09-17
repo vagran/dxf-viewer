@@ -11,6 +11,12 @@ export const HatchStyle = Object.freeze({
 /** Force intersection at this distance from edge endpoint (parameter value). */
 const ENDPOINT_MARGIN = 1e-4
 
+/** Tolerance for "this point sits on that edge", as a fraction of the edge length. Boundary loops
+ * of one hatch share corners and whole edges, exactly so in a well-formed file; the margin is for
+ * the ones which only nearly do.
+ */
+const ON_EDGE_MARGIN = 1e-6
+
 /** @return {boolean} True if both edges crossed from the same side, false otherwise. */
 function EdgeSameSide(e1, e2) {
     return (e1.intersection[2] > 0 && e2.intersection[2] > 0) ||
@@ -274,6 +280,80 @@ class ClipCalculator {
     }
 }
 
+/** Ray casting test. A point lying on the loop itself gets an arbitrary answer, so callers must
+ * make sure it does not.
+ * @param {Vector2} pt
+ * @param {Vector2[]} loop
+ * @return {boolean} True if the point is inside the loop.
+ */
+function IsPointInsideLoop(pt, loop) {
+    let inside = false
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+        const a = loop[i]
+        const b = loop[j]
+        if ((a.y > pt.y) != (b.y > pt.y) &&
+            pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) {
+            inside = !inside
+        }
+    }
+    return inside
+}
+
+/**
+ * @param {Vector2} pt
+ * @param {Vector2[]} loop
+ * @return {boolean} True if the point lies on one of the loop's edges.
+ */
+function IsPointOnLoop(pt, loop) {
+    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+        const a = loop[j]
+        const b = loop[i]
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const lenSq = dx * dx + dy * dy
+        if (lenSq == 0) {
+            continue
+        }
+        /* Both distances are taken as a fraction of the edge length, which keeps the margin
+         * meaningful whatever the drawing's units and magnitude are.
+         */
+        if (Math.abs(dx * (pt.y - a.y) - dy * (pt.x - a.x)) > ON_EDGE_MARGIN * lenSq) {
+            continue
+        }
+        const t = ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / lenSq
+        if (t >= -ON_EDGE_MARGIN && t <= 1 + ON_EDGE_MARGIN) {
+            return true
+        }
+    }
+    return false
+}
+
+/** Nesting test for two loops which do not cross each other, which is what a well-formed hatch
+ * boundary guarantees: the whole of `inner` is then on one side of `outer`, so one point of it
+ * decides.
+ *
+ * The point is taken from an edge rather than from a vertex. Boundary loops of one hatch routinely
+ * touch - wall segments meeting at a corner, two fills sharing an edge - and a point on the shared
+ * part reads as inside the other loop as readily as outside, which would turn a filled loop into
+ * its neighbour's hole. Such points are skipped, and only a loop lying entirely on `outer` runs
+ * out of them.
+ *
+ * @param {Vector2[]} inner
+ * @param {Vector2[]} outer
+ * @return {boolean}
+ */
+function IsLoopInsideLoop(inner, outer) {
+    for (let i = 0, j = inner.length - 1; i < inner.length; j = i++) {
+        const a = inner[j]
+        const b = inner[i]
+        const pt = new Vector2((a.x + b.x) / 2, (a.y + b.y) / 2)
+        if (!IsPointOnLoop(pt, outer)) {
+            return IsPointInsideLoop(pt, outer)
+        }
+    }
+    return false
+}
+
 export class HatchCalculator {
     boundaryLoops
     style
@@ -300,6 +380,78 @@ export class HatchCalculator {
      */
     ClipLine(line) {
         return new ClipCalculator(this.boundaryLoops, this.style, line).Calculate()
+    }
+
+    /**
+     * Group the boundary loops into the areas a solid infill covers, so that each one can be
+     * triangulated on its own.
+     *
+     * The loops of one HATCH are not necessarily one contour with its islands. An architectural
+     * drawing routinely puts a dozen disjoint loops into a single hatch, one per wall segment, and
+     * taking the first loop as the contour and all the rest as its holes hands the triangulator a
+     * self-inconsistent polygon: the loops outside the first one are dropped and the fill spreads
+     * over the whole hull instead.
+     *
+     * Nesting depth is what tells a hole from a separate area, which is the same rule the scanline
+     * clipping applies for patterned hatches: a loop with an even number of loops around it is
+     * filled, an odd one is a hole in the innermost loop containing it.
+     *
+     * @return {{contour: Vector2[], holes: Vector2[][]}[]} Loops which enclose no area are
+     *  dropped.
+     */
+    GetSolidRegions() {
+        /* A loop of fewer than three vertices encloses nothing: it can neither be filled nor
+         * contain anything, and feeding it to the triangulator only inflates the vertex buffer.
+         */
+        const loops = this.boundaryLoops.filter(loop => loop.length >= 3)
+
+        /* containers[i] - indices of the loops which contain loop i, so its nesting depth is their
+         * count. O(n^2) in the loop count of one hatch, which is a handful in practice; index the
+         * loops by bounding box if some drawing ever makes that hurt.
+         */
+        const containers = []
+        for (let i = 0; i < loops.length; i++) {
+            const loopContainers = []
+            for (let j = 0; j < loops.length; j++) {
+                if (i != j && IsLoopInsideLoop(loops[i], loops[j])) {
+                    loopContainers.push(j)
+                }
+            }
+            containers.push(loopContainers)
+        }
+
+        const regions = []
+        /* Index in `regions` of the region each even-depth loop opens, -1 for the rest. */
+        const regionIdx = []
+        for (let i = 0; i < loops.length; i++) {
+            if (containers[i].length % 2 != 0) {
+                regionIdx.push(-1)
+                continue
+            }
+            regionIdx.push(regions.length)
+            regions.push({contour: loops[i], holes: []})
+        }
+
+        for (let i = 0; i < loops.length; i++) {
+            if (containers[i].length % 2 == 0) {
+                continue
+            }
+            /* The innermost containing loop is the one with the most containers of its own. Its
+             * depth is one less, so it is an even-depth loop and has a region, unless the loops
+             * intersect each other and the nesting is not a hierarchy at all.
+             */
+            let parent = containers[i][0]
+            for (const j of containers[i]) {
+                if (containers[j].length > containers[parent].length) {
+                    parent = j
+                }
+            }
+            if (regionIdx[parent] >= 0) {
+                regions[regionIdx[parent]].holes.push(loops[i])
+            }
+        }
+
+        return regions
     }
 
     /**

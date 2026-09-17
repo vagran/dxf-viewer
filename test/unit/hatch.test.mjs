@@ -106,3 +106,89 @@ test("a line touching a single corner produces nothing", () => {
 test("an empty boundary clips everything away", () => {
     AssertRanges(Clip([], HatchStyle.ODD_PARITY, [-5, 5], [15, 5]), [], "no loops at all")
 })
+
+
+/* HatchCalculator.GetSolidRegions — the nesting grouping behind every solid hatch.
+ *
+ * The loops of one hatch are not necessarily one contour with its islands, so the grouping has to
+ * read the nesting out of the geometry: even depth is a filled area, odd depth is a hole in the
+ * innermost loop around it. The loop *order* must not matter, which is what several of these check
+ * by declaring the loops inside out.
+ */
+
+/** Regions as `contour vertex count -> hole vertex counts`, which identifies them here because no
+ * two loops in one case have the same size.
+ */
+function Regions(loops) {
+    return new HatchCalculator(loops, HatchStyle.ODD_PARITY).GetSolidRegions()
+        .map(({contour, holes}) => [contour.length, holes.map(hole => hole.length).sort()])
+        .sort((a, b) => a[0] - b[0])
+}
+
+/** A square of `size`, `n` vertices along each side, with its lower left corner at (x, y). */
+function Square(x, y, size, n = 1) {
+    const points = []
+    for (const [dx, dy] of [[1, 0], [1, 1], [0, 1], [0, 0]]) {
+        for (let i = 0; i < n; i++) {
+            points.push([x + size * dx, y + size * dy])
+        }
+    }
+    return Loop(points)
+}
+
+test("a lone loop is one region with no holes", () => {
+    assert.deepStrictEqual(Regions([SQUARE]), [[4, []]])
+})
+
+test("a loop inside another is its hole", () => {
+    assert.deepStrictEqual(Regions([SQUARE, HOLE]), [[4, [4]]])
+    assert.deepStrictEqual(Regions([HOLE, SQUARE]), [[4, [4]]],
+                           "and the declaration order does not decide which is which")
+})
+
+test("disjoint loops are separate regions, not each other's holes", () => {
+    /* The bug this grouping exists for: a wall fill carries one loop per wall segment, and taking
+     * the first as the contour and the rest as its holes fills the space between them instead.
+     */
+    const walls = [Square(0, 0, 10), Square(20, 0, 10, 2), Square(40, 0, 10, 3)]
+    assert.deepStrictEqual(Regions(walls), [[4, []], [8, []], [12, []]])
+})
+
+test("loops sharing a whole edge stay separate regions", () => {
+    /* Wall segments meeting. A probe taken at a shared vertex or along the shared edge reads as
+     * inside the neighbour as readily as outside, which would make one of these a hole.
+     */
+    assert.deepStrictEqual(Regions([Square(0, 0, 10), Square(10, 0, 10, 2)]), [[4, []], [8, []]])
+})
+
+test("loops touching at a single corner stay separate regions", () => {
+    assert.deepStrictEqual(Regions([Square(0, 0, 10), Square(10, 10, 10, 2)]), [[4, []], [8, []]])
+})
+
+test("an island inside a hole is filled again", () => {
+    /* Depth 2. Everything below the top level used to be a hole of the first loop, so this one
+     * came out as a gap in the fill rather than as fill.
+     */
+    const island = Square(4, 4, 2, 3)
+    assert.deepStrictEqual(Regions([SQUARE, HOLE, island]), [[4, [4]], [12, []]])
+    assert.deepStrictEqual(Regions([island, HOLE, SQUARE]), [[4, [4]], [12, []]],
+                           "innermost first")
+})
+
+test("a hole belongs to the innermost loop containing it", () => {
+    /* Two nested holes under one contour: the deeper one is a hole of the island, not of the
+     * square, and attaching it to the wrong parent would punch it out of the wrong fill.
+     */
+    const island = Square(4, 4, 3, 3)
+    const islandHole = Square(4.5, 4.5, 2, 4)
+    assert.deepStrictEqual(Regions([SQUARE, HOLE, island, islandHole]),
+                           [[4, [4]], [12, [16]]])
+})
+
+test("loops which cannot bound an area are dropped", () => {
+    assert.deepStrictEqual(Regions([Loop([[0, 0], [10, 0]]), Loop([[5, 5]]), SQUARE]), [[4, []]])
+})
+
+test("no loops at all is no regions", () => {
+    assert.deepStrictEqual(Regions([]), [])
+})

@@ -213,6 +213,28 @@ def _SolidHatch(doc, msp):
                                   flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
 
 
+@Fixture("solid-hatch-disjoint")
+def _SolidHatchDisjoint(doc, msp):
+    """Solid HATCH whose loops are separate areas rather than one contour with its islands.
+
+    Nesting depth is what tells the two apart, so the loops here cover every depth the grouping has
+    to get right: two disjoint squares, one of them with a hole which in turn has an island, and a
+    third square sharing a whole edge with the second. Loops touching like that are the reason the
+    nesting probe cannot be a vertex.
+
+    Declared in an order that does not match the nesting, and with no external or outermost flag,
+    so nothing but the geometry can be used to sort them out.
+    """
+    hatch = msp.add_hatch(color=4)
+    for loop in ((0, 0, 20, 20),      # disjoint from the rest
+                 (40, 0, 60, 20),     # contour with a hole and an island in it
+                 (45, 5, 55, 15),     # the hole
+                 (48, 8, 52, 12),     # the island
+                 (60, 0, 70, 20)):    # shares the whole x=60 edge with the second one
+        x0, y0, x1, y1 = loop
+        hatch.paths.add_polyline_path([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], is_closed=True)
+
+
 @Fixture("pattern-hatch")
 def _PatternHatch(doc, msp):
     """Pattern HATCH, which goes through the hatch line clipping instead."""

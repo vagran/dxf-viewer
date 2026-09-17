@@ -1193,26 +1193,32 @@ export class DxfScene {
             filteredBoundaryLoops = boundaryLoops.map(loop => loop.vertices)
         }
 
+        const calc = new HatchCalculator(filteredBoundaryLoops, style)
+
         if (entity.isSolid) {
-            const coords = this._TransformBoundaryLoop(filteredBoundaryLoops[0], transform)
-            const holes = []
-            for (let i = 1; i < filteredBoundaryLoops.length; i++) {
-                holes.push(coords.length / 2)
-                this._TransformBoundaryLoop(filteredBoundaryLoops[i], transform, coords)
+            /* Each region is triangulated on its own: the loops of one hatch may well be disjoint
+             * areas rather than a single contour with its islands.
+             */
+            for (const {contour, holes} of calc.GetSolidRegions()) {
+                const coords = this._TransformBoundaryLoop(contour, transform)
+                const vertices = [...contour]
+                const holeIndices = []
+                for (const hole of holes) {
+                    holeIndices.push(coords.length / 2)
+                    this._TransformBoundaryLoop(hole, transform, coords)
+                    vertices.push(...hole)
+                }
+                const indices = earcut(coords, holeIndices)
+                if (indices.length == 0) {
+                    continue
+                }
+                yield new Entity({
+                    type: Entity.Type.TRIANGLES,
+                    vertices, indices, layer, color
+                })
             }
-            const indices = earcut(coords, holes)
-            const vertices = []
-            for (const loop of filteredBoundaryLoops) {
-                vertices.push(...loop)
-            }
-            yield new Entity({
-                type: Entity.Type.TRIANGLES,
-                vertices, indices, layer, color
-            })
             return
         }
-
-        const calc = new HatchCalculator(filteredBoundaryLoops, style)
 
         let pattern = null
         if (entity.definitionLines) {
