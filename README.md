@@ -145,4 +145,4 @@ This project is licensed under the terms of the
 
 ## Donations
 
-Want to say thanks to the project maintainer? Here is the link: [![Donate](https://img.shields.io/static/v1?label=Donate&message=PayPal&color=orange&logo=paypal)](https://www.paypal.com/donate?business=artyom.lebedev@gmail.com&no_recurring=0&item_name=To+support+`dxf-viewer`+project+maintenance.+Thank+you!&currency_code=EUR)
+Want to say thanks to the project maintainer? Here is the link: [![Sponsor](https://img.shields.io/static/v1?label=Sponsor&message=GitHub&color=ea4aaa&logo=githubsponsors)](https://github.com/sponsors/vagran)
