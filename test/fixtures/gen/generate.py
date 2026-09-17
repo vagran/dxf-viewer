@@ -235,6 +235,39 @@ def _SolidHatchDisjoint(doc, msp):
         hatch.paths.add_polyline_path([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], is_closed=True)
 
 
+@Fixture("solid-hatch-mirrored")
+def _SolidHatchMirrored(doc, msp):
+    """Solid HATCH with a negative Z extrusion, which mirrors it about the X axis.
+
+    Group 210 was not read for HATCH at all until 2026-09-17, so a mirrored hatch drew unmirrored
+    and the transform `_DecomposeHatch()` threads through both of its paths was dead code. The
+    loops are the same shapes as `solid-hatch-disjoint`, so the two dumps should differ only in the
+    sign of every x.
+    """
+    hatch = msp.add_hatch(color=4, dxfattribs={"extrusion": (0, 0, -1)})
+    for x0, y0, x1, y1 in ((0, 0, 20, 20), (40, 0, 60, 20), (45, 5, 55, 15), (48, 8, 52, 12)):
+        hatch.paths.add_polyline_path([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], is_closed=True)
+
+
+@Fixture("solid-hatch-ignore-style")
+def _SolidHatchIgnoreStyle(doc, msp):
+    """Solid HATCH in "ignore" style (75 = 2) over two external loops, one of them with an island.
+
+    The style fills through the inner structure, so the island must not be punched out -- and the
+    second external loop must survive, which it did not until 2026-09-17: the filter kept
+    `boundaryLoops[0]` alone, on the assumption that a hatch has one external loop.
+    """
+    hatch = msp.add_hatch(color=6)
+    hatch.dxf.hatch_style = ezdxf.const.HATCH_STYLE_IGNORE
+    for loop, external in (((0, 0, 20, 20), True),
+                           ((5, 5, 15, 15), False),
+                           ((30, 0, 50, 20), True)):
+        x0, y0, x1, y1 = loop
+        hatch.paths.add_polyline_path(
+            [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], is_closed=True,
+            flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL if external else 0)
+
+
 @Fixture("pattern-hatch")
 def _PatternHatch(doc, msp):
     """Pattern HATCH, which goes through the hatch line clipping instead."""

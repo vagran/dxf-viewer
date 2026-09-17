@@ -1172,8 +1172,18 @@ export class DxfScene {
         })
 
         if (style == HatchStyle.THROUGH_ENTIRE_AREA) {
-            /* Leave only external loop. */
-            filteredBoundaryLoops = [boundaryLoops[0].vertices]
+            /* Leave external loops only. A hatch can have several of them - the inner structure is
+             * what this style ignores, not the other outlines.
+             */
+            filteredBoundaryLoops = []
+            for (const loop of boundaryLoops) {
+                if (loop.isExternal) {
+                    filteredBoundaryLoops.push(loop.vertices)
+                }
+            }
+            if (filteredBoundaryLoops.length == 0) {
+                filteredBoundaryLoops = null
+            }
 
         } else if (style == HatchStyle.OUTERMOST) {
             /* Leave external and outermost loop. */

@@ -119,8 +119,8 @@ test("an empty boundary clips everything away", () => {
 /** Regions as `contour vertex count -> hole vertex counts`, which identifies them here because no
  * two loops in one case have the same size.
  */
-function Regions(loops) {
-    return new HatchCalculator(loops, HatchStyle.ODD_PARITY).GetSolidRegions()
+function Regions(loops, style = HatchStyle.ODD_PARITY) {
+    return new HatchCalculator(loops, style).GetSolidRegions()
         .map(({contour, holes}) => [contour.length, holes.map(hole => hole.length).sort()])
         .sort((a, b) => a[0] - b[0])
 }
@@ -191,4 +191,33 @@ test("loops which cannot bound an area are dropped", () => {
 
 test("no loops at all is no regions", () => {
     assert.deepStrictEqual(Regions([]), [])
+})
+
+test("THROUGH_ENTIRE_AREA fills through the inner loops instead of holing them", () => {
+    /* The style's whole meaning: ignore the internal structure. A hole would contradict it, and
+     * the scanline clipping says the same for a patterned hatch of this style.
+     */
+    assert.deepStrictEqual(Regions([SQUARE, HOLE], HatchStyle.THROUGH_ENTIRE_AREA), [[4, []]])
+    assert.deepStrictEqual(Regions([SQUARE, HOLE, Square(4, 4, 2, 3)],
+                                   HatchStyle.THROUGH_ENTIRE_AREA),
+                           [[4, []]], "and an island inside the hole adds nothing")
+})
+
+test("THROUGH_ENTIRE_AREA still keeps disjoint loops apart", () => {
+    /* Only the *inner* structure is ignored. A hatch can have several outlines, and dropping all
+     * but the first is what used to leave wall fills missing.
+     */
+    assert.deepStrictEqual(Regions([Square(0, 0, 10), Square(20, 0, 10, 2)],
+                                   HatchStyle.THROUGH_ENTIRE_AREA),
+                           [[4, []], [8, []]])
+})
+
+test("a line crossing two disjoint loops under THROUGH_ENTIRE_AREA is clipped to each", () => {
+    /* The clipping counts crossings per loop, so the gap between two separate loops stays empty
+     * rather than being bridged from the first crossing to the last.
+     */
+    const left = Loop([[0, 0], [10, 0], [10, 10], [0, 10]])
+    const right = Loop([[20, 0], [30, 0], [30, 10], [20, 10]])
+    AssertRanges(Clip([left, right], HatchStyle.THROUGH_ENTIRE_AREA, [-10, 5], [40, 5]),
+                 [[0.2, 0.4], [0.6, 0.8]], "two segments, not one spanning both")
 })

@@ -394,12 +394,15 @@ export class HatchCalculator {
      *
      * Nesting depth is what tells a hole from a separate area, which is the same rule the scanline
      * clipping applies for patterned hatches: a loop with an even number of loops around it is
-     * filled, an odd one is a hole in the innermost loop containing it.
+     * filled, an odd one is a hole in the innermost loop containing it. Under
+     * `THROUGH_ENTIRE_AREA` there are no holes at all - every outermost loop is filled solid,
+     * matching what `ClipLine()` does for a patterned hatch of the same style.
      *
      * @return {{contour: Vector2[], holes: Vector2[][]}[]} Loops which enclose no area are
      *  dropped.
      */
     GetSolidRegions() {
+        const throughAll = this.style == HatchStyle.THROUGH_ENTIRE_AREA
         /* A loop of fewer than three vertices encloses nothing: it can neither be filled nor
          * contain anything, and feeding it to the triangulator only inflates the vertex buffer.
          */
@@ -421,15 +424,21 @@ export class HatchCalculator {
         }
 
         const regions = []
-        /* Index in `regions` of the region each even-depth loop opens, -1 for the rest. */
+        /* Index in `regions` of the region each filled loop opens, -1 for the rest. */
         const regionIdx = []
         for (let i = 0; i < loops.length; i++) {
-            if (containers[i].length % 2 != 0) {
+            const isFilled = throughAll ? containers[i].length == 0 : containers[i].length % 2 == 0
+            if (!isFilled) {
                 regionIdx.push(-1)
                 continue
             }
             regionIdx.push(regions.length)
             regions.push({contour: loops[i], holes: []})
+        }
+
+        if (throughAll) {
+            /* Inner loops are exactly what this style ignores, so nothing becomes a hole. */
+            return regions
         }
 
         for (let i = 0; i < loops.length; i++) {
