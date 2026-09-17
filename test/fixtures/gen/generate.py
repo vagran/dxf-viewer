@@ -317,6 +317,35 @@ def _PatternHatch(doc, msp):
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
 
 
+@Fixture("pattern-hatch-cut-corner")
+def _PatternHatchCutCorner(doc, msp):
+    """Pattern HATCH over a hole whose corner is cut by one short chord.
+
+    The clipper decides an intersection is "at a vertex" -- and so belongs to the pair of edges
+    meeting there rather than being a crossing of its own -- by a margin. As a fraction of the edge
+    that margin means the two edges at one vertex disagree about where the vertex ends, and a line
+    passing just clear of the corner is a clean crossing of the short chord *and* a vertex hit on
+    the long wall: two toggles for one crossing, which inverts the parity of the rest of the line.
+    It was drawn straight through the hole instead of stopping at it.
+
+    The numbers are tuned, not arbitrary. ANSI31 at scale 2 puts its lines at y = x + k * 8.980256,
+    so the k = 0 line is y = x; the corner sits 0.0005 above it, which is inside the 9.9995-long
+    wall's old margin of 1e-3 and outside the 0.112-long chord's of 1.1e-5. This is also why the
+    coordinates are not the usual exact-in-binary ones -- the fixture exists to land in that gap.
+
+    Corners arrive like this in real drawings all the time: a tessellated fillet is short chords
+    running into whatever wall follows them.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=2, scale=2.0)
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    # Declared from the cut corner, so the chord is clipped before the wall running into it --
+    # the order in which the spurious second crossing is the one that survives.
+    hatch.paths.add_polyline_path([(5, 5.0005), (5.1, 4.95), (15, 4.95), (15, 15), (5, 15)],
+                                  is_closed=True, flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
+
+
 @Fixture("pattern-hatch-concave")
 def _PatternHatchConcave(doc, msp):
     """Pattern HATCH over an L-shaped boundary.

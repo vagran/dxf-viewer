@@ -107,6 +107,41 @@ test("an empty boundary clips everything away", () => {
     AssertRanges(Clip([], HatchStyle.ODD_PARITY, [-5, 5], [15, 5]), [], "no loops at all")
 })
 
+test("a near miss of a corner is not counted as a crossing through it", () => {
+    /* The endpoint margin decides when an intersection is "at the vertex", so that the two edges
+     * meeting there are collapsed into one crossing decision. As a fraction of the edge it means
+     * they disagree about it: the long edge below reaches 0.003 from the corner and the short one
+     * 1.4e-5, so a line passing 0.001 clear of the corner is a clean crossing of the short edge
+     * *and* a vertex hit on the long one -- two toggles for one crossing, which inverts the parity
+     * of everything after it. Here the line was drawn through the hole and stopped at the far side
+     * of it instead. Corners arrive like this constantly: a tessellated fillet is short chords
+     * running into whatever wall follows it.
+     */
+    const bigSquare = Loop([[0, 0], [100, 0], [100, 100], [0, 100]])
+    /* The hole's lower left corner is cut by a single short chord, and the loop starts there so
+     * that the chord is clipped before the long edge running into it -- the order in which the
+     * spurious second node is the one that survives.
+     */
+    const cutCorner = Loop([[30, 30.1], [30.1, 30], [70, 30], [70, 60], [30, 60]])
+    AssertRanges(Clip([bigSquare, cutCorner], HatchStyle.ODD_PARITY, [-10, 30.099], [110, 30.099]),
+                 [[10 / 120, 40.001 / 120], [80 / 120, 110 / 120]],
+                 "up to the corner, then on from the far wall")
+})
+
+test("the endpoint margin follows the boundary's scale", () => {
+    /* The same geometry a thousand times smaller. A margin fixed in drawing units would swallow
+     * this whole hole; one fixed as a fraction of the edge would fail it the same way the case
+     * above fails.
+     */
+    const Scaled = points => Loop(points.map(([x, y]) => [x / 1000, y / 1000]))
+    const bigSquare = Scaled([[0, 0], [100, 0], [100, 100], [0, 100]])
+    const cutCorner = Scaled([[30, 30.1], [30.1, 30], [70, 30], [70, 60], [30, 60]])
+    AssertRanges(Clip([bigSquare, cutCorner], HatchStyle.ODD_PARITY,
+                      [-0.01, 30.099 / 1000], [0.11, 30.099 / 1000]),
+                 [[10 / 120, 40.001 / 120], [80 / 120, 110 / 120]],
+                 "the same two ranges, in the same places")
+})
+
 
 /* HatchCalculator.GetSolidRegions — the nesting grouping behind every solid hatch.
  *

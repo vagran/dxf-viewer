@@ -53,10 +53,11 @@ function Canonical(scene, offset = [0, 0]) {
 
 /** Hatch *patterns* are anchored in model space, not to their boundary -- which is why AutoCAD
  * offers a hatch origin at all. Moving the geometry therefore moves it relative to the pattern and
- * legitimately changes which lines fall inside the loop, so these two are not invariant and are not
+ * legitimately changes which lines fall inside the loop, so these are not invariant and are not
  * expected to be. Solid hatches, whose triangulation follows the boundary, stay in.
  */
-const NOT_TRANSLATION_INVARIANT = new Set(["pattern-hatch", "pattern-hatch-concave"])
+const NOT_TRANSLATION_INVARIANT = new Set(["pattern-hatch", "pattern-hatch-concave",
+                                           "pattern-hatch-cut-corner"])
 
 for (const fixture of fixtures) {
     const name = path.basename(fixture, ".dxf")
@@ -96,31 +97,46 @@ for (const fixture of fs.readdirSync(explodedDir).filter(n => n.endsWith(".dxf")
 /* ---------------------------------------------------------------------------------------------
  * Hatch containment.
  *
- * Every hatch line the clipper emits has to lie inside the boundary. The concave fixture is the
- * one that matters: on a convex loop, "between the outermost two crossings" is accidentally
- * correct, and only a notch distinguishes real clipping from that.
+ * Every hatch line the clipper emits has to lie inside the boundary. The convex case cannot fail
+ * on its own -- "between the outermost two crossings" is accidentally correct there -- so the two
+ * that carry this section are the concave one, whose notch distinguishes real clipping from that,
+ * and the cut-corner one, whose hole and near-tangent corner are where the crossing count goes
+ * wrong.
  * ------------------------------------------------------------------------------------------- */
 
-/** Boundaries as given to add_polyline_path in test/fixtures/gen/generate.py. */
+/** Boundaries as given to add_polyline_path in test/fixtures/gen/generate.py, one entry per
+ * boundary loop of the hatch.
+ */
 const HATCH_BOUNDARIES = {
-    "pattern-hatch": [[0, 0], [20, 0], [20, 20], [0, 20]],
-    "pattern-hatch-concave": [[0, 0], [20, 0], [20, 8], [8, 8], [8, 20], [0, 20]]
+    "pattern-hatch": [[[0, 0], [20, 0], [20, 20], [0, 20]]],
+    "pattern-hatch-concave": [[[0, 0], [20, 0], [20, 8], [8, 8], [8, 20], [0, 20]]],
+    /* A hole, and one of its corners cut by a short chord. A line grazing that corner used to be
+     * counted as crossing it -- once on the chord and once on the long wall meeting it -- which
+     * left the parity inverted and drew the line through the hole instead of stopping at it.
+     */
+    "pattern-hatch-cut-corner": [[[0, 0], [20, 0], [20, 20], [0, 20]],
+                                 [[5, 5.0005], [5.1, 4.95], [15, 4.95], [15, 15], [5, 15]]]
 }
 
-/** Ray casting. Returns true when the point is strictly inside the loop. */
-function IsInside([x, y], loop) {
+/** Ray casting under odd parity, which is what hatch style 0 means: a point enclosed by an odd
+ * number of the loops is inside the fill, and one enclosed by two -- a hole -- is not.
+ * Returns true when the point is strictly inside.
+ */
+function IsInside([x, y], loops) {
     let inside = false
-    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-        const [xi, yi] = loop[i]
-        const [xj, yj] = loop[j]
-        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-            inside = !inside
+    for (const loop of loops) {
+        for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+            const [xi, yi] = loop[i]
+            const [xj, yj] = loop[j]
+            if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+                inside = !inside
+            }
         }
     }
     return inside
 }
 
-for (const [name, loop] of Object.entries(HATCH_BOUNDARIES)) {
+for (const [name, loops] of Object.entries(HATCH_BOUNDARIES)) {
     test(`hatch lines stay inside the boundary: ${name}`, async () => {
         const scene = await BuildScene(path.join(fixturesDir, `${name}.dxf`))
         let segments = 0
@@ -130,7 +146,7 @@ for (const [name, loop] of Object.entries(HATCH_BOUNDARIES)) {
                 const a = primitive.vertices[i - 1]
                 const b = primitive.vertices[i]
                 const midpoint = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
-                assert.ok(IsInside(midpoint, loop),
+                assert.ok(IsInside(midpoint, loops),
                           `segment ${JSON.stringify(a)}-${JSON.stringify(b)} has its midpoint ` +
                           `at ${JSON.stringify(midpoint)}, outside the boundary`)
                 assert.ok(Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-9,
