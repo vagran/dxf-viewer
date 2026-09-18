@@ -1243,15 +1243,21 @@ export class DxfScene {
         if (entity.definitionLines) {
             pattern = new Pattern(entity.definitionLines, entity.patternName, false)
         }
-        /* QCAD always embed ANSI31-like pattern definition. Try to detect it, and let named
-         * pattern override the provided definition.
+        /* QCAD embeds a single 45 degree solid line into every hatch it exports, whatever the
+         * pattern is named, so a definition of that shape may be a placeholder for the named
+         * pattern - but it may equally be the truth, because ANSI31 is that line. Only the named
+         * pattern can tell the two apart, and where it agrees the embedded copy is the one to
+         * keep: it records the spacing the hatch was actually drawn at, while the registry's has
+         * still to be scaled, and `$MEASUREMENT` says by how much and is wrong by a factor of 25.4
+         * in six of the drawings in test-data/.
          */
         if ((pattern == null || pattern.isQcadDefault) && entity.patternName) {
             const _pattern = LookupPattern(entity.patternName, this.isMetric)
             if (!_pattern) {
                 console.log(`Hatch pattern with name ${entity.patternName} not found ` +
                             `(metric: ${this.isMetric})`)
-            } else {
+            } else if (pattern == null ||
+                       pattern.ContradictsNamedPattern(_pattern, entity.patternAngle ?? 0)) {
                 pattern = _pattern
             }
         }

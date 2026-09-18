@@ -57,7 +57,9 @@ function Canonical(scene, offset = [0, 0]) {
  * expected to be. Solid hatches, whose triangulation follows the boundary, stay in.
  */
 const NOT_TRANSLATION_INVARIANT = new Set(["pattern-hatch", "pattern-hatch-concave",
-                                           "pattern-hatch-cut-corner"])
+                                           "pattern-hatch-cut-corner",
+                                           "pattern-hatch-embedded-spacing",
+                                           "pattern-hatch-placeholder"])
 
 for (const fixture of fixtures) {
     const name = path.basename(fixture, ".dxf")

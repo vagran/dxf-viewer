@@ -75,6 +75,80 @@ test("isQcadDefault rejects anything else", () => {
                            .isQcadDefault, false, "dashed, so not the default")
 })
 
+/* ContradictsNamedPattern -- whether a definition embedded in a HATCH could be the pattern the
+ * entity names. It decides whether the file's own definition is used, which is the only place the
+ * spacing the hatch was drawn at is recorded, or the registry's copy, which still has to be scaled.
+ *
+ * ANSI31 as the registry holds it: one solid line at 45 degrees. PLAST: three solid lines at 0,
+ * which is what QCAD writes a single 45 degree line in place of.
+ */
+const ANSI31 = new Pattern([Line(Math.PI / 4, new Vector2(0, 3.175))], "ANSI31")
+const PLAST = new Pattern([Line(0), Line(0), Line(0)], "PLAST")
+
+test("a definition of the same shape as the named pattern is kept", () => {
+    /* The case that matters for spacing: AutoCAD writes a real ANSI31 definition, already scaled,
+     * and it must not be thrown away for looking like QCAD's placeholder -- it looks like it
+     * because ANSI31 is that line.
+     */
+    const embedded = new Pattern([Line(Math.PI / 4, new Vector2(0, 0.3175))], "ANSI31", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(ANSI31), false)
+})
+
+test("spacing and base points are not what identifies a pattern", () => {
+    /* An embedded definition arrives scaled, so neither can be compared -- only the shape. */
+    const embedded = new Pattern([Line(Math.PI / 4, new Vector2(0, 1e6))], "ANSI31", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(ANSI31), false)
+})
+
+test("the pattern angle is taken off before the angles are compared", () => {
+    /* A hatch rotates the named pattern by group 52, and the embedded definition is written
+     * already rotated. PLAST at 90 degrees is what test-data's ED81 carries.
+     */
+    const embedded = new Pattern([Line(Math.PI / 2), Line(Math.PI / 2), Line(Math.PI / 2)],
+                                 "PLAST", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(PLAST, Math.PI / 2), false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(PLAST, 0), true,
+                       "unrotated, three lines at 90 degrees are not three at 0")
+})
+
+test("a line angle is the same one drawn the other way round", () => {
+    const embedded = new Pattern([Line(Math.PI / 4 + Math.PI, new Vector2(0, 1))], "ANSI31", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(ANSI31), false, "225 degrees is 45")
+})
+
+test("QCAD's placeholder contradicts the pattern it is named after", () => {
+    /* The workaround this exists for: QCAD exports one 45 degree solid line whatever the hatch is
+     * called, so for anything but a pattern that really is that line the name has to win.
+     */
+    const placeholder = new Pattern([Line(Math.PI / 4)], "PLAST", false)
+    assert.strictEqual(placeholder.ContradictsNamedPattern(PLAST), true)
+})
+
+test("a differing line count or dash structure contradicts", () => {
+    assert.strictEqual(new Pattern([Line(0), Line(0)]).ContradictsNamedPattern(PLAST), true,
+                       "two lines are not three")
+    assert.strictEqual(new Pattern([]).ContradictsNamedPattern(ANSI31), true, "no lines at all")
+    const dashed = new Pattern([Line(Math.PI / 4, new Vector2(0, 1), {dashes: [1, -1]})])
+    assert.strictEqual(dashed.ContradictsNamedPattern(ANSI31), true, "dashed, ANSI31 is solid")
+})
+
+test("dash lengths are scaled too, so only their signs are compared", () => {
+    const named = new Pattern([Line(0, new Vector2(1, 2), {dashes: [0, -2]})], "DOTS")
+    const embedded = new Pattern([Line(0, new Vector2(0.1, 0.2), {dashes: [0, -0.2]})],
+                                 "DOTS", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(named), false)
+    const inverted = new Pattern([Line(0, new Vector2(0.1, 0.2), {dashes: [-0.2, 0]})],
+                                 "DOTS", false)
+    assert.strictEqual(inverted.ContradictsNamedPattern(named), true,
+                       "a space where a dot belongs is a different pattern")
+})
+
+test("lines are matched in any order", () => {
+    const named = new Pattern([Line(0), Line(Math.PI / 2)], "CROSS")
+    const embedded = new Pattern([Line(Math.PI / 2), Line(0)], "CROSS", false)
+    assert.strictEqual(embedded.ContradictsNamedPattern(named), false)
+})
+
 test("offsetInLineSpace defaults on, and is the difference between a .pat and an embedded pattern",
      () => {
          assert.strictEqual(new Pattern([Line(0)]).offsetInLineSpace, true)

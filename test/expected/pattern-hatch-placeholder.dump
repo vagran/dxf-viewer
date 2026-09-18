@@ -1,0 +1,19 @@
+origin (0, 6.35)
+bounds (0, 0.7938) (20, 19.8437)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 1
+  LINES layer="0" block=- color=0000ff lineType=0 vertices=40
+primitives 10
+  POLYLINE layer="0" color=0000ff (0, 0.7937) (20, 0.7937)
+  POLYLINE layer="0" color=0000ff (0, 1.5875) (20, 1.5875)
+  POLYLINE layer="0" color=0000ff (0, 12.7) (20, 12.7)
+  POLYLINE layer="0" color=0000ff (0, 13.4938) (20, 13.4938)
+  POLYLINE layer="0" color=0000ff (0, 14.2875) (20, 14.2875)
+  POLYLINE layer="0" color=0000ff (0, 19.05) (20, 19.05)
+  POLYLINE layer="0" color=0000ff (0, 19.8437) (20, 19.8437)
+  POLYLINE layer="0" color=0000ff (0, 6.35) (20, 6.35)
+  POLYLINE layer="0" color=0000ff (0, 7.1437) (20, 7.1437)
+  POLYLINE layer="0" color=0000ff (0, 7.9375) (20, 7.9375)

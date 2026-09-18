@@ -317,6 +317,46 @@ def _PatternHatch(doc, msp):
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
 
 
+@Fixture("pattern-hatch-embedded-spacing")
+def _PatternHatchEmbeddedSpacing(doc, msp):
+    """Pattern HATCH whose embedded definition disagrees with what $MEASUREMENT implies.
+
+    A HATCH carries its own pattern definition, already scaled, and that is the spacing the drawing
+    was made at. The registry's copy is unscaled, and picking between the metric and the imperial
+    table is what $MEASUREMENT is for -- so preferring the registry means believing that header
+    over the file's own numbers, and the two differ by 25.4 whenever it is wrong. Six drawings in
+    test-data/ have it wrong, in both directions.
+
+    Here the definition is written while the document is metric and the header is then set to
+    imperial, which is `Floor plan (mirrorring,dim).dxf` inverted: the embedded spacing is 6.35 and
+    the registry would say 0.125 * 2 = 0.25, packing the lines 25.4 times too tightly.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=3, scale=2.0)
+    doc.header["$MEASUREMENT"] = 0
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+
+
+@Fixture("pattern-hatch-placeholder")
+def _PatternHatchPlaceholder(doc, msp):
+    """Pattern HATCH carrying QCAD's placeholder definition instead of a real one.
+
+    QCAD exports a single 45 degree solid line as the embedded definition of every hatch, whatever
+    the pattern is named, so the definition cannot simply be trusted. PLAST is three solid lines at
+    0 degrees; one line at 45 cannot be it, and the name has to win. Reported as #129.
+
+    The counterpart of `pattern-hatch-embedded-spacing`: between them they pin both answers, which
+    a rule based on the shape of the definition alone -- ANSI31 *is* a single 45 degree solid line
+    -- cannot give.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("PLAST", color=5, scale=1.0,
+                           definition=[[45.0, (0.0, 0.0), (0.0, 0.125), []]])
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+
+
 @Fixture("pattern-hatch-cut-corner")
 def _PatternHatchCutCorner(doc, msp):
     """Pattern HATCH over a hole whose corner is cut by one short chord.
