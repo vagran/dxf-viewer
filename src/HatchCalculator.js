@@ -84,7 +84,16 @@ class ClipCalculator {
             for (const edge of loop) {
                 const edgeVec = edge.end.clone().sub(edge.start)
                 const len = edgeVec.length()
-                edge.isZero = len <= Number.EPSILON
+                /* Against the endpoint margin, not against zero. `Number.EPSILON` is a margin for
+                 * numbers near 1, and boundary coordinates are routinely in the thousands, where
+                 * one representable step is already 1e-12: a loop that repeats a vertex - which
+                 * tessellated arcs do where they meet the next edge - then yields an edge one ulp
+                 * long that passes for real. Its direction is the rounding between two equal
+                 * points, and the side it reports is noise, which at a vertex is the whole answer.
+                 * The endpoint margin is the distance at which two points are already the same
+                 * point, so an edge shorter than it cannot be anything else.
+                 */
+                edge.isZero = len <= this.endpointMargin
                 if (edge.isZero) {
                     continue
                 }

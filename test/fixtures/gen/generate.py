@@ -425,6 +425,41 @@ def _PatternHatchCutCorner(doc, msp):
                                   flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
 
 
+# One representable step at 8192, the magnitude `pattern-hatch-repeated-vertex` sits at:
+# 2**13 * 2**-52. ezdxf writes it as 8200.000000000002, which reads back as the same double.
+_ULP = 2 ** -39
+
+
+@Fixture("pattern-hatch-repeated-vertex")
+def _PatternHatchRepeatedVertex(doc, msp):
+    """Pattern HATCH whose hole repeats a vertex one representable step away from itself.
+
+    A loop that names the same point twice - which a tessellated arc does where it meets the edge
+    after it - leaves an edge of no length between the two. Where the coordinates are large the
+    two copies are not bit-identical, because they were arrived at by different arithmetic, and
+    the edge is then one unit in the last place long rather than zero: 9e-13 at the 6270 of
+    "03.Profili.dxf", against the 2e-16 an exact zero has to beat to be recognised as one. It has
+    a direction, computed by normalising the rounding between two equal points, and that direction
+    decides which side of the line the boundary leaves on. The answer is noise, and at a vertex it
+    is the whole answer: the crossing there was read as a touch and dropped, and the line carried
+    on through the hole -- 12.8 units of it in that drawing.
+
+    The hole here has that corner at (8200, 8200), and ANSI31's line through it grazes it: at 8192
+    one step is 1.8e-12, comfortably above 2e-16, so the edge passes for real. The outer boundary
+    is about 40 units across, which puts the endpoint margin at 6e-5 -- the crossing has to land
+    inside that for the corner to be examined at all. It is not square with the hole, so that no
+    pattern line enters or leaves through one of its own corners, where which of the two edges is
+    crossed is a tie.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=5, scale=1.0)
+    hatch.paths.add_polyline_path([(8176, 8180), (8220, 8180), (8220, 8224), (8176, 8224)],
+                                  is_closed=True, flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    hatch.paths.add_polyline_path([(8200, 8212), (8200, 8200), (8200 + _ULP, 8200),
+                                   (8212, 8204), (8208, 8212)],
+                                  is_closed=True, flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
+
+
 @Fixture("block-flattened")
 def _BlockFlattened(doc, msp):
     """A block small enough that DxfScene inlines it into ordinary batches.

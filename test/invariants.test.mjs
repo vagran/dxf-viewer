@@ -58,7 +58,8 @@ function Canonical(scene, offset = [0, 0]) {
  */
 const NOT_TRANSLATION_INVARIANT = new Set([
     "pattern-hatch", "pattern-hatch-concave", "pattern-hatch-cut-corner",
-    "pattern-hatch-embedded-spacing", "pattern-hatch-placeholder", "pattern-hatch-rotated"
+    "pattern-hatch-embedded-spacing", "pattern-hatch-placeholder", "pattern-hatch-rotated",
+    "pattern-hatch-repeated-vertex"
 ])
 
 for (const fixture of fixtures) {
@@ -116,6 +117,13 @@ const HATCH_BOUNDARIES = {
     "pattern-hatch-cut-corner": [
         [[-5, -5], [60, -5], [60, 100], [-5, 100]],
         [[2, 2 + 1 / 128], [2 + 1 / 128, 2], [42, 2], [42, 92], [2, 92]]
+    ],
+    /* The hole repeats its (8200, 8200) corner one representable step away from itself. The line
+     * grazing that corner used to lose its crossing there and run on across the hole.
+     */
+    "pattern-hatch-repeated-vertex": [
+        [[8176, 8180], [8220, 8180], [8220, 8224], [8176, 8224]],
+        [[8200, 8212], [8200, 8200], [8200 + 2 ** -39, 8200], [8212, 8204], [8208, 8212]]
     ]
 }
 

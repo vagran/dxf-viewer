@@ -122,6 +122,43 @@ test("a line passing clear of a cut corner is not clipped by it", () => {
                  "both sides of the hole, the far one in full")
 })
 
+test("a vertex the loop repeats does not swallow the crossing at it", () => {
+    /* A loop that names the same point twice -- a tessellated arc meeting the edge after it --
+     * leaves an edge of no length between the two copies. Where the coordinates are large they are
+     * not bit-identical, having been arrived at by different arithmetic, so the edge is one unit
+     * in the last place long rather than zero and passes the test for an empty one. Its direction
+     * is then the rounding between two equal points, and that direction is what says which side of
+     * the line the boundary leaves on: the crossing at the corner was read as a touch and dropped,
+     * and the line ran on across the hole. "03.Profili.dxf" lost 12.8 units of one profile to it.
+     *
+     * At 8192 one step is 1.8e-12, which is four orders of magnitude above the 2.2e-16 an exact
+     * zero has to beat, and the 40-unit square puts the endpoint margin at 5.7e-5 -- the crossing
+     * lands 1e-5 from the corner, inside it, so the corner is examined.
+     *
+     * The line is y = x + 1e-5. It enters the square through the bottom edge at y = 8180, meets
+     * the hole at its repeated corner (8200, 8200) and leaves the hole through the edge from
+     * (8212, 8204) to (8208, 8212), at x = 8212 - (8 + 1e-5) / 3, and leaves the square through
+     * its right edge. The boundary reaches past the line at both ends, so that neither the entry
+     * nor the exit lands on one of its corners, where which of two edges is crossed is a tie.
+     *
+     * The corner itself is bracketed, not crossed at a point: an empty edge between two others is
+     * what the collinear handling is for, and it takes the pair either side of it as one crossing
+     * running from the first of their two intersections to the second. The edge leaving the corner
+     * runs (12, 4), so the line meets it 1.5 * 1e-5 short of x = 8200, and that is where the
+     * segment ends.
+     */
+    const ULP = 2 ** -39
+    const C = 1e-5
+    const outer = Loop([[8176, 8180], [8220, 8180], [8220, 8224], [8176, 8224]])
+    const repeated = Loop([[8200, 8212], [8200, 8200], [8200 + ULP, 8200],
+                           [8212, 8204], [8208, 8212]])
+    /* Parameter along the line, which runs from x = 8170 to x = 8230. */
+    const At = x => (x - 8170) / 60
+    AssertRanges(Clip([outer, repeated], HatchStyle.ODD_PARITY, [8170, 8170 + C], [8230, 8230 + C]),
+                 [[At(8180 - C), At(8200 - 1.5 * C)], [At(8212 - (8 + C) / 3), At(8220)]],
+                 "up to the repeated corner, then on from the far side of the hole")
+})
+
 test("an empty boundary clips everything away", () => {
     AssertRanges(Clip([], HatchStyle.ODD_PARITY, [-5, 5], [15, 5]), [], "no loops at all")
 })

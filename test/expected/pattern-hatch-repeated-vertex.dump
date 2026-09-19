@@ -1,0 +1,32 @@
+origin (8215.921, 8180)
+bounds (8176, 8180) (8220, 8224)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 1
+  LINES layer="0" block=- color=0000ff lineType=0 vertices=92
+primitives 23
+  POLYLINE layer="0" color=0000ff (8176, 8180.4901) (8200, 8204.4901)
+  POLYLINE layer="0" color=0000ff (8176, 8184.9803) (8200, 8208.9803)
+  POLYLINE layer="0" color=0000ff (8176, 8189.4704) (8210.5296, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8193.9605) (8206.0395, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8198.4506) (8201.5494, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8202.9408) (8197.0592, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8207.4309) (8192.5691, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8211.921) (8188.079, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8216.4112) (8183.5888, 8224)
+  POLYLINE layer="0" color=0000ff (8176, 8220.9013) (8179.0987, 8224)
+  POLYLINE layer="0" color=0000ff (8180, 8180) (8200, 8200)
+  POLYLINE layer="0" color=0000ff (8184.4901, 8180) (8206.7352, 8202.2451)
+  POLYLINE layer="0" color=0000ff (8188.9803, 8180) (8220, 8211.0197)
+  POLYLINE layer="0" color=0000ff (8193.4704, 8180) (8220, 8206.5296)
+  POLYLINE layer="0" color=0000ff (8197.9605, 8180) (8220, 8202.0395)
+  POLYLINE layer="0" color=0000ff (8202.4506, 8180) (8220, 8197.5494)
+  POLYLINE layer="0" color=0000ff (8203.0197, 8212) (8215.0197, 8224)
+  POLYLINE layer="0" color=0000ff (8206.9408, 8180) (8220, 8193.0592)
+  POLYLINE layer="0" color=0000ff (8207.5099, 8212) (8219.5099, 8224)
+  POLYLINE layer="0" color=0000ff (8209.3333, 8209.3333) (8220, 8220)
+  POLYLINE layer="0" color=0000ff (8210.83, 8206.3399) (8220, 8215.5099)
+  POLYLINE layer="0" color=0000ff (8211.4309, 8180) (8220, 8188.5691)
+  POLYLINE layer="0" color=0000ff (8215.921, 8180) (8220, 8184.079)
