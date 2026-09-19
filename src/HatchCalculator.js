@@ -8,23 +8,17 @@ export const HatchStyle = Object.freeze({
     THROUGH_ENTIRE_AREA: 2
 })
 
-/** An intersection this close to an edge endpoint is treated as being at the vertex itself, so
- * that the two edges meeting there are collapsed into a single crossing decision.
+/** Force intersection at this distance from an edge endpoint, as a fraction of the boundary
+ * bounding box diagonal.
  *
- * It is a *distance*, given as a fraction of the boundary's overall size and converted to each
- * edge's parameter space in `_ProcessEdges()`. As a fraction of the edge it would mean the two
- * edges at one vertex disagree about where that vertex ends: a tessellated fillet chord and the
- * wall it runs into differ in length by two orders of magnitude routinely, and the long one then
- * claims every near miss of the corner as a crossing through it -- on top of the real crossing the
- * short one already reported. See `ENDPOINT_MARGIN_MAX`.
+ * It is a distance and not a fraction of the edge. The two edges meeting at a vertex routinely
+ * differ in length by two orders of magnitude - a tessellated fillet chord against the wall running
+ * into it - so a fraction of each lets them disagree about where that vertex ends: the same line
+ * is then a clean crossing of the short edge and a vertex hit on the long one. Two toggles for one
+ * crossing inverts the parity of the rest of the line, which carries on through the hole it should
+ * have stopped at. The margin is converted into each edge's parameter space in `_ProcessEdges()`.
  */
 const ENDPOINT_MARGIN = 1e-6
-
-/** Upper bound for the converted margin, for an edge shorter than the margin itself. Such an edge
- * is below the resolution the boundary is described at, and taking all of it as "at the vertex" is
- * the intended reading; it must stay under 0.5 so the two ends of one edge cannot both match.
- */
-const ENDPOINT_MARGIN_MAX = 0.25
 
 /** Tolerance for "this point sits on that edge", as a fraction of the edge length. Boundary loops
  * of one hatch share corners and whole edges, exactly so in a well-formed file; the margin is for
@@ -41,6 +35,10 @@ function EdgeSameSide(e1, e2) {
 /** Context for one line clipping calculations. */
 class ClipCalculator {
 
+    /** @param endpointMargin {number} `ENDPOINT_MARGIN` as a distance, from
+     *  `HatchCalculator._GetEndpointMargin()`. Converted into edge parameter space one edge at a
+     *  time in `_ProcessEdges()`.
+     */
     constructor(boundaryLoops, style, line, endpointMargin) {
         this.style = style
         this.line = line
@@ -90,7 +88,10 @@ class ClipCalculator {
                 if (edge.isZero) {
                     continue
                 }
-                edge.endMargin = Math.min(this.endpointMargin / len, ENDPOINT_MARGIN_MAX)
+                /* "Near a vertex" is a distance, so it is a different parameter value for every
+                 * edge - see ENDPOINT_MARGIN.
+                 */
+                edge.endpointMargin = this.endpointMargin / len
                 edgeVec.divideScalar(len)
                 const a = edgeVec.cross(this.lineDir)
                 edge.isParallel = Math.abs(a) <= 1e-6
@@ -122,15 +123,15 @@ class ClipCalculator {
                     continue
                 }
 
-                if (edge.intersection[1] < -edge.endMargin ||
-                    edge.intersection[1] > 1 + edge.endMargin) {
+                if (edge.intersection[1] < -edge.endpointMargin ||
+                    edge.intersection[1] > 1 + edge.endpointMargin) {
                     /* No intersection. */
                     continue
                 }
 
                 /* Some intersection exists, check if near endpoints. */
-                const isStartVtx = edge.intersection[1] <= edge.endMargin
-                if (isStartVtx || edge.intersection[1] >= 1 - edge.endMargin) {
+                const isStartVtx = edge.intersection[1] <= edge.endpointMargin
+                if (isStartVtx || edge.intersection[1] >= 1 - edge.endpointMargin) {
                     /* Intersection near start or end vertex, force connected edge check. */
                     let [connEdge, isDirect] = this._GetConnectedEdge(edge, isStartVtx)
                     if (!connEdge) {
@@ -402,22 +403,24 @@ export class HatchCalculator {
                                   this._GetEndpointMargin()).Calculate()
     }
 
-    /** @return {number} `ENDPOINT_MARGIN` as a distance in the boundary's own units. Taken from
-     *  the boundary's bounding box so that it means the same thing whatever the drawing's scale,
-     *  and computed once: a patterned hatch clips tens of thousands of lines against these loops.
+    /** @return {number} `ENDPOINT_MARGIN` as a distance in the boundary's own units, taken from
+     *  the boundary's bounding box so that it means the same thing whatever the drawing's scale.
+     *
+     *  Computed once and kept: the boundary does not move, and a patterned hatch clips tens of
+     *  thousands of lines against it, so measuring the box per line is measurable - about 8% of
+     *  the build time of `vessel_r2(hatch).dxf`, the most hatch-heavy drawing in the corpus.
      */
     _GetEndpointMargin() {
         if (this._endpointMargin === undefined) {
-            const box = new Box2()
+            const bbox = new Box2()
             for (const loop of this.boundaryLoops) {
                 for (const v of loop) {
-                    box.expandByPoint(v)
+                    bbox.expandByPoint(v)
                 }
             }
-            const size = box.isEmpty() ? 0 : box.min.distanceTo(box.max)
-            /* A boundary of zero extent produces nothing to clip, but the margin still has to be
-             * a positive number for the conversion in `_ProcessEdges()`. */
-            this._endpointMargin = (size || 1) * ENDPOINT_MARGIN
+            /* An empty boundary gives a zero margin, which is the right answer for it: there is
+             * nothing to be near. */
+            this._endpointMargin = ENDPOINT_MARGIN * bbox.getSize(new Vector2()).length()
         }
         return this._endpointMargin
     }

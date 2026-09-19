@@ -1,36 +1,19 @@
 origin (0, 0)
-bounds (0, 0) (40, 20)
+bounds (0, 0) (20, 20)
 hasMissingChars no
 layers 2
   "0" color=ffffff
   "Defpoints" color=ffffff
-batches 1
-  INDEXED_TRIANGLES layer="0" block=- color=ffff00 lineType=0 chunks=1 vertices=58 indices=81
-primitives 27
-  TRIANGLE layer="0" color=ffff00 (0, 0) (5, 10) (5.076, 10.8682)
-  TRIANGLE layer="0" color=ffff00 (0, 0) (5, 5) (5, 10)
-  TRIANGLE layer="0" color=ffff00 (0, 0) (5.076, 10.8682) (5.3015, 11.7101)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (0, 0) (5.3015, 11.7101)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (10, 15) (10.8682, 14.924)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (10.8682, 14.924) (11.7101, 14.6985)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (5.3015, 11.7101) (5.6699, 12.5)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (5.6699, 12.5) (6.1698, 13.2139)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (6.1698, 13.2139) (6.7861, 13.8302)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (6.7861, 13.8302) (7.5, 14.3301)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (7.5, 14.3301) (8.2899, 14.6985)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (8.2899, 14.6985) (9.1318, 14.924)
-  TRIANGLE layer="0" color=ffff00 (0, 20) (9.1318, 14.924) (10, 15)
-  TRIANGLE layer="0" color=ffff00 (15, 10) (15, 5) (20, 20)
+batches 2
+  LINES layer="0" block=- color=ffff00 lineType=0 vertices=4
+  INDEXED_TRIANGLES layer="0" block=- color=ffff00 lineType=0 chunks=1 vertices=16 indices=24
+primitives 9
+  POLYLINE layer="0" color=ffff00 (0, 0) (20, 0)
+  TRIANGLE layer="0" color=ffff00 (0, 0) (5, 5) (5, 15)
+  TRIANGLE layer="0" color=ffff00 (0, 20) (0, 0) (5, 15)
+  TRIANGLE layer="0" color=ffff00 (0, 20) (5, 15) (15, 15)
+  TRIANGLE layer="0" color=ffff00 (15, 15) (15, 5) (20, 20)
+  TRIANGLE layer="0" color=ffff00 (15, 15) (20, 20) (0, 20)
   TRIANGLE layer="0" color=ffff00 (15, 5) (0, 0) (20, 0)
   TRIANGLE layer="0" color=ffff00 (15, 5) (20, 0) (20, 20)
   TRIANGLE layer="0" color=ffff00 (15, 5) (5, 5) (0, 0)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (0, 20) (11.7101, 14.6985)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (11.7101, 14.6985) (12.5, 14.3301)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (12.5, 14.3301) (13.2139, 13.8302)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (13.2139, 13.8302) (13.8302, 13.2139)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (13.8302, 13.2139) (14.3301, 12.5)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (14.3301, 12.5) (14.6985, 11.7101)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (14.6985, 11.7101) (14.924, 10.8682)
-  TRIANGLE layer="0" color=ffff00 (20, 20) (14.924, 10.8682) (15, 10)
-  TRIANGLE layer="0" color=ffff00 (40, 10) (30, 0) (40, 0)
-  TRIANGLE layer="0" color=ffff00 (40, 10) (30, 10) (30, 0)

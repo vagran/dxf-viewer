@@ -5,10 +5,22 @@ layers 2
   "0" color=ffffff
   "Defpoints" color=ffffff
 batches 1
-  LINES layer="0" block=- color=00ff00 lineType=0 vertices=20
-primitives 5
+  LINES layer="0" block=- color=00ff00 lineType=0 vertices=68
+primitives 17
   POLYLINE layer="0" color=00ff00 (0, 0) (20, 20)
+  POLYLINE layer="0" color=00ff00 (0, 11.2253) (8.7747, 20)
+  POLYLINE layer="0" color=00ff00 (0, 13.4704) (6.5296, 20)
+  POLYLINE layer="0" color=00ff00 (0, 15.7154) (4.2846, 20)
   POLYLINE layer="0" color=00ff00 (0, 17.9605) (2.0395, 20)
+  POLYLINE layer="0" color=00ff00 (0, 2.2451) (17.7549, 20)
+  POLYLINE layer="0" color=00ff00 (0, 4.4901) (15.5099, 20)
+  POLYLINE layer="0" color=00ff00 (0, 6.7352) (13.2648, 20)
   POLYLINE layer="0" color=00ff00 (0, 8.9803) (11.0197, 20)
+  POLYLINE layer="0" color=00ff00 (11.2253, 0) (20, 8.7747)
+  POLYLINE layer="0" color=00ff00 (13.4704, 0) (20, 6.5296)
+  POLYLINE layer="0" color=00ff00 (15.7154, 0) (20, 4.2846)
   POLYLINE layer="0" color=00ff00 (17.9605, 0) (20, 2.0395)
+  POLYLINE layer="0" color=00ff00 (2.2451, 0) (20, 17.7549)
+  POLYLINE layer="0" color=00ff00 (4.4901, 0) (20, 15.5099)
+  POLYLINE layer="0" color=00ff00 (6.7352, 0) (20, 13.2648)
   POLYLINE layer="0" color=00ff00 (8.9803, 0) (20, 11.0197)

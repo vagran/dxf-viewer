@@ -170,6 +170,7 @@ function ParseBoundaryLoop(curr, scanner) {
         const e = {type: curr.value}
         curr = scanner.next()
         const isSpline = e.type == 4
+        let sawFitDataCount = false
 
         while (true) {
             switch (curr.code) {
@@ -223,35 +224,39 @@ function ParseBoundaryLoop(curr, scanner) {
                 e.degreeOfSplineCurve = curr.value
                 break
 
-            /* Spline-only groups, none of which carry anything this renderer needs yet. Two
-             * rules, and an edge which breaks either of them ends the boundary path early and
-             * drops every path after it as well:
-             *
-             *  - A group the edge does not own has to end it rather than be skipped. 97 is the
-             *    ambiguous one: inside a spline edge it counts the fit data, but after the last
-             *    edge of a boundary path the same code counts that path's source objects.
-             *  - A group the edge does own has to be consumed, tangents included. A spline
-             *    writes 12 and 13 whenever it has fit data, and they follow the 11 pairs.
-             */
-            case 42:
+            case 12:
+            case 13:
+                /* Fit data start and end tangents, which follow the fit points of a spline. They
+                 * are points like any other, so they have to be read as one: consuming the x and
+                 * leaving the y behind ends the edge at the y, and the path with it.
+                 */
+                if (!isSpline) {
+                    return e
+                }
+                if (curr.code == 12) {
+                    e.startTangent = helpers.parsePoint(scanner)
+                } else {
+                    e.endTangent = helpers.parsePoint(scanner)
+                }
+                break
+
+            case 97:
+                /* A spline edge writes its own 97 first - the number of fit data, whose points
+                 * follow it - so that one is the edge's. Every other 97 belongs to the boundary
+                 * path, which names there the source objects its handles follow: the edge is over
+                 * and the path parser has to see it. Group 97 is the same number in both places;
+                 * only the order tells them apart.
+                 */
+                if (!isSpline || sawFitDataCount) {
+                    return e
+                }
+                sawFitDataCount = true
+                break
+
+            //XXX ignore some groups for now, mostly spline
             case 95:
             case 96:
-            case 97:
-                if (!isSpline) {
-                    return e
-                }
-                break
-            case 12:
-                if (!isSpline) {
-                    return e
-                }
-                e.startTangent = helpers.parsePoint(scanner)
-                break
-            case 13:
-                if (!isSpline) {
-                    return e
-                }
-                e.endTangent = helpers.parsePoint(scanner)
+            case 42:
                 break
             default:
                 return e

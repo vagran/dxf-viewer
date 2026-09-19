@@ -1,5 +1,10 @@
 import {Vector2} from "three"
 
+/* Tolerance for comparing two line angles, in radians. Angles survive the embedding unscaled, so
+ * only the precision the file was written with has to be absorbed.
+ */
+const ANGLE_EPS = 1e-6
+
 /**
  * @typedef PatternLineDef
  * @property {number} angle Line angle in radians.
@@ -8,40 +13,6 @@ import {Vector2} from "three"
  * @property {?number[]} dashes Dash lengths. Solid line if not specified. Negative numbers for
  *  spaces, positive for dashes, zero for dots.
  */
-
-/** Tolerance for two pattern line angles being the same one, in radians. The values compared are
- * degrees out of a DXF file converted to radians against a table written in the same degrees, so
- * the only difference to absorb is that conversion's own rounding.
- */
-const ANGLE_TOLERANCE = 1e-6
-
-/** Reduce a line angle to [0, PI): a family of parallel lines is the same family drawn the other
- * way round.
- */
-function NormalizeLineAngle(angle) {
-    const a = angle % Math.PI
-    return a < 0 ? a + Math.PI : a
-}
-
-/** @param {number} a Normalized angle.
- * @param {number} b Normalized angle.
- * @return {boolean} True if equal within `ANGLE_TOLERANCE`, wrapping around PI.
- */
-function AnglesEqual(a, b) {
-    const d = Math.abs(a - b)
-    return d <= ANGLE_TOLERANCE || Math.PI - d <= ANGLE_TOLERANCE
-}
-
-/** @param {PatternLineDef} line
- * @return {string} What the line's dashes are, with their lengths left out: those are scaled along
- *  with everything else, while the count and the dash/space/dot of each one are not.
- */
-function DashSignature(line) {
-    if (!line.dashes || line.dashes.length == 0) {
-        return ""
-    }
-    return line.dashes.map(Math.sign).join(",")
-}
 
 export class Pattern {
     /**
@@ -75,40 +46,51 @@ export class Pattern {
         return true
     }
 
-    /** Whether this definition, embedded in a HATCH entity, cannot be the pattern that entity
-     * names - which means it is a placeholder and the named pattern should be used instead.
+    /** Check whether the shape of this pattern contradicts the shape of `named`, i.e. whether the
+     * two cannot be the same pattern. Used to tell a placeholder definition embedded by an editor
+     * from a real one, so only the properties an embedded definition preserves are compared: the
+     * number of lines, the angles between them and the signs of the dash sequences. Spacing, base
+     * points and dash lengths are all scaled by the embedding and so say nothing about the name.
      *
-     * Asked of a definition that looks like QCAD's placeholder (see `isQcadDefault`), which is the
-     * only case where an embedded definition is doubted at all. It cannot simply be thrown away
-     * for looking like that line: ANSI31 *is* a single 45 degree solid line, and the embedded copy
-     * is the only place the file says what spacing it was drawn at. Comparing it with the named
-     * pattern settles it.
-     *
-     * Only the shape is comparable. An embedded definition is already scaled and rotated, so its
-     * spacing, base points and dash lengths say nothing about which pattern it is; the number of
-     * lines, their angles relative to the hatch's own pattern angle, and whether each line is
-     * solid, dashed or dotted all survive that transformation.
-     *
-     * @param {Pattern} named The pattern of this name from the registry.
-     * @param {number} patternAngle Rotation the HATCH applies to the named pattern, in radians
-     *  (group 52).
+     * The angles are compared relative to the pattern's own first line, not to the drawing, because
+     * an embedded definition carries the orientation the drawing uses the pattern in. A mirrored
+     * plan hatches "ANSI31" along 135 degrees and one of its walls rotates that by another 90, so
+     * its definition lines read 45 - which against the pattern table's own 45 is either the same
+     * pattern or half a turn from it, depending on which of the two rotations is accounted for.
+     * Comparing the internal structure sidesteps the question, and a placeholder is a single line
+     * at 135 where the name means three horizontal ones, so the line count still separates them.
+     * @param named {Pattern} Pattern to compare with, normally the one found by name.
      * @return {boolean}
      */
-    ContradictsNamedPattern(named, patternAngle = 0) {
-        if (this.lines.length == 0 || this.lines.length != named.lines.length) {
+    ContradictsNamedPattern(named) {
+        if (this.lines.length != named.lines.length) {
             return true
         }
-        const unmatched = [...this.lines]
-        for (const namedLine of named.lines) {
-            const angle = NormalizeLineAngle((namedLine.angle ?? 0) + patternAngle)
-            const dashes = DashSignature(namedLine)
-            const i = unmatched.findIndex(
-                line => DashSignature(line) == dashes &&
-                        AnglesEqual(NormalizeLineAngle(line.angle ?? 0), angle))
-            if (i < 0) {
+        /* A line family is the same family turned by half a turn, so angles are modulo 180. */
+        const Normalize = angle => {
+            const a = angle % Math.PI
+            return a < 0 ? a + Math.PI : a
+        }
+        const Offsets = pattern => {
+            const base = Normalize(pattern.lines[0].angle ?? 0)
+            return pattern.lines.map(line => Normalize((line.angle ?? 0) - base))
+        }
+        const offsets = Offsets(this)
+        const namedOffsets = Offsets(named)
+        for (let i = 0; i < this.lines.length; i++) {
+            if (Math.abs(offsets[i] - namedOffsets[i]) > ANGLE_EPS) {
                 return true
             }
-            unmatched.splice(i, 1)
+            const dashes = this.lines[i].dashes ?? []
+            const namedDashes = named.lines[i].dashes ?? []
+            if (dashes.length != namedDashes.length) {
+                return true
+            }
+            for (let j = 0; j < dashes.length; j++) {
+                if (Math.sign(dashes[j]) != Math.sign(namedDashes[j])) {
+                    return true
+                }
+            }
         }
         return false
     }

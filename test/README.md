@@ -35,8 +35,8 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
   take numbers and strings. `parser-color`, `parser-layer` and `parser-hatch` are the same idea one
   level up — they splice group codes into a dozen lines of DXF text and read back what the parser
   made of them, which is how a group whose *value* needs interpreting (a color method marker, a
-  bit-coded flag), or whose *meaning depends on where it sits* (group 97, which counts a boundary
-  path's source objects but a spline edge's fit data), gets pinned without a fixture.
+  bit-coded flag, a group that means one thing on an edge and another on the path around it) gets
+  pinned without a fixture.
 - **`invariants.test.mjs`** — properties that need no expected output: a translated drawing
   produces the same geometry shifted, a drawing with its blocks exploded produces the same geometry
   as one with blocks, hatch lines stay inside their boundary, and a polyline over 0x10000 vertices

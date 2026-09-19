@@ -123,6 +123,11 @@ export declare class Pattern {
     readonly name: string | null
 
     static ParsePatFile(content: string): Pattern
+
+    /** Whether this pattern cannot be the same as `named`, comparing only what an embedded
+     * definition preserves: line count, line angles and dash signs.
+     */
+    ContradictsNamedPattern(named: Pattern): boolean
 }
 
 export function RegisterPattern(pattern: Pattern, isMetric?: boolean): void

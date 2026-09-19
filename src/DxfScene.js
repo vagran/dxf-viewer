@@ -1256,8 +1256,7 @@ export class DxfScene {
             if (!_pattern) {
                 console.log(`Hatch pattern with name ${entity.patternName} not found ` +
                             `(metric: ${this.isMetric})`)
-            } else if (pattern == null ||
-                       pattern.ContradictsNamedPattern(_pattern, entity.patternAngle ?? 0)) {
+            } else if (pattern == null || pattern.ContradictsNamedPattern(_pattern)) {
                 pattern = _pattern
             }
         }
@@ -1586,6 +1585,14 @@ export class DxfScene {
                     }
                     case 4:
                         /* Spline. */
+                        if (!edge.controlPoints) {
+                            //XXX a spline given by fit points has no control points to interpolate,
+                            //and converting one form to the other is the same unsolved gap as for
+                            //SPLINE entities. Skipping the edge leaves the loop open, which is what
+                            //dropping the whole path used to do.
+                            console.warn("Hatch boundary spline edge without control points")
+                            break
+                        }
                         const controlPoints = edge.controlPoints.map(p => [p.x, p.y])
                         const subdivisions = controlPoints.length * SPLINE_SUBDIVISION
                         const step = 1 / subdivisions

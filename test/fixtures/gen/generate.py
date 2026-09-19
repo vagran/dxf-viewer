@@ -272,38 +272,27 @@ def _SolidHatchIgnoreStyle(doc, msp):
 def _SolidHatchEdgePaths(doc, msp):
     """Solid HATCH whose boundary paths are edge lists rather than polylines.
 
-    An edge path ends with group 97 -- the number of source boundary objects -- followed by a 330
-    handle per object, and 97 is also a spline edge's own "number of fit data". The edge parser
-    read it as the spline group in both places, which swallowed the end of the path and left every
-    path after it unparsed: a two-loop hatch came out with one loop, so the hole here would be
-    filled and the hatch on the other side of it missing entirely. Real files are full of these --
-    every associative hatch names the objects it was traced from.
-
-    Three paths, so the loss shows up as more than a missing hole, and one edge of each kind the
-    decomposer understands.
+    The same square and hole as `solid-hatch`, so the two dumps should agree on the geometry, but
+    arriving by the other half of the parser: an edge path ends with `97` and the handles of the
+    objects it was made from, and the edge parser used to swallow that `97` as one of its own
+    spline groups. It is the handles that make it fatal -- the `97` of the hole is read anyway,
+    because the path parser picks the next path up from its `92` -- so the outer path is made
+    associative to the line it was drawn from, which is how a real drawing writes it. The parser
+    was then left staring at a `330`, ended the whole entity, and the hole was lost: the square
+    filled in solid. This is the only fixture whose boundaries reach that code; a polyline path
+    writes its `97` too, but the edge parser is never called for it.
     """
     hatch = msp.add_hatch(color=2)
-    contour = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
-    for start, end in (((0, 0), (20, 0)), ((20, 0), (20, 20)), ((20, 20), (0, 20)),
-                       ((0, 20), (0, 0))):
-        contour.add_line(start, end)
-    contour.source_boundary_objects = ["ABC"]
+    points = [(0, 0), (20, 0), (20, 20), (0, 20)]
+    path = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    for i, point in enumerate(points):
+        path.add_line(point, points[(i + 1) % len(points)])
+    hatch.associate(path, [msp.add_line(points[0], points[1], dxfattribs={"color": 2})])
 
     hole = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
-    hole.add_line((5, 5), (15, 5))
-    hole.add_line((15, 5), (15, 10))
-    # A half circle closing the hole, so an arc edge (72 = 2) is covered too.
-    hole.add_arc((10, 10), radius=5, start_angle=0, end_angle=180)
-    hole.add_line((5, 10), (5, 5))
-    hole.source_boundary_objects = ["DEF"]
-
-    # A second area, disjoint from the first: this one is dropped outright when the path before it
-    # eats its own terminator.
-    other = hatch.paths.add_edge_path(flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
-    for start, end in (((30, 0), (40, 0)), ((40, 0), (40, 10)), ((40, 10), (30, 10)),
-                       ((30, 10), (30, 0))):
-        other.add_line(start, end)
-    other.source_boundary_objects = ["012", "345"]
+    hole_points = [(5, 5), (15, 5), (15, 15), (5, 15)]
+    for i, point in enumerate(hole_points):
+        hole.add_line(point, hole_points[(i + 1) % len(hole_points)])
 
 
 @Fixture("pattern-hatch")
@@ -319,71 +308,75 @@ def _PatternHatch(doc, msp):
 
 @Fixture("pattern-hatch-embedded-spacing")
 def _PatternHatchEmbeddedSpacing(doc, msp):
-    """Pattern HATCH whose embedded definition disagrees with what $MEASUREMENT implies.
+    """Pattern HATCH whose embedded definition disagrees with $MEASUREMENT.
 
-    A HATCH carries its own pattern definition, already scaled, and that is the spacing the drawing
-    was made at. The registry's copy is unscaled, and picking between the metric and the imperial
-    table is what $MEASUREMENT is for -- so preferring the registry means believing that header
-    over the file's own numbers, and the two differ by 25.4 whenever it is wrong. Six drawings in
-    test-data/ have it wrong, in both directions.
+    A definition embedded in the entity is already scaled, so it records the spacing the drawing
+    was made at; the pattern table copy still has to be scaled, and which table that is comes from
+    the header. Editors do write the two inconsistently -- six drawings of the corpus do -- and
+    believing the header over the numbers in the entity makes the hatch 25.4 times too dense, which
+    at any ordinary zoom is solid.
 
-    Here the definition is written while the document is metric and the header is then set to
-    imperial, which is `Floor plan (mirrorring,dim).dxf` inverted: the embedded spacing is 6.35 and
-    the registry would say 0.125 * 2 = 0.25, packing the lines 25.4 times too tightly.
+    Metric numbers are embedded here and then the header is switched to imperial, which is the
+    direction that costs a factor of 25.4. ANSI31 is 3.175 mm against 0.125 in, so the embedded
+    line spacing is 3.175 * 0.5 and the table would give 0.125 * 0.5.
     """
+    doc.header["$MEASUREMENT"] = 1
     hatch = msp.add_hatch()
-    hatch.set_pattern_fill("ANSI31", color=3, scale=2.0)
+    hatch.set_pattern_fill("ANSI31", color=3, scale=0.5)
     doc.header["$MEASUREMENT"] = 0
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+
+
+@Fixture("pattern-hatch-rotated")
+def _PatternHatchRotated(doc, msp):
+    """The same pattern as `pattern-hatch-embedded-spacing`, at the orientation a mirrored plan
+    hatches it in.
+
+    A definition embedded in a HATCH carries the orientation *that drawing* uses the pattern in, and
+    the entity's pattern angle is what turned it there. This one is the table's ANSI31 turned by 90
+    as the drawing's own base -- the walls run the other way round, which is what "mirrorring" means
+    in the file this comes from -- and then turned by another 90, so the definition line reads 45
+    again and the single 45 degrees solid line is once more what both sides see.
+
+    Comparing the two by their absolute angles still called that a different pattern, so the table
+    won: one wall of a floor plan came out hatched at 135 degrees with 9.525 between its lines where
+    the walls beside it have 0.375 at 45. The header is metric and the numbers in the entity
+    imperial, as in the neighbour, so the two answers differ in density too.
+
+    Written out by hand rather than through `set_pattern_fill(..., angle=90)`, which would bake the
+    rotation into the definition line and put it at 135 -- and a definition line that is not 45 is
+    not what the QCAD placeholder test matches, so the hatch would never reach the code at all.
+    """
+    doc.header["$MEASUREMENT"] = 1
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=3, scale=1.0)
+    half = 0.125 / 2 ** 0.5
+    hatch.set_pattern_definition([(45.0, (0, 0), (half, -half), [])])
+    hatch.dxf.pattern_angle = 90
     hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
 
 
 @Fixture("pattern-hatch-placeholder")
 def _PatternHatchPlaceholder(doc, msp):
-    """Pattern HATCH carrying QCAD's placeholder definition instead of a real one.
+    """A HATCH named PLAST carrying the single 45 degrees line QCAD writes into every hatch it
+    creates, whatever the hatch is named.
 
-    QCAD exports a single 45 degree solid line as the embedded definition of every hatch, whatever
-    the pattern is named, so the definition cannot simply be trusted. PLAST is three solid lines at
-    0 degrees; one line at 45 cannot be it, and the name has to win. Reported as #129.
+    The name is what the drawing means, so the pattern table has to win here -- but the two cannot
+    be told apart by that line alone, since ANSI31 is itself a single 45 degrees solid line. What
+    separates them is that PLAST is three horizontal lines, so this pins the case where the
+    embedded definition really is a placeholder. Its neighbour, `pattern-hatch-embedded-spacing`,
+    pins the case where it is not, and the two answers are opposite.
 
-    The counterpart of `pattern-hatch-embedded-spacing`: between them they pin both answers, which
-    a rule based on the shape of the definition alone -- ANSI31 *is* a single 45 degree solid line
-    -- cannot give.
+    The definition is the one QCAD writes whatever the hatch is named: ANSI31's own line, scaled by
+    the pattern scale, which is 1 here and so the numbers of the pattern table itself.
     """
     hatch = msp.add_hatch()
-    hatch.set_pattern_fill("PLAST", color=5, scale=1.0,
-                           definition=[[45.0, (0.0, 0.0), (0.0, 0.125), []]])
+    hatch.set_pattern_fill("PLAST", color=3, scale=1.0)
+    hatch.set_pattern_definition([(45.0, (0, 0), (-2.2450640303, 2.2450640303), [])])
     hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
-
-
-@Fixture("pattern-hatch-cut-corner")
-def _PatternHatchCutCorner(doc, msp):
-    """Pattern HATCH over a hole whose corner is cut by one short chord.
-
-    The clipper decides an intersection is "at a vertex" -- and so belongs to the pair of edges
-    meeting there rather than being a crossing of its own -- by a margin. As a fraction of the edge
-    that margin means the two edges at one vertex disagree about where the vertex ends, and a line
-    passing just clear of the corner is a clean crossing of the short chord *and* a vertex hit on
-    the long wall: two toggles for one crossing, which inverts the parity of the rest of the line.
-    It was drawn straight through the hole instead of stopping at it.
-
-    The numbers are tuned, not arbitrary. ANSI31 at scale 2 puts its lines at y = x + k * 8.980256,
-    so the k = 0 line is y = x; the corner sits 0.0005 above it, which is inside the 9.9995-long
-    wall's old margin of 1e-3 and outside the 0.112-long chord's of 1.1e-5. This is also why the
-    coordinates are not the usual exact-in-binary ones -- the fixture exists to land in that gap.
-
-    Corners arrive like this in real drawings all the time: a tessellated fillet is short chords
-    running into whatever wall follows them.
-    """
-    hatch = msp.add_hatch()
-    hatch.set_pattern_fill("ANSI31", color=2, scale=2.0)
-    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
-                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
-    # Declared from the cut corner, so the chord is clipped before the wall running into it --
-    # the order in which the spurious second crossing is the one that survives.
-    hatch.paths.add_polyline_path([(5, 5.0005), (5.1, 4.95), (15, 4.95), (15, 15), (5, 15)],
-                                  is_closed=True, flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
 
 
 @Fixture("pattern-hatch-concave")
@@ -398,6 +391,38 @@ def _PatternHatchConcave(doc, msp):
     hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 8), (8, 8), (8, 20), (0, 20)],
                                   is_closed=True,
                                   flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+
+
+# How much of the bottom left corner of `pattern-hatch-cut-corner`'s hole is cut off. Small on
+# purpose -- see the builder.
+_CORNER_CUT = 1 / 128
+
+
+@Fixture("pattern-hatch-cut-corner")
+def _PatternHatchCutCorner(doc, msp):
+    """Pattern HATCH whose hole has a corner cut off, at the size that puts a pattern line through
+    the cut.
+
+    The clipping has to decide, for every crossing near a loop vertex, whether the line really
+    crossed the boundary there or only touched it. That decision used to be taken as a fraction of
+    each edge, so the two edges meeting at a vertex disagreed about where the vertex ends -- a
+    tessellated fillet chord against the long wall running into it is a ratio of two orders of
+    magnitude. ANSI31's line through the origin is the one that grazes the cut here: it crosses the
+    cut edge cleanly but comes within the long wall's own margin of the cut corner, and the pair
+    was then counted once instead of twice. Everything past the corner came out with its parity
+    inverted, which draws the line straight across the hole -- 40 of the 56.5 units of it.
+
+    The cut is 1/128, which puts the graze inside the window the old margin left open. The hole is
+    twice as tall as it is wide so that the line leaves through its right edge rather than exactly
+    through its top corner.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=5, scale=1.0)
+    hatch.paths.add_polyline_path([(-5, -5), (60, -5), (60, 100), (-5, 100)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    hatch.paths.add_polyline_path([(2, 2 + _CORNER_CUT), (2 + _CORNER_CUT, 2), (42, 2),
+                                   (42, 92), (2, 92)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
 
 
 @Fixture("block-flattened")
