@@ -278,7 +278,8 @@ function ParseBoundaryLoop(curr, scanner) {
             entity = {
                 type: curr.value,
                 isExternal: (curr.value & 1) != 0,
-                isOutermost: (curr.value & 16) != 0
+                isOutermost: (curr.value & 16) != 0,
+                isTextbox: (curr.value & 8) != 0
             }
             curr = scanner.next()
         }

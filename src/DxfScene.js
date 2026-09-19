@@ -1506,6 +1506,19 @@ export class DxfScene {
         }
 
         for (const loop of entity.boundaryLoops) {
+            /* A textbox path (group 92 bit 8) is the bounding box of a text entity the
+             * associative hatch was created from, not a piece of its outline: AutoCAD writes one
+             * per label in the boundary set, and hatching them paints a rectangle wherever that
+             * label happens to sit. They are marked external like a real outline, so the style
+             * filters below keep them. ezdxf ignores them when building hatch paths
+             * (`filter_text_boxes`) and the Autodesk viewer shows no such rectangles; that they
+             * may be the box of text *inside* the hatch, where island detection would want them
+             * as holes, does not change what they are - a text box is never a fill area.
+             */
+            if (loop.isTextbox) {
+                continue
+            }
+
             const vertices = []
 
             if (loop.type & 2) {

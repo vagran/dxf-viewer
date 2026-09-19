@@ -62,6 +62,25 @@ test("a path's source object handles do not end the path", () => {
     assert.strictEqual(hatch.boundaryLoops[1].edges.length, 4, "and the second one in full")
 })
 
+test("the group 92 bits are read apart from each other", () => {
+    /* 1 external, 2 polyline, 4 derived, 8 textbox, 16 outermost. A textbox path is the bounding
+     * box of a text entity an associative hatch was made from; AutoCAD marks it external too, so
+     * the two bits arrive together in the wild and the textbox bit has to be readable on its own.
+     */
+    const hatch = Parse([
+        Edges(1, SQUARE),
+        Edges(1 | 8, INNER),
+        Edges(16, SQUARE)
+    ])
+    const [external, textbox, outermost] = hatch.boundaryLoops
+    assert.deepStrictEqual(
+        [external.isExternal, external.isOutermost, external.isTextbox], [true, false, false])
+    assert.deepStrictEqual(
+        [textbox.isExternal, textbox.isOutermost, textbox.isTextbox], [true, false, true])
+    assert.deepStrictEqual(
+        [outermost.isExternal, outermost.isOutermost, outermost.isTextbox], [false, true, false])
+})
+
 test("a count of zero costs no handles", () => {
     /* What a non-associative hatch writes. It reads the same either way, because the value is
      * never what stopped the parse -- the token was. */

@@ -460,6 +460,32 @@ def _PatternHatchRepeatedVertex(doc, msp):
                                   is_closed=True, flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
 
 
+@Fixture("pattern-hatch-textbox")
+def _PatternHatchTextbox(doc, msp):
+    """Pattern HATCH carrying textbox boundary paths (group 92 bit 8).
+
+    An associative hatch made from an area containing text writes one textbox path per text
+    entity, the bounding box of that text. AutoCAD marks them external like a real outline, so
+    the style filters keep them, and using them as fill boundaries paints a rectangle wherever a
+    label happens to sit. "03.Profili.dxf" has one hatch on layer "Srafura unutra" carrying nine
+    of them -- six 26.65 by 13 and three smaller, all outside the real outline -- which came out
+    as nine red hatched rectangles scattered over the sheet.
+
+    Two boxes pin both halves of "a textbox is never a fill area": one clear of the square, which
+    was filled as a separate region, and one inside it, where island detection would instead
+    punch a hole. ezdxf ignores text boxes the same way, in both its hatch renderer
+    (`hatch_boundary_paths(filter_text_boxes=True)`) and its drawing frontend.
+    """
+    hatch = msp.add_hatch()
+    hatch.set_pattern_fill("ANSI31", color=3, scale=2.0)
+    hatch.paths.add_polyline_path([(0, 0), (20, 0), (20, 20), (0, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    for x0, y0, x1, y1 in ((30, 0, 40, 10), (5, 5, 15, 15)):
+        hatch.paths.add_polyline_path(
+            [(x0, y0), (x1, y0), (x1, y1), (x0, y1)], is_closed=True,
+            flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL | ezdxf.const.BOUNDARY_PATH_TEXTBOX)
+
+
 @Fixture("block-flattened")
 def _BlockFlattened(doc, msp):
     """A block small enough that DxfScene inlines it into ordinary batches.

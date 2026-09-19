@@ -59,7 +59,7 @@ function Canonical(scene, offset = [0, 0]) {
 const NOT_TRANSLATION_INVARIANT = new Set([
     "pattern-hatch", "pattern-hatch-concave", "pattern-hatch-cut-corner",
     "pattern-hatch-embedded-spacing", "pattern-hatch-placeholder", "pattern-hatch-rotated",
-    "pattern-hatch-repeated-vertex"
+    "pattern-hatch-repeated-vertex", "pattern-hatch-textbox"
 ])
 
 for (const fixture of fixtures) {
