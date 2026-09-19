@@ -51,6 +51,8 @@ for (const layer of layers) {
 
 viewer.FitView(0, 100, 0, 100)
 viewer.FitView(0, 100, 0, 100, 0.2)
+viewer.SetClearColor("#fff")
+viewer.SetClearColor(0x000000)
 viewer.SetSize(640, 480)
 viewer.GetCanvas()
 viewer.GetCamera()

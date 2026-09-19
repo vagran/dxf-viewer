@@ -5,7 +5,8 @@ export class MaterialKey {
     /**
      * @param instanceType {Number} One of InstanceType values.
      * @param geometryType {?number} One of BatchingKey.GeometryType.
-     * @param color {number} Color ARGB value.
+     * @param color {number} Color RGB value as the drawing specifies it, before the contrast
+     *  correction against the background color is applied.
      * @param lineType {?number} Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */

@@ -1,5 +1,6 @@
 import * as three from "three"
 import {BatchingKey} from "./BatchingKey.js"
+import {TransformColor} from "./ColorTransform.js"
 import {DxfWorker} from "./DxfWorker.js"
 import {MaterialKey} from "./MaterialKey.js"
 import {ColorCode, DxfScene} from "./DxfScene.js"
@@ -64,6 +65,18 @@ export class DxfViewer {
         camera.position.z = 1
         camera.position.x = 0
         camera.position.y = 0
+
+        /* Whether the shaders have to encode their output to the renderer's color space.
+         *
+         * `three.Color` keeps a color in the working color space, which with color management
+         * enabled (the default) means linear-sRGB, and three converts it back to sRGB when writing
+         * the fragment - but only in the shaders it generates itself. A RawShaderMaterial gets no
+         * such conversion injected, and without it every mid tone is written as a linear value into
+         * an sRGB canvas and displayed darker than the drawing asks for (white, black and fully
+         * saturated colors are the fixed points that hid this).
+         */
+        this.convertToSrgb = three.ColorManagement.enabled &&
+                             renderer.outputColorSpace === three.SRGBColorSpace
 
         this.simpleColorMaterial = []
         this.simplePointMaterial = []
@@ -277,6 +290,35 @@ export class DxfViewer {
         for (const obj of layer.objects) {
             obj.visible = show
         }
+        this.Render()
+    }
+
+    /** Change the frame buffer clear color. Unlike the `clearColor` option of the same name, this
+     *  takes effect immediately: the already loaded scene is re-rendered with the new background
+     *  and the entity colors are corrected against it again. Safe to call before anything is
+     *  loaded, where it only establishes the background color.
+     *
+     * @param color {number|string|three.Color} New clear color. The alpha value is not changed, see
+     *      the `clearAlpha` option.
+     */
+    SetClearColor(color) {
+        this._EnsureRenderer()
+
+        const clearColor = color instanceof three.Color ? color : new three.Color(color)
+        /* Assigned, not mutated in place: `options` is created with DxfViewer.DefaultOptions as its
+         * prototype, so the value here is the shared default until an own property shadows it.
+         */
+        this.options.clearColor = clearColor
+        this.clearColor = clearColor.getHex()
+        this.renderer.setClearColor(clearColor, this.options.clearAlpha)
+
+        /* The material cache is keyed by the color as the drawing specifies it, so the correction
+         * can be recomputed for the new background. Only uniform values change - no shader is
+         * recompiled and no object is rebuilt.
+         */
+        this.materials.each(entry =>
+            entry.material.uniforms.color.value.setHex(this._TransformColor(entry.key.color)))
+
         this.Render()
     }
 
@@ -496,6 +538,11 @@ export class DxfViewer {
         }
     }
 
+    /** @param color {number} Color RGB numeric value, as the drawing specifies it - before the
+     *      contrast correction. The material cache is keyed by this color so that the correction
+     *      can be re-applied to the existing materials when the background changes.
+     * @param instanceType {number}
+     */
     _GetSimpleColorMaterial(color, instanceType = InstanceType.NONE) {
         const key = new MaterialKey(instanceType, null, color, 0)
         let entry = this.materials.find({key})
@@ -504,7 +551,8 @@ export class DxfViewer {
         }
         entry = {
             key,
-            material: this._CreateSimpleColorMaterialInstance(color, instanceType)
+            material: this._CreateSimpleColorMaterialInstance(this._TransformColor(color),
+                                                              instanceType)
         }
         this.materials.insert(entry)
         return entry.material
@@ -538,6 +586,11 @@ export class DxfViewer {
         return m
     }
 
+    /** @param color {number} Color RGB numeric value, as the drawing specifies it - before the
+     *      contrast correction. The material cache is keyed by this color so that the correction
+     *      can be re-applied to the existing materials when the background changes.
+     * @param instanceType {number}
+     */
     _GetSimplePointMaterial(color, instanceType = InstanceType.NONE) {
         const key = new MaterialKey(instanceType, BatchingKey.GeometryType.POINTS, color, 0)
         let entry = this.materials.find({key})
@@ -546,8 +599,8 @@ export class DxfViewer {
         }
         entry = {
             key,
-            material: this._CreateSimplePointMaterialInstance(color, this.options.pointSize,
-                                                              instanceType)
+            material: this._CreateSimplePointMaterialInstance(this._TransformColor(color),
+                                                              this.options.pointSize, instanceType)
         }
         this.materials.insert(entry)
         return entry.material
@@ -581,7 +634,7 @@ export class DxfViewer {
         /* Should reuse compiled shaders. */
         const m = src.clone()
         m.uniforms.color = {value: new three.Color(color)}
-        m.uniforms.size = {value: size}
+        m.uniforms.pointSize = {value: size}
         return m
     }
 
@@ -612,6 +665,17 @@ export class DxfViewer {
         const pointSizeUniform = pointSize ? "uniform float pointSize;" : ""
         const pointSizeAssigment = pointSize ? "gl_PointSize = pointSize;" : ""
 
+        /* The sRGB transfer function, the same one three.js uses in LinearTosRGB(). Only generated
+         * when the renderer's output color space asks for it, see `convertToSrgb`.
+         */
+        const srgbConversion = this.convertToSrgb ? `
+            vec3 LinearToSRGB(vec3 c) {
+                return mix(pow(c, vec3(1.0 / 2.4)) * 1.055 - 0.055, c * 12.92,
+                           vec3(lessThanEqual(c, vec3(0.0031308))));
+            }
+            ` : ""
+        const fragmentColor = this.convertToSrgb ? "LinearToSRGB(color)" : "color"
+
         return {
             vertex: `
 
@@ -637,10 +701,11 @@ export class DxfViewer {
             precision highp float;
             precision highp int;
             uniform vec3 color;
+            ${srgbConversion}
             out vec4 fragColor;
 
             void main() {
-                fragColor = vec4(color, 1.0);
+                fragColor = vec4(${fragmentColor}, 1.0);
             }
             `
         }
@@ -651,38 +716,8 @@ export class DxfViewer {
      * @return {number} RGB value to use for rendering.
      */
     _TransformColor(color) {
-        if (!this.options.colorCorrection && !this.options.blackWhiteInversion) {
-            return color
-        }
-        /* Just black and white inversion. */
-        const bkgLum = Luminance(this.clearColor)
-        if (color === 0xffffff && bkgLum >= 0.8) {
-            return 0
-        }
-        if (color === 0 && bkgLum <= 0.2) {
-            return 0xffffff
-        }
-        if (!this.options.colorCorrection) {
-            return color
-        }
-        const fgLum = Luminance(color)
-        const MIN_TARGET_RATIO = 1.5
-        const contrast = ContrastRatio(color, this.clearColor)
-        const diff = contrast >= 1 ? contrast : 1 / contrast
-        if (diff < MIN_TARGET_RATIO) {
-            let targetLum
-            if (bkgLum > 0.5) {
-                targetLum = bkgLum / 2
-            } else {
-                targetLum = bkgLum * 2
-            }
-            if (targetLum > fgLum) {
-                color = Lighten(color, targetLum / fgLum)
-            } else {
-                color = Darken(color, fgLum / targetLum)
-            }
-        }
-        return color
+        return TransformColor(color, this.clearColor, this.options.colorCorrection,
+                              this.options.blackWhiteInversion)
     }
 }
 
@@ -854,7 +889,10 @@ class Batch {
             this.key.geometryType === BatchingKey.GeometryType.POINT_INSTANCE ?
                 this.viewer._GetSimplePointMaterial : this.viewer._GetSimpleColorMaterial
 
-        const material = materialFactory.call(this.viewer, this.viewer._TransformColor(color),
+        /* The color is passed as the drawing specifies it; the contrast correction is applied by
+         * the material factory and re-applied by SetClearColor() when the background changes.
+         */
+        const material = materialFactory.call(this.viewer, color,
                                               instanceBatch?.GetInstanceType() ?? InstanceType.NONE)
 
         let objConstructor
@@ -980,123 +1018,3 @@ class Block {
 
 /** Custom viewer event names are prefixed with this string. */
 const EVENT_NAME_PREFIX = "__dxf_"
-
-/** Transform sRGB color component to linear color space. */
-function LinearColor(c) {
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-}
-
-/** Transform linear color component to sRGB color space. */
-function SRgbColor(c) {
-    return c < 0.003 ? c * 12.92 : Math.pow(c, 1 / 2.4) * 1.055 - 0.055
-}
-
-/** Get relative luminance value for a color.
- * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#relativeluminancedef
- * @param color {number} RGB color value.
- * @return {number} Luminance value in range [0; 1].
- */
-function Luminance(color) {
-    const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
-    const g = LinearColor(((color & 0xff00) >>> 8) / 255)
-    const b = LinearColor((color & 0xff) / 255)
-
-    return r * 0.2126 + g * 0.7152 + b * 0.0722
-}
-
-/**
- * Get contrast ratio for a color pair.
- * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#contrast-ratiodef
- * @param c1
- * @param c2
- * @return {number} Contrast ratio between the colors. Greater than one if the first color color is
- *  brighter than the second one.
- */
-function ContrastRatio(c1, c2) {
-    return (Luminance(c1) + 0.05) / (Luminance(c2) + 0.05)
-}
-
-function HlsToRgb({h, l, s}) {
-    let r, g, b
-    if (s === 0) {
-        /* Achromatic */
-        r = g = b = l
-    } else {
-        function hue2rgb(p, q, t) {
-            if (t < 0) {
-                t += 1
-            }
-            if (t > 1) {
-                t -= 1
-            }
-            if (t < 1 / 6) {
-                return p + (q - p) * 6 * t
-            }
-            if (t < 1 / 2) {
-                return q
-            }
-            if (t < 2 / 3) {
-                return p + (q - p) * (2 / 3 - t) * 6
-            }
-            return p
-        }
-
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s
-        const p = 2 * l - q
-        r = hue2rgb(p, q, h + 1 / 3)
-        g = hue2rgb(p, q, h)
-        b = hue2rgb(p, q, h - 1 / 3)
-    }
-
-    return (Math.min(Math.floor(SRgbColor(r) * 256), 255) << 16) |
-           (Math.min(Math.floor(SRgbColor(g) * 256), 255) << 8) |
-            Math.min(Math.floor(SRgbColor(b) * 256), 255)
-}
-
-function RgbToHls(color) {
-    const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
-    const g = LinearColor(((color & 0xff00) >>> 8) / 255)
-    const b = LinearColor((color & 0xff) / 255)
-
-    const max = Math.max(r, g, b)
-    const min = Math.min(r, g, b)
-    let h, s
-    const l = (max + min) / 2
-
-    if (max === min) {
-        /* Achromatic */
-        h = s = 0
-    } else {
-        const d = max - min
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-        switch (max) {
-        case r:
-            h = (g - b) / d + (g < b ? 6 : 0)
-            break
-        case g:
-            h = (b - r) / d + 2
-            break
-        case b:
-            h = (r - g) / d + 4
-            break
-        }
-        h /= 6
-    }
-
-    return {h, l, s}
-}
-
-function Lighten(color, factor) {
-    const hls = RgbToHls(color)
-    hls.l *= factor
-    if (hls.l > 1) {
-        hls.l = 1
-    }
-    return HlsToRgb(hls)
-}
-
-function Darken(color, factor) {
-    const hls = RgbToHls(color)
-    hls.l /= factor
-    return HlsToRgb(hls)
-}

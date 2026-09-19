@@ -79,6 +79,10 @@ export declare class DxfViewer {
     HasRenderer(): boolean
     Load(params: DxfViewerLoadParams): Promise<void>
     Render(): void
+    /** Change the frame buffer clear color, re-applying entity color correction to the loaded
+     * drawing. Takes effect immediately, unlike the `clearColor` constructor option.
+     */
+    SetClearColor(color: THREE.Color | number | string): void
     SetSize(width: number, height: number): void
     SetView(center: THREE.Vector3, width: number): void
     ShowLayer(name: string, show: boolean): void
