@@ -12,7 +12,70 @@ import {DefaultTextOptions} from "./TextRendererOptions.js"
  */
 
 /** Regex for parsing special characters in text entities. */
-const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))/gi
+const SPECIAL_CHARS_RE =
+    /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))|(?:\\M\+([1-5][0-9a-f]{4}))/gi
+
+/** TextDecoder labels for the code page selector digit of a "\M+" (MIF) escape. Indexed by the
+ * digit itself.
+ * //XXX Index 4 is Johab (code page 1361), which has no TextDecoder label, so such escapes are
+ * left undecoded.
+ */
+const MIF_CODE_PAGES = [null, "shift_jis", "big5", "euc-kr", null, "gbk"]
+
+/** Decoder per code page selector digit, created on first use. A null entry is a code page this
+ * environment cannot decode.
+ * @type {Map<number, ?TextDecoder>}
+ */
+const mifDecoders = new Map()
+
+/**
+ * @param {number} codePage Code page selector digit of a "\M+" escape.
+ * @returns {?TextDecoder} Null if the code page cannot be decoded here.
+ */
+function GetMifDecoder(codePage) {
+    if (mifDecoders.has(codePage)) {
+        return mifDecoders.get(codePage)
+    }
+    const label = MIF_CODE_PAGES[codePage] ?? null
+    let decoder = null
+    if (label !== null) {
+        try {
+            /* Fatal mode so that an invalid byte pair is rejected instead of silently becoming
+             * a replacement character.
+             */
+            decoder = new TextDecoder(label, {fatal: true})
+        } catch {
+            /* Environment without the legacy encodings compiled in. */
+            console.warn(`Code page not supported for MIF encoded text: ${label}`)
+        }
+    }
+    mifDecoders.set(codePage, decoder)
+    return decoder
+}
+
+/**
+ * Decode user data of a "\M+" (MIF) escape. Unlike "\U+", its four hex digits are a character code
+ * in the legacy code page selected by the leading digit, not a unicode code point.
+ * @param {string} data Five digits following "\M+".
+ * @returns {?string} Decoded character, null if it cannot be decoded.
+ */
+function DecodeMifChar(data) {
+    const code = parseInt(data.slice(1), 16)
+    /* Single byte values are not code page specific. */
+    if (code < 0x80) {
+        return String.fromCharCode(code)
+    }
+    const decoder = GetMifDecoder(parseInt(data.charAt(0)))
+    if (decoder === null) {
+        return null
+    }
+    const bytes = code < 0x100 ? [code] : [code >> 8, code & 0xff]
+    try {
+        return decoder.decode(new Uint8Array(bytes))
+    } catch {
+        return null
+    }
+}
 
 /**
  * Parse special characters in text entities and convert them to corresponding unicode
@@ -22,7 +85,7 @@ const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))/gi
  * @returns {string} String with special characters replaced.
  */
 export function ParseSpecialChars(text) {
-    return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
+    return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2, p3) => {
         if (p1 !== undefined) {
             switch (p1.toLowerCase()) {
             case "d":
@@ -46,6 +109,9 @@ export function ParseSpecialChars(text) {
                 return match
             }
             return String.fromCharCode(code)
+        } else if (p3 !== undefined) {
+            /* Undecodable sequence is left as is, same as reference implementations do. */
+            return DecodeMifChar(p3) ?? match
         }
         return match
     })

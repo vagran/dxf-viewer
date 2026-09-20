@@ -70,7 +70,8 @@ time. Most significant reason for missing implementation is lack of correspondin
    tuning, limits and tolerances). Dimensions types other than linear ones.
  * Leaders
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
-   parameter is ignored.
+   parameter is ignored. MIF encoded characters (`\M+nXXXX`) are decoded, except for the Johab code
+   page which the browser cannot decode.
  * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z
    (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
    processed.

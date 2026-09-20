@@ -47,6 +47,37 @@ test("\\U+XXXX escapes become their code point", () => {
     assert.strictEqual(ParseSpecialChars("\\U+00B"), "\\U+00B", "needs four digits")
 })
 
+test("\\M+nXXXX escapes are decoded through their code page", () => {
+    assert.strictEqual(ParseSpecialChars("\\M+5D7DF\\M+5CFDF\\M+5BCDC"), "走线架",
+                       "simplified Chinese, code page 936")
+    assert.strictEqual(ParseSpecialChars("\\M+18382"), "モ", "Japanese, code page 932")
+    assert.strictEqual(ParseSpecialChars("\\M+2A440"), "一",
+                       "traditional Chinese, code page 950")
+    assert.strictEqual(ParseSpecialChars("\\M+3B0A1"), "가", "Korean Wansung, code page 949")
+    assert.strictEqual(ParseSpecialChars("\\M+5d7df"), "走", "lower case hex")
+    assert.strictEqual(ParseSpecialChars("a\\M+5D7DFb"), "a走b", "in place")
+})
+
+test("\\M+nXXXX below 0x80 is the ASCII character", () => {
+    assert.strictEqual(ParseSpecialChars("\\M+10041"), "A")
+    assert.strictEqual(ParseSpecialChars("\\M+5005C"), "\\",
+                       "single byte values are not code page specific")
+})
+
+test("\\M+nXXXX which cannot be decoded is left alone", () => {
+    assert.strictEqual(ParseSpecialChars("\\M+48861"), "\\M+48861",
+                       "Johab (code page 1361) is not supported")
+    assert.strictEqual(ParseSpecialChars("\\M+6D7DF"), "\\M+6D7DF", "code page out of 1-5")
+    assert.strictEqual(ParseSpecialChars("\\M+5D7D"), "\\M+5D7D", "needs four hex digits")
+    assert.strictEqual(ParseSpecialChars("\\M+5ZZZZ"), "\\M+5ZZZZ", "not hex, so not a code")
+    assert.strictEqual(ParseSpecialChars("\\M+5FFFF"), "\\M+5FFFF",
+                       "not a character in that code page")
+})
+
+test("\\M+nXXXX has fixed width and does not swallow what follows", () => {
+    assert.strictEqual(ParseSpecialChars("\\M+5D7DF\\M+5CFDFM+5BCDC"), "走线M+5BCDC")
+})
+
 /** The parsed tree as nested plain data, so a test can state the whole expected shape at once. */
 function Parse(text) {
     const parser = new MTextFormatParser()
