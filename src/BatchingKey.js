@@ -2,13 +2,13 @@
 export class BatchingKey {
     /**
      * Components order matters for lookup by prefix.
-     * @param layerName {?String} Layer name, null if not bound to a layer (e.g. block definition
+     * @param {?String} layerName Layer name, null if not bound to a layer (e.g. block definition
      *  without layer specified).
-     * @param blockName {?String} Block name if applicable. If specified and geometryType is not
+     * @param {?String} blockName Block name if applicable. If specified and geometryType is not
      *  BLOCK_INSTANCE, the batch is part of block definition. Otherwise it is block instance.
-     * @param geometryType {?number} One of BatchingKey.GeometryType.
-     * @param color {number} Color ARGB value.
-     * @param lineType {?number} Line type ID, null for non-lines. Zero is default type (solid
+     * @param {?number} geometryType One of BatchingKey.GeometryType.
+     * @param {number} color Color ARGB value.
+     * @param {?number} lineType Line type ID, null for non-lines. Zero is default type (solid
      *  line).
      */
     constructor(layerName, blockName, geometryType, color, lineType) {

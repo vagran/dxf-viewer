@@ -211,10 +211,10 @@ export class MTextFormatParser {
         EmitText()
     }
 
-    /** @typedef MTextFormatEntity
-     * @property type One of EntityType
+    /** @typedef {object} MTextFormatEntity
+     * @property {number} type One of EntityType
      *
-     * @return {MTextFormatEntity[]} List of format chunks. Each chunk is either a text chunk with
+     * @returns {MTextFormatEntity[]} List of format chunks. Each chunk is either a text chunk with
      * TEXT type or some format entity. Entity with type SCOPE represents format scope which has
      * nested list of entities in "content" property.
      */

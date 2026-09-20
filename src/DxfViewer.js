@@ -20,9 +20,10 @@ const MessageLevel = Object.freeze({
 export class DxfViewer {
 
     /**
-     * @param domContainer Container element to create the canvas in. Usually empty div. Should not
-     *  have padding if auto-resize feature is used.
-     * @param options Some options can be overridden if specified. See DxfViewer.DefaultOptions.
+     * @param {HTMLElement} domContainer Container element to create the canvas in. Usually empty
+     *  div. Should not have padding if auto-resize feature is used.
+     * @param {?object} options Some options can be overridden if specified. See
+     *  DxfViewer.DefaultOptions.
      */
     constructor(domContainer, options = null) {
         this.domContainer = domContainer
@@ -121,7 +122,9 @@ export class DxfViewer {
         /* Indexed by block name, value is Block instance. */
         this.blocks = new Map()
 
-        /** Set during data loading. */
+        /** Set during data loading.
+         * @private
+         */
         this.worker = null
     }
 
@@ -140,14 +143,22 @@ export class DxfViewer {
         return this.renderer
     }
 
+    /** @returns {HTMLCanvasElement} The canvas the viewer renders into. */
     GetCanvas() {
         return this.canvas
     }
 
+    /** @returns {?object} The parsed document. Retained only when the `retainParsedDxf` option
+     *  is set, null otherwise.
+     */
     GetDxf() {
         return this.parsedDxf
     }
 
+    /** Resize the canvas, keeping the current view centre and scale.
+     * @param {number} width New canvas width in pixels.
+     * @param {number} height New canvas height in pixels.
+     */
     SetSize(width, height) {
         this._EnsureRenderer()
 
@@ -177,18 +188,19 @@ export class DxfViewer {
     }
 
     /** Load DXF into the viewer. Old content is discarded, state is reset.
-     * @param {string} url DXF file URL.
-     * @param {?string[]} fonts List of font URLs. Files should have typeface.js format. Fonts are
-     *  used in the specified order, each one is checked until necessary glyph is found. Text is not
-     *  rendered if fonts are not specified.
-     * @param {?Function} progressCbk (phase, processedSize, totalSize)
+     * @param {object} params
+     * @param {string} params.url DXF file URL.
+     * @param {?string[]} params.fonts List of font URLs. Files should have typeface.js format.
+     *  Fonts are used in the specified order, each one is checked until necessary glyph is found.
+     *  Text is not rendered if fonts are not specified.
+     * @param {?Function} params.progressCbk (phase, processedSize, totalSize)
      *  Possible phase values:
      *  * "font"
      *  * "fetch"
      *  * "parse"
      *  * "prepare"
-     * @param {?Function} workerFactory Factory for worker creation. The worker script should
-     *  invoke DxfViewer.SetupWorker() function.
+     * @param {?Function} params.workerFactory Factory for worker creation. The worker script
+     *  should invoke DxfViewer.SetupWorker() function.
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
         if (url === null || url === undefined) {
@@ -260,12 +272,18 @@ export class DxfViewer {
         this.Render()
     }
 
+    /** Draw the current scene into the canvas. The viewer renders on its own whenever the view
+     *  or the layer visibility changes, so this is only needed after modifying the scene
+     *  returned by GetScene().
+     */
     Render() {
         this._EnsureRenderer()
         this.renderer.render(this.scene, this.camera)
     }
 
-    /** @return {Iterable<{name:String, color:number}>} List of layer names. */
+    /** @param {boolean} nonEmptyOnly Skip layers which carry no geometry.
+     * @returns {Iterable<{name:String, color:number}>} List of layer names.
+     */
     GetLayers(nonEmptyOnly = false) {
         const result = []
         for (const lyr of this.layers.values()) {
@@ -281,6 +299,10 @@ export class DxfViewer {
         return result
     }
 
+    /** Show or hide a layer. Does nothing if no such layer is present in the drawing.
+     * @param {string} name Layer name, as GetLayers() reports it.
+     * @param {boolean} show True to show the layer, false to hide it.
+     */
     ShowLayer(name, show) {
         this._EnsureRenderer()
         const layer = this.layers.get(name)
@@ -298,7 +320,7 @@ export class DxfViewer {
      *  and the entity colors are corrected against it again. Safe to call before anything is
      *  loaded, where it only establishes the background color.
      *
-     * @param color {number|string|three.Color} New clear color. The alpha value is not changed, see
+     * @param {number|string|three.Color} color New clear color. The alpha value is not changed, see
      *      the `clearAlpha` option.
      */
     SetClearColor(color) {
@@ -370,6 +392,11 @@ export class DxfViewer {
         this.renderer = null
     }
 
+    /** Set the view to a centre point and a width, the height following from the canvas aspect
+     *  ratio.
+     * @param {three.Vector3} center View centre in scene coordinates. Only X and Y are used.
+     * @param {number} width View width in scene coordinates.
+     */
     SetView(center, width) {
         const aspect = this.canvasWidth / this.canvasHeight
         const height = width / aspect
@@ -390,7 +417,13 @@ export class DxfViewer {
         this._Emit("viewChanged")
     }
 
-    /** Set view to fit the specified bounds. */
+    /** Set view to fit the specified bounds.
+     * @param {number} minX
+     * @param {number} maxX
+     * @param {number} minY
+     * @param {number} maxY
+     * @param {number} padding Fraction of the fitted size to leave as a margin.
+     */
     FitView(minX, maxX, minY, maxY, padding = 0.1) {
         const aspect = this.canvasWidth / this.canvasHeight
         let width = maxX - minX
@@ -405,25 +438,25 @@ export class DxfViewer {
         this.SetView(center, width * (1 + padding))
     }
 
-    /** @return {Scene} three.js scene for the viewer. Can be used to add custom entities on the
-     *      scene. Remember to apply scene origin available via GetOrigin() method.
+    /** @returns {three.Scene} three.js scene for the viewer. Can be used to add custom entities
+     *      on the scene. Remember to apply scene origin available via GetOrigin() method.
      */
     GetScene() {
         return this.scene
     }
 
-    /** @return {OrthographicCamera} three.js camera for the viewer. */
+    /** @returns {three.OrthographicCamera} three.js camera for the viewer. */
     GetCamera() {
         return this.camera
     }
 
-    /** @return {Vector2} Scene origin in global drawing coordinates. */
+    /** @returns {three.Vector2} Scene origin in global drawing coordinates. */
     GetOrigin() {
         return this.origin
     }
 
     /**
-     * @return {?{maxX: number, maxY: number, minX: number, minY: number}} Scene bounds in model
+     * @returns {?{maxX: number, maxY: number, minX: number, minY: number}} Scene bounds in model
      *      space coordinates. Null if empty scene.
      */
     GetBounds() {
@@ -440,8 +473,8 @@ export class DxfViewer {
      *  * "viewChanged"
      *  * "message" - Some message from the viewer. {message: string, level: string}.
      *
-     * @param eventName {string}
-     * @param eventHandler {function} Accepts event object.
+     * @param {string} eventName
+     * @param {function} eventHandler Accepts event object.
      */
     Subscribe(eventName, eventHandler) {
         this._EnsureRenderer()
@@ -451,8 +484,8 @@ export class DxfViewer {
     /** Unsubscribe from previously subscribed event. The arguments should match previous
      * Subscribe() call.
      *
-     * @param eventName {string}
-     * @param eventHandler {function}
+     * @param {string} eventName
+     * @param {function} eventHandler
      */
     Unsubscribe(eventName, eventHandler) {
         this._EnsureRenderer()
@@ -510,7 +543,9 @@ export class DxfViewer {
         })
     }
 
-    /** @return {{x,y}} Scene coordinate corresponding to the specified canvas pixel coordinates. */
+    /** @returns {{x: number, y: number}} Scene coordinate corresponding to the specified canvas
+     *  pixel coordinates.
+     */
     _CanvasToSceneCoord(x, y) {
         const v = new three.Vector3(x * 2 / this.canvasWidth - 1,
                                     -y * 2 / this.canvasHeight + 1,
@@ -538,10 +573,10 @@ export class DxfViewer {
         }
     }
 
-    /** @param color {number} Color RGB numeric value, as the drawing specifies it - before the
+    /** @param {number} color Color RGB numeric value, as the drawing specifies it - before the
      *      contrast correction. The material cache is keyed by this color so that the correction
      *      can be re-applied to the existing materials when the background changes.
-     * @param instanceType {number}
+     * @param {number} instanceType
      */
     _GetSimpleColorMaterial(color, instanceType = InstanceType.NONE) {
         const key = new MaterialKey(instanceType, null, color, 0)
@@ -575,8 +610,8 @@ export class DxfViewer {
         })
     }
 
-    /** @param color {number} Color RGB numeric value.
-     * @param instanceType {number}
+    /** @param {number} color Color RGB numeric value.
+     * @param {number} instanceType
      */
     _CreateSimpleColorMaterialInstance(color, instanceType = InstanceType.NONE) {
         const src = this.simpleColorMaterial[instanceType]
@@ -586,10 +621,10 @@ export class DxfViewer {
         return m
     }
 
-    /** @param color {number} Color RGB numeric value, as the drawing specifies it - before the
+    /** @param {number} color Color RGB numeric value, as the drawing specifies it - before the
      *      contrast correction. The material cache is keyed by this color so that the correction
      *      can be re-applied to the existing materials when the background changes.
-     * @param instanceType {number}
+     * @param {number} instanceType
      */
     _GetSimplePointMaterial(color, instanceType = InstanceType.NONE) {
         const key = new MaterialKey(instanceType, BatchingKey.GeometryType.POINTS, color, 0)
@@ -625,9 +660,9 @@ export class DxfViewer {
         })
     }
 
-    /** @param color {number} Color RGB numeric value.
-     * @param size {number} Rasterized point size in pixels.
-     * @param instanceType {number}
+    /** @param {number} color Color RGB numeric value.
+     * @param {number} size Rasterized point size in pixels.
+     * @param {number} instanceType
      */
     _CreateSimplePointMaterialInstance(color, size = 2, instanceType = InstanceType.NONE) {
         const src = this.simplePointMaterial[instanceType]
@@ -712,8 +747,8 @@ export class DxfViewer {
     }
 
     /** Ensure the color is contrast enough with current background color.
-     * @param color {number} RGB value.
-     * @return {number} RGB value to use for rendering.
+     * @param {number} color RGB value.
+     * @returns {number} RGB value to use for rendering.
      */
     _TransformColor(color) {
         return TransformColor(color, this.clearColor, this.options.colorCorrection,
@@ -793,8 +828,8 @@ const InstanceType = Object.freeze({
 class Batch {
     /**
      * @param {DxfViewer} viewer
-     * @param scene Serialized scene.
-     * @param batch Serialized scene batch.
+     * @param {object} scene Serialized scene.
+     * @param {object} batch Serialized scene batch.
      */
     constructor(viewer, scene, batch) {
         this.viewer = viewer
@@ -939,7 +974,7 @@ class Batch {
     }
 
     /**
-     * @param {InstancedBufferGeometry} geometry
+     * @param {three.InstancedBufferGeometry} geometry
      */
     _SetInstanceTransformAttribute(geometry) {
         if (!geometry.isInstancedBufferGeometry) {
@@ -969,7 +1004,7 @@ class Batch {
 
     /**
      * @param {Batch} blockBatch Block definition batch.
-     * @return {number} RGB color value for a block instance.
+     * @returns {number} RGB color value for a block instance.
      */
     _GetInstanceColor(blockBatch) {
         const defColor = blockBatch.key.color
@@ -1010,7 +1045,7 @@ class Block {
         this.batches = []
     }
 
-    /** @param batch {Batch} */
+    /** @param {Batch} batch */
     PushBatch(batch) {
         this.batches.push(batch)
     }

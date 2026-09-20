@@ -17,6 +17,7 @@ const ANGLE_EPS = 1e-6
 export class Pattern {
     /**
      * @param {PatternLineDef[]} lines
+     * @param {?string} name Pattern name, null for an unnamed pattern.
      * @param {boolean} offsetInLineSpace Line offset is defined in line space when true, in pattern
      *  space when false. Pattern space offset is the observed behavior of AutoDesk viewer for
      *  patterns defined in hatch entity itself.
@@ -59,8 +60,8 @@ export class Pattern {
      * pattern or half a turn from it, depending on which of the two rotations is accounted for.
      * Comparing the internal structure sidesteps the question, and a placeholder is a single line
      * at 135 where the name means three horizontal ones, so the line count still separates them.
-     * @param named {Pattern} Pattern to compare with, normally the one found by name.
-     * @return {boolean}
+     * @param {Pattern} named Pattern to compare with, normally the one found by name.
+     * @returns {boolean}
      */
     ContradictsNamedPattern(named) {
         if (this.lines.length != named.lines.length) {
@@ -95,6 +96,10 @@ export class Pattern {
         return false
     }
 
+    /** Parse a pattern from the content of a .pat file.
+     * @param {string} content Whole file content.
+     * @returns {Pattern} The parsed pattern.
+     */
     static ParsePatFile(content) {
         const lines = content.split(/\r?\n/)
         if (lines.length < 2) {
@@ -151,7 +156,11 @@ export class Pattern {
 const patternsRegistryMetric = new Map()
 const patternsRegistryImperial = new Map()
 
-/** @param {Pattern} pattern */
+/** Add a pattern to the registry its name is looked up in.
+ * @param {Pattern} pattern Must be named; an anonymous pattern throws.
+ * @param {boolean} isMetric Register in the metric registry when true, the imperial one when
+ *  false. The two are selected by the drawing's $MEASUREMENT variable.
+ */
 export function RegisterPattern(pattern, isMetric = true) {
     if (!pattern.name) {
         throw new Error("Anonymous pattern cannot be registered")
@@ -165,7 +174,11 @@ export function RegisterPattern(pattern, isMetric = true) {
     registry.set(name, pattern)
 }
 
-/** @return {?Pattern} */
+/** Find a registered pattern by name, case-insensitively.
+ * @param {string} name Pattern name.
+ * @param {boolean} isMetric Which registry to search. See RegisterPattern().
+ * @returns {?Pattern} Null if no pattern of that name is registered.
+ */
 export function LookupPattern(name, isMetric = true) {
     return (isMetric ? patternsRegistryMetric : patternsRegistryImperial)
         .get(name.toUpperCase()) ?? null

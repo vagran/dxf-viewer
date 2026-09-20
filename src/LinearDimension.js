@@ -2,12 +2,14 @@ import {Vector2, Matrix3} from "three"
 import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
 import {ParseSpecialChars} from "./TextRenderer.js"
 
-/**
- * @property {{color: ?number, start: Vector2, end: Vector2}[]} lines
- * @property {{color: ?number, vertices: Vector2[]}[], indices: number[]} triangles On or more
- *  triangles in each item.
- * @property {{text: string, size: number, angle: number, color: number, position: Vector2}[]} texts
- *   Each item position is specified as middle point of the rendered text.
+/** Geometry produced for one DIMENSION entity: the lines, filled triangles and text placements
+ * that render it. Populated by LinearDimension and consumed by DxfScene.
+ *
+ * @property {Array<{color: ?number, start: Vector2, end: Vector2}>} lines
+ * @property {Array<{color: ?number, vertices: Vector2[], indices: number[]}>} triangles One or
+ *  more triangles in each item.
+ * @property {Array<{text: string, size: number, angle: number, color: number, position: Vector2}>}
+ *  texts Each item position is specified as middle point of the rendered text.
  */
 export class DimensionLayout {
     constructor() {
@@ -57,8 +59,8 @@ export class LinearDimension {
 
     /**
      * @param {LinearDimensionParams} params
-     * @param {Function<any(string)>} styleResolver Provides value for a requested style parameter.
-     * @param {Function<number(string, number)>} textWidthCalculator Get text width in model space
+     * @param {function(string): *} styleResolver Provides value for a requested style parameter.
+     * @param {function(string, number): number} textWidthCalculator Get text width in model space
      *  units for a given text and font size (height).
      */
     constructor(params, styleResolver, textWidthCalculator) {
@@ -79,7 +81,7 @@ export class LinearDimension {
     }
 
     /**
-     * @return {DimensionLayout}
+     * @returns {DimensionLayout}
      */
     GenerateLayout() {
         /* See https://ezdxf.readthedocs.io/en/stable/tables/dimstyle_table_entry.html */

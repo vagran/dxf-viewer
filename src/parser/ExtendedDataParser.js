@@ -13,7 +13,7 @@ export default class ExtendedDataParser {
 
     /**
      * Feed next token.
-     * @return {boolean} True if new parser instance should be created for this token.
+     * @returns {boolean} True if new parser instance should be created for this token.
      */
     Feed(curr) {
         if (!this.appName) {

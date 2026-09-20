@@ -26,7 +26,7 @@ const ENDPOINT_MARGIN = 1e-6
  */
 const ON_EDGE_MARGIN = 1e-6
 
-/** @return {boolean} True if both edges crossed from the same side, false otherwise. */
+/** @returns {boolean} True if both edges crossed from the same side, false otherwise. */
 function EdgeSameSide(e1, e2) {
     return (e1.intersection[2] > 0 && e2.intersection[2] > 0) ||
            (e1.intersection[2] < 0 && e2.intersection[2] < 0)
@@ -35,7 +35,7 @@ function EdgeSameSide(e1, e2) {
 /** Context for one line clipping calculations. */
 class ClipCalculator {
 
-    /** @param endpointMargin {number} `ENDPOINT_MARGIN` as a distance, from
+    /** @param {number} endpointMargin `ENDPOINT_MARGIN` as a distance, from
      *  `HatchCalculator._GetEndpointMargin()`. Converted into edge parameter space one edge at a
      *  time in `_ProcessEdges()`.
      */
@@ -62,8 +62,8 @@ class ClipCalculator {
     }
 
     /**
-     * @return {number[2][]} List of resulting line segments in parametric form. Parameter value 0
-     *  corresponds to the provided line start point, 1 - to end point.
+     * @returns {Array<number[]>} List of resulting line segments in parametric form. Parameter
+     *  value 0 corresponds to the provided line start point, 1 - to end point.
      */
     Calculate() {
         this._ProcessEdges()
@@ -190,11 +190,11 @@ class ClipCalculator {
     }
 
     /**
-     * @param {Edge} edge
+     * @param {object} edge Boundary edge, as `_ProcessEdges()` builds them.
      * @param {boolean} isStartVtx True for connected through start vertex, false for end vertex.
-     * @return {[?Edge, boolean]} Connected valid edge if found, null if not found (e.g. is the same
-     *  edge for some reason). Second value is true if directly connected, false if though colinear
-     *  edges.
+     * @returns {Array} Two-element array. First is the connected valid edge if found, null if
+     *  not found (e.g. is the same edge for some reason). Second value is true if directly
+     *  connected, false if though colinear edges.
      */
     _GetConnectedEdge(edge, isStartVtx) {
         const loop = this.loops[edge.loopIdx]
@@ -311,7 +311,7 @@ class ClipCalculator {
  * make sure it does not.
  * @param {Vector2} pt
  * @param {Vector2[]} loop
- * @return {boolean} True if the point is inside the loop.
+ * @returns {boolean} True if the point is inside the loop.
  */
 function IsPointInsideLoop(pt, loop) {
     let inside = false
@@ -329,7 +329,7 @@ function IsPointInsideLoop(pt, loop) {
 /**
  * @param {Vector2} pt
  * @param {Vector2[]} loop
- * @return {boolean} True if the point lies on one of the loop's edges.
+ * @returns {boolean} True if the point lies on one of the loop's edges.
  */
 function IsPointOnLoop(pt, loop) {
     for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
@@ -367,7 +367,7 @@ function IsPointOnLoop(pt, loop) {
  *
  * @param {Vector2[]} inner
  * @param {Vector2[]} outer
- * @return {boolean}
+ * @returns {boolean}
  */
 function IsLoopInsideLoop(inner, outer) {
     for (let i = 0, j = inner.length - 1; i < inner.length; j = i++) {
@@ -391,7 +391,7 @@ export class HatchCalculator {
      * Arrays of `Path` to use as boundary, and each `Path` is array of `Point`.
      *
      * @param {Vector2[][]} boundaryLoops
-     * @param {HatchStyle} style
+     * @param {number} style One of HatchStyle values.
      */
     constructor(boundaryLoops, style) {
         this.boundaryLoops = boundaryLoops
@@ -401,9 +401,9 @@ export class HatchCalculator {
     /**
      * Clip `line` using strategy defined by `this.style`
      *
-     * @param {[Vector2, Vector2]} line Line segment defined by start and end points. Assuming start
-     *  and end points lie out of the boundary loops specified in the constructor.
-     * @returns {[number, number][]} Parameter ranges along the input line which are inside the
+     * @param {Vector2[]} line Line segment defined by start and end points. Assuming start and
+     *  end points lie out of the boundary loops specified in the constructor.
+     * @returns {Array<number[]>} Parameter ranges along the input line which are inside the
      *  boundary, ordered and non-overlapping. Zero is the start point and one is the end point, so
      *  the caller scales them back out along the line vector.
      */
@@ -412,7 +412,7 @@ export class HatchCalculator {
                                   this._GetEndpointMargin()).Calculate()
     }
 
-    /** @return {number} `ENDPOINT_MARGIN` as a distance in the boundary's own units, taken from
+    /** @returns {number} `ENDPOINT_MARGIN` as a distance in the boundary's own units, taken from
      *  the boundary's bounding box so that it means the same thing whatever the drawing's scale.
      *
      *  Computed once and kept: the boundary does not move, and a patterned hatch clips tens of
@@ -450,8 +450,8 @@ export class HatchCalculator {
      * `THROUGH_ENTIRE_AREA` there are no holes at all - every outermost loop is filled solid,
      * matching what `ClipLine()` does for a patterned hatch of the same style.
      *
-     * @return {{contour: Vector2[], holes: Vector2[][]}[]} Loops which enclose no area are
-     *  dropped.
+     * @returns {Array<{contour: Vector2[], holes: Vector2[][]}>} Loops which enclose no area
+     *  are dropped.
      */
     GetSolidRegions() {
         const throughAll = this.style == HatchStyle.THROUGH_ENTIRE_AREA
@@ -516,10 +516,11 @@ export class HatchCalculator {
     }
 
     /**
-     * @param {Vector2} seedPoint Pattern seed point coordinates in OCS.
-     * @param {?number} angle Pattern rotation angle in radians.
-     * @param {?number} scale Pattern scale.
-     * @return {Matrix3} Transformation from OCS to pattern space.
+     * @param {object} params
+     * @param {Vector2} params.seedPoint Pattern seed point coordinates in OCS.
+     * @param {?number} params.angle Pattern rotation angle in radians.
+     * @param {?number} params.scale Pattern scale.
+     * @returns {Matrix3} Transformation from OCS to pattern space.
      */
     GetPatternTransform({seedPoint, angle, scale}) {
         const m = new Matrix3().makeTranslation(-seedPoint.x, -seedPoint.y)
@@ -533,11 +534,12 @@ export class HatchCalculator {
     }
 
     /**
-     * @param {Matrix3} patTransform Transformation from OCS to pattern space previously obtained by
-     *      GetPatternTransform() method.
-     * @param {?Vector2} basePoint Line base point coordinate in pattern space.
-     * @param {?number} angle Line direction angle in radians, CCW from +X direction.
-     * @return {Matrix3} Transformation from OCS to pattern line space. Line is started at origin
+     * @param {object} params
+     * @param {Matrix3} params.patTransform Transformation from OCS to pattern space previously
+     *      obtained by GetPatternTransform() method.
+     * @param {?Vector2} params.basePoint Line base point coordinate in pattern space.
+     * @param {?number} params.angle Line direction angle in radians, CCW from +X direction.
+     * @returns {Matrix3} Transformation from OCS to pattern line space. Line is started at origin
      *  and directed into position X axis direction.
      */
     GetLineTransform({patTransform, basePoint, angle}) {
@@ -553,7 +555,7 @@ export class HatchCalculator {
 
     /**
      * @param {Matrix3} transform Transformation from OCS to target coordinates space.
-     * @return {Box2} Pattern AABB in target coordinate space.
+     * @returns {Box2} Pattern AABB in target coordinate space.
      */
     GetBoundingBox(transform) {
         const box = new Box2()

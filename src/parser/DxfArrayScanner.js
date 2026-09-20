@@ -6,7 +6,7 @@
  *
  * Reads through an array representing lines of a dxf file. Takes an array and
  * provides an easy interface to extract group code and value pairs.
- * @param data - an array where each element represents a line in the dxf file
+ * @param {string[]} data - an array where each element represents a line in the dxf file
  * @constructor
  */
 export default function DxfArrayScanner(data) {
@@ -110,8 +110,8 @@ DxfArrayScanner.prototype.isEOF = function() {
  * Parse a value to its proper type.
  * See pages 3 - 10 of the AutoCad DXF 2012 reference given at the top of this file
  *
- * @param code
- * @param value
+ * @param {number} code
+ * @param {string} value
  * @returns {*}
  */
 function parseGroupValue(code, value) {
@@ -191,7 +191,7 @@ function parseGroupValue(code, value) {
 
 /**
  * Parse a boolean according to a 1 or 0 value
- * @param str
+ * @param {string} str
  * @returns {boolean}
  */
 function parseBoolean(str) {

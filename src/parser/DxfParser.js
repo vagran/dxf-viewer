@@ -161,7 +161,7 @@ DxfParser.prototype._parse = function(dxfString) {
 
     /**
      *
-     * @return {object} header
+     * @returns {object} header
      */
     var parseHeader = function() {
         // interesting variables:
@@ -315,7 +315,7 @@ DxfParser.prototype._parse = function(dxfString) {
 
     /**
      * parseTables
-     * @return {Object} Object representing tables
+     * @returns {Object} Object representing tables
      */
     var parseTables = function() {
         var tables = {}
@@ -822,7 +822,7 @@ DxfParser.prototype._parse = function(dxfString) {
     /**
      * Is called after the parser first reads the 0:ENTITIES group. The scanner
      * should be on the start of the first entity already.
-     * @return {Array} the resulting entities
+     * @returns {Array} the resulting entities
      */
     var parseEntities = function(forBlock) {
         var entities = []
@@ -868,7 +868,7 @@ DxfParser.prototype._parse = function(dxfString) {
      * Parses a 2D or 3D point, returning it as an object with x, y, and (sometimes) z property if
      * it is 3D. It is assumed the current group is x of the point being read in, and scanner.next()
      * will return the y. The parser will determine if there is a z point automatically.
-     * @return {Object} The 2D or 3D point as an object with x, y[, z]
+     * @returns {Object} The 2D or 3D point as an object with x, y[, z]
      */
     var parsePoint = function() {
         var point = {},
@@ -920,7 +920,7 @@ function debugCode(curr) {
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
- * @return {Number} truecolor value as a number
+ * @returns {Number} truecolor value as a number
  */
 function getAcadColor(index) {
     return AUTO_CAD_COLOR_INDEX[index]

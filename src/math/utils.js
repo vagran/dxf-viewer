@@ -8,7 +8,7 @@ import {Matrix3, Vector2} from "three"
  * @param {Vector2} b2 Second segment end point.
  * @param {boolean} force Force intersection calculation even if intersection point is out of
  *  segment range.
- * @return {?number[3]} Parameters for the first and second segment in the intersection point
+ * @returns {?Array<number>} Parameters for the first and second segment in the intersection point
  *  (parameter value 0 corresponds to a start point, 1 - to an end point). Third number is segments
  *  direction vectors pseudo-cross-product. Null if there is no intersection.
  */
@@ -48,7 +48,7 @@ export function IntersectSegmentsParametric(a1, a2, b1, b2, force = false) {
  * @param {Vector2} a2 First segment end point.
  * @param {Vector2} b1 Second segment start point.
  * @param {Vector2} b2 Second segment end point.
- * @return {?Vector2} Intersection point coordinate, null if no intersection.
+ * @returns {?Vector2} Intersection point coordinate, null if no intersection.
  */
 export function IntersectSegments(a1, a2, b1, b2) {
     const params = IntersectSegmentsParametric(a1, a2, b1, b2)
@@ -69,7 +69,7 @@ const _m = new Matrix3()
  * @param {Matrix3} m Matrix to transform.
  * @param {number} tx
  * @param {number} ty
- * @return {Matrix3} The same matrix, for chaining.
+ * @returns {Matrix3} The same matrix, for chaining.
  */
 export function MatrixTranslate(m, tx, ty) {
     return m.premultiply(_m.makeTranslation(tx, ty))
@@ -79,7 +79,7 @@ export function MatrixTranslate(m, tx, ty) {
  * @param {Matrix3} m Matrix to transform.
  * @param {number} sx
  * @param {number} sy
- * @return {Matrix3} The same matrix, for chaining.
+ * @returns {Matrix3} The same matrix, for chaining.
  */
 export function MatrixScale(m, sx, sy) {
     return m.premultiply(_m.makeScale(sx, sy))
@@ -90,7 +90,7 @@ export function MatrixScale(m, sx, sy) {
  * in the clockwise convention.
  * @param {Matrix3} m Matrix to transform.
  * @param {number} theta Rotation angle in radians, clockwise from +X direction.
- * @return {Matrix3} The same matrix, for chaining.
+ * @returns {Matrix3} The same matrix, for chaining.
  */
 export function MatrixRotateCW(m, theta) {
     return m.premultiply(_m.makeRotation(-theta))

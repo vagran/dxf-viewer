@@ -1,8 +1,8 @@
 /** Typed-array-based buffer which can be dynamically extended. */
 export class DynamicBuffer {
     /**
-     * @param type Array type, see NativeType.
-     * @param initialCapacity Initial capacity, number of elements.
+     * @param {number} type Array type, see NativeType.
+     * @param {number} initialCapacity Initial capacity, number of elements.
      */
     constructor(type, initialCapacity = 16) {
         this.type = type
@@ -17,7 +17,7 @@ export class DynamicBuffer {
 
     /**
      * Append new value to the buffer end.
-     * @return Appended value position in the buffer.
+     * @returns {number} Appended value position in the buffer.
      */
     Push(value) {
         this._CheckGrow()
@@ -35,10 +35,11 @@ export class DynamicBuffer {
     }
 
     /** Copy content to the specified buffer.
-     * @param dstBuffer Destination buffer, should be typed array of the same type.
-     * @param dstOffset {number} Offset in elements in the destination buffer.
-     * @param srcOffset {number} Offset in elements in this buffer.
-     * @param size {number} Number of elements to copy, -1 (default) to copy till this buffer end.
+     * @param {ArrayBufferView} dstBuffer Destination buffer, should be typed array of the same
+     *  type.
+     * @param {number} dstOffset Offset in elements in the destination buffer.
+     * @param {number} srcOffset Offset in elements in this buffer.
+     * @param {number} size Number of elements to copy, -1 (default) to copy till this buffer end.
      */
     CopyTo(dstBuffer, dstOffset, srcOffset = 0, size = -1) {
         if (size === -1) {

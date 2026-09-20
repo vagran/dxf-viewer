@@ -3,7 +3,7 @@ import ExtendedDataParser from "./ExtendedDataParser.js"
 
 /**
  * Returns the truecolor value of the given AutoCad color index value
- * @return {Number} truecolor value as a number
+ * @returns {Number} truecolor value as a number
  */
 export function getAcadColor(index) {
     return AUTO_CAD_COLOR_INDEX[index]
@@ -47,7 +47,7 @@ export function parsePoint(scanner) {
 /** Some entities may contain embedded object which is started by group 101. All the rest data until
  * end of entity should not be interpreted as entity attributes. There is no documentation for this
  * feature.
- * @param scanner
+ * @param {object} scanner DxfArrayScanner positioned at the group to skip.
  */
 export function skipEmbeddedObject(scanner) {
     /* Ensure proper start group. */

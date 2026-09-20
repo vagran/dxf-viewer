@@ -18,8 +18,8 @@ function SRgbColor(c) {
 
 /** Get relative luminance value for a color.
  * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#relativeluminancedef
- * @param color {number} RGB color value.
- * @return {number} Luminance value in range [0; 1].
+ * @param {number} color RGB color value.
+ * @returns {number} Luminance value in range [0; 1].
  */
 export function Luminance(color) {
     const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
@@ -32,9 +32,9 @@ export function Luminance(color) {
 /**
  * Get contrast ratio for a color pair.
  * https://www.w3.org/TR/2008/REC-WCAG20-20081211/#contrast-ratiodef
- * @param c1
- * @param c2
- * @return {number} Contrast ratio between the colors. Greater than one if the first color color is
+ * @param {number} c1 First RGB color value.
+ * @param {number} c2 Second RGB color value.
+ * @returns {number} Contrast ratio between the colors. Greater than one if the first color color is
  *  brighter than the second one.
  */
 export function ContrastRatio(c1, c2) {
@@ -152,8 +152,8 @@ function LabCurve(t) {
 /** CIE L*a*b* chroma of a color, against the D65 white point. Near zero for a grey - the matrix
  *  rows and the white point are not the same numbers to the last digit, so an achromatic color
  *  lands within a few millionths of the axis rather than exactly on it.
- * @param color {number} RGB color value.
- * @return {number} Chroma.
+ * @param {number} color RGB color value.
+ * @returns {number} Chroma.
  */
 export function Chroma(color) {
     const r = LinearColor(((color & 0xff0000) >>> 16) / 255)
@@ -175,12 +175,12 @@ export function Chroma(color) {
 
 /**
  * Ensure the color is contrast enough with the specified background color.
- * @param color {number} RGB value.
- * @param clearColor {number} Background RGB value.
- * @param colorCorrection {boolean} Adjust every color which is too close to the background.
- * @param blackWhiteInversion {boolean} Invert pure white and black colors which are invisible
+ * @param {number} color RGB value.
+ * @param {number} clearColor Background RGB value.
+ * @param {boolean} colorCorrection Adjust every color which is too close to the background.
+ * @param {boolean} blackWhiteInversion Invert pure white and black colors which are invisible
  *  against the background.
- * @return {number} RGB value to use for rendering.
+ * @returns {number} RGB value to use for rendering.
  */
 export function TransformColor(color, clearColor, colorCorrection, blackWhiteInversion) {
     if (!colorCorrection && !blackWhiteInversion) {

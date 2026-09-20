@@ -2,12 +2,15 @@ import DxfParser from "./parser/DxfParser.js"
 
 /** Fetches and parses DXF file. */
 export class DxfFetcher {
+    /** @param {string} url DXF file URL.
+     * @param {string} encoding Encoding to decode the file with.
+     */
     constructor(url, encoding = "utf-8") {
         this.url = url
         this.encoding = encoding
     }
 
-    /** @param progressCbk {Function} (phase, receivedSize, totalSize) */
+    /** @param {Function} progressCbk (phase, receivedSize, totalSize) */
     async Fetch(progressCbk = null) {
         const response = await fetch(this.url)
         /* Without this the error body is fed to the parser as if it were a drawing, and an HTTP

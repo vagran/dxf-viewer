@@ -6,6 +6,11 @@ import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
 import {MTextFormatParser} from "./MTextFormatParser.js"
 import {DefaultTextOptions} from "./TextRendererOptions.js"
 
+/** Brings the typedef into scope for the type checker. jsdoc ignores the tag and still
+ * renders the type by name.
+ * @import {MTextFormatEntity} from "./MTextFormatParser.js"
+ */
+
 /** Regex for parsing special characters in text entities. */
 const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))/gi
 
@@ -14,7 +19,7 @@ const SPECIAL_CHARS_RE = /(?:%%([dpcou%]))|(?:\\U\+([0-9a-f]{4}))/gi
  * characters.
  * https://knowledge.autodesk.com/support/autocad/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-Core/files/GUID-518E1A9D-398C-4A8A-AC32-2D85590CDBE1-htm.html
  * @param {string} text Raw string.
- * @return {string} String with special characters replaced.
+ * @returns {string} String with special characters replaced.
  */
 export function ParseSpecialChars(text) {
     return text.replaceAll(SPECIAL_CHARS_RE, (match, p1, p2) => {
@@ -55,10 +60,10 @@ export function ParseSpecialChars(text) {
 export class TextRenderer {
 
     /**
-     * @param fontFetchers {?Function[]} List of font fetchers. Fetcher should return promise with
+     * @param {?Function[]} fontFetchers List of font fetchers. Fetcher should return promise with
      *  loaded font object (opentype.js). They are invoked only when necessary. Each glyph is being
      *  searched sequentially in each provided font.
-     * @param options {?{}} See TextRenderer.DefaultOptions.
+     * @param {?{}} options See TextRenderer.DefaultOptions.
      */
     constructor(fontFetchers, options = null) {
         this.fontFetchers = fontFetchers
@@ -79,9 +84,9 @@ export class TextRenderer {
 
     /** Fetch necessary fonts to render the provided text. Should be called for each string which
      * will be rendered later.
-     * @param text {string}
-     * @return {Boolean} True if all characters can be rendered, false if none of the provided fonts
-     *  contains glyphs for some of the specified text characters.
+     * @param {string} text
+     * @returns {Boolean} True if all characters can be rendered, false if none of the provided
+     *  fonts contains glyphs for some of the specified text characters.
      */
     async FetchFonts(text) {
         if (!this.stubShapeLoaded) {
@@ -133,8 +138,8 @@ export class TextRenderer {
     }
 
     /** Get width in model space units for a single line of text.
-     * @param text {string}
-     * @param fontSize {number}
+     * @param {string} text
+     * @param {number} fontSize
      */
     GetLineWidth(text, fontSize) {
         const block = new TextBlock(fontSize)
@@ -149,17 +154,18 @@ export class TextRenderer {
     }
 
     /**
-     * @param {string} text
-     * @param {{x,y}} startPos
-     * @param {?{x,y}} endPos TEXT group second alignment point.
-     * @param {?number} rotation Rotation attribute, deg.
-     * @param {?number} widthFactor Relative X scale factor (group 41)
-     * @param {?number} hAlign Horizontal text justification type code (group 72)
-     * @param {?number} vAlign Vertical text justification type code (group 73).
-     * @param {number} color
-     * @param {?string} layer
-     * @param {number} fontSize Font size.
-     * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
+     * @param {object} params
+     * @param {string} params.text
+     * @param {{x: number, y: number}} params.startPos
+     * @param {?{x: number, y: number}} params.endPos TEXT group second alignment point.
+     * @param {?number} params.rotation Rotation attribute, deg.
+     * @param {?number} params.widthFactor Relative X scale factor (group 41)
+     * @param {?number} params.hAlign Horizontal text justification type code (group 72)
+     * @param {?number} params.vAlign Vertical text justification type code (group 73).
+     * @param {number} params.color
+     * @param {?string} params.layer
+     * @param {number} params.fontSize Font size.
+     * @returns {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
     *Render({text, startPos, endPos, rotation = 0, widthFactor = 1, hAlign = 0, vAlign = 0,
@@ -176,19 +182,21 @@ export class TextRenderer {
     }
 
     /**
-     * @param {MTextFormatEntity[]} formattedText Parsed formatted text.
-     * @param {{x, y}} position Insertion position.
-     * @param {?number} fontSize If not specified, then it still may be defined by inline
+     * @param {object} params
+     * @param {MTextFormatEntity[]} params.formattedText Parsed formatted text.
+     * @param {{x: number, y: number}} params.position Insertion position.
+     * @param {?number} params.fontSize If not specified, then it still may be defined by inline
      *  formatting codes, otherwise 1 is used as fall-back value.
-     * @param {?Number} width Text block width, no wrapping if undefined.
-     * @param {?Number} rotation Text block rotation in degrees.
-     * @param {?{x, y}} direction Text block orientation defined as direction vector. Takes a
-     * precedence over rotation if both provided.
-     * @param {number} attachment Attachment point, one of MTextAttachment values.
-     * @param {?number} lineSpacing Line spacing ratio relative to default one (5/3 of font size).
-     * @param {number} color
-     * @param {?string} layer
-     * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
+     * @param {?Number} params.width Text block width, no wrapping if undefined.
+     * @param {?Number} params.rotation Text block rotation in degrees.
+     * @param {?{x: number, y: number}} params.direction Text block orientation defined as direction
+     *  vector. Takes a precedence over rotation if both provided.
+     * @param {number} params.attachment Attachment point, one of MTextAttachment values.
+     * @param {?number} params.lineSpacing Line spacing ratio relative to default one (5/3 of font
+     *  size).
+     * @param {number} params.color
+     * @param {?string} params.layer
+     * @returns {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
     *RenderMText({formattedText, position, fontSize, width = null, rotation = 0, direction = null,
@@ -202,7 +210,7 @@ export class TextRenderer {
                           layer)
     }
 
-    /** @return {CharShape} Shape for the specified character.
+    /** @returns {CharShape} Shape for the specified character.
      * Each shape is indexed triangles mesh for font size 1. They should be further transformed as
      * needed.
      */
@@ -236,16 +244,16 @@ export class TextRenderer {
 TextRenderer.DefaultOptions = DefaultTextOptions
 
 /** @typedef {Object} CharPath
- * @property advance {number}
- * @property path {?ShapePath}
- * @property bounds {xMin: number, xMax: number, yMin: number, yMax: number}
+ * @property {number} advance
+ * @property {?ShapePath} path
+ * @property {{xMin: number, xMax: number, yMin: number, yMax: number}} bounds
  */
 
 class CharShape {
     /**
-     * @param font {Font}
-     * @param glyph {CharPath}
-     * @param options {{}} Renderer options.
+     * @param {Font} font
+     * @param {CharPath} glyph
+     * @param {{}} options Renderer options.
      */
     constructor(font, glyph, options) {
         this.font = font
@@ -303,9 +311,9 @@ class CharShape {
     }
 
     /** Get vertices array transformed to the specified position and with the specified size.
-     * @param position {{x,y}}
-     * @param size {number}
-     * @return {Vector2[]}
+     * @param {{x: number, y: number}} position
+     * @param {number} size
+     * @returns {Vector2[]}
      */
     GetVertices(position, size) {
         return this.vertices.map(v => v.clone().multiplyScalar(size).add(position))
@@ -329,16 +337,17 @@ class Font {
     }
 
     /**
-     * @param char {string} Character code point as string.
-     * @return {Boolean} True if the font has glyphs for the specified character.
+     * @param {string} char Character code point as string.
+     * @returns {Boolean} True if the font has glyphs for the specified character.
      */
     HasChar(char) {
         return this.charMap.has(char)
     }
 
     /**
-     * @param char {string} Character code point as string.
-     * @return {?CharPath} Path is scaled to size 1. Null if no glyphs for the specified characters.
+     * @param {string} char Character code point as string.
+     * @returns {?CharPath} Path is scaled to size 1. Null if no glyphs for the specified
+     *  characters.
      */
     GetCharPath(char) {
         const glyph = this.charMap.get(char)
@@ -376,9 +385,9 @@ class Font {
     }
 
     /**
-     * @param c1 {string}
-     * @param c2 {string}
-     * @return {number}
+     * @param {string} c1
+     * @param {string} c2
+     * @returns {number}
      */
     GetKerning(c1, c2) {
         const i1 = this.data.charToGlyphIndex(c1)
@@ -427,8 +436,8 @@ const MTextAttachment = Object.freeze({
 /** Encapsulates layout calculations for a multiline-line text block. */
 class TextBox {
     /**
-     * @param fontSize
-     * @param {Function<CharShape, String>} charShapeProvider
+     * @param {number} fontSize
+     * @param {function(String): CharShape} charShapeProvider
      */
     constructor(fontSize, charShapeProvider) {
         this.fontSize = fontSize
@@ -801,8 +810,8 @@ TextBox.Paragraph.Chunk = class {
     }
 
     /**
-     * @param char {string}
-     * @param shape {CharShape}
+     * @param {string} char
+     * @param {CharShape} shape
      */
     PushChar(char, shape) {
         if (this.spaceStartKerning === null) {
@@ -915,8 +924,8 @@ class TextBlock {
     }
 
     /**
-     * @param char {string}
-     * @param shape {CharShape}
+     * @param {string} char
+     * @param {CharShape} shape
      */
     PushChar(char, shape) {
         /* Initially store with just font size and characters position applied. Origin is the first
@@ -967,15 +976,15 @@ class TextBlock {
     }
 
     /**
-     * @param startPos {{x,y}} TEXT group first alignment point.
-     * @param endPos {?{x,y}} TEXT group second alignment point.
-     * @param rotation {?number} Rotation attribute, deg.
-     * @param widthFactor {?number} Relative X scale factor (group 41).
-     * @param hAlign {?number} Horizontal text justification type code (group 72).
-     * @param vAlign {?number} Vertical text justification type code (group 73).
-     * @param color {number}
-     * @param layer {?string}
-     * @return {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
+     * @param {{x: number, y: number}} startPos TEXT group first alignment point.
+     * @param {?{x: number, y: number}} endPos TEXT group second alignment point.
+     * @param {?number} rotation Rotation attribute, deg.
+     * @param {?number} widthFactor Relative X scale factor (group 41).
+     * @param {?number} hAlign Horizontal text justification type code (group 72).
+     * @param {?number} vAlign Vertical text justification type code (group 73).
+     * @param {number} color
+     * @param {?string} layer
+     * @returns {Generator<Entity>} Rendering entities. Currently just indexed triangles for each
      *  glyph.
      */
     *Render(startPos, endPos, rotation, widthFactor, hAlign, vAlign, color, layer) {

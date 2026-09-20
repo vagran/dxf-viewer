@@ -8,9 +8,9 @@ const MSG_SIGNATURE = "DxfWorkerMsg"
  * web-worker is not used and all heavy operations are performed in main thread.
  */
 export class DxfWorker {
-    /** @param worker Web worker instance with DxfViewer.SetupWorker() function called. Can be null
-     *  for synchronous operations.
-     *  @param isWorker True for worker-side wrapper.
+    /** @param {?Worker} worker Web worker instance with DxfViewer.SetupWorker() function called.
+     *  Can be null for synchronous operations.
+     * @param {boolean} isWorker True for worker-side wrapper.
      */
     constructor(worker, isWorker = false) {
         this.worker = worker
@@ -27,9 +27,9 @@ export class DxfWorker {
     }
 
     /**
-     * @param url DXF file URL.
+     * @param {string} url DXF file URL.
      * @param {?string[]} fonts Fonts URLs.
-     * @param options Viewer options. See DxfViewer.DefaultOptions.
+     * @param {object} options Viewer options. See DxfViewer.DefaultOptions.
      * @param {?Function} progressCbk (phase, processedSize, totalSize)
      */
     async Load(url, fonts, options, progressCbk) {
@@ -145,7 +145,7 @@ export class DxfWorker {
         })
     }
 
-    /** @return {Object} DxfScene serialized scene. */
+    /** @returns {Object} DxfScene serialized scene. */
     async _Load(url, fonts, options, progressCbk) {
         let fontFetchers
         if (fonts) {

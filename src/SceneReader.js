@@ -30,16 +30,16 @@ export const PrimitiveType = Object.freeze({
 
 /**
  * @typedef {Object} Primitive
- * @property type {string} One of {@link PrimitiveType}.
- * @property layer {?string} Resolved layer name, null when the geometry is bound to no layer.
- * @property color {number} Resolved RGB value. Never a {@link ColorCode} sentinel: BY_LAYER and
+ * @property {string} type One of {@link PrimitiveType}.
+ * @property {?string} layer Resolved layer name, null when the geometry is bound to no layer.
+ * @property {number} color Resolved RGB value. Never a {@link ColorCode} sentinel: BY_LAYER and
  *  BY_BLOCK are resolved against the instantiating block and layer, exactly as the renderer
  *  resolves them.
- * @property vertices {number[][]} `[x, y]` pairs in model space.
+ * @property {number[][]} vertices `[x, y]` pairs in model space.
  */
 
 export class SceneReader {
-    /** @param scene {{}} The object produced by `DxfScene.Build()`, i.e. `dxfScene.scene`. */
+    /** @param {{}} scene The object produced by `DxfScene.Build()`, i.e. `dxfScene.scene`. */
     constructor(scene) {
         this.scene = scene
         this.origin = scene.origin ?? {x: 0, y: 0}
@@ -66,17 +66,17 @@ export class SceneReader {
         }
     }
 
-    /** @return {{x: number, y: number}} Offset that was subtracted from every stored vertex. */
+    /** @returns {{x: number, y: number}} Offset that was subtracted from every stored vertex. */
     GetOrigin() {
         return this.origin
     }
 
-    /** @return {?{minX: number, maxX: number, minY: number, maxY: number}} Model space bounds. */
+    /** @returns {?{minX: number, maxX: number, minY: number, maxY: number}} Model space bounds. */
     GetBounds() {
         return this.scene.bounds ?? null
     }
 
-    /** @return {Iterable<{name: string, displayName: string, color: number}>} */
+    /** @returns {Iterable<{name: string, displayName: string, color: number}>} */
     GetLayers() {
         return this.layers.values()
     }
@@ -86,7 +86,7 @@ export class SceneReader {
      * Block definition batches are not yielded on their own; they are yielded once per instance,
      * transformed into place, which is how they are drawn.
      *
-     * @return {Generator<Primitive>} In batch order, which is the order the renderer draws them.
+     * @returns {Generator<Primitive>} In batch order, which is the order the renderer draws them.
      */
     *ReadPrimitives() {
         for (const batch of this.scene.batches) {
@@ -163,9 +163,9 @@ class BatchReader {
             (this.reader.layers.get(this.key.layerName) ?? null) : null
     }
 
-    /** @param instanceBatch {?BatchReader} The instance batch placing this one, when this is a
+    /** @param {?BatchReader} instanceBatch The instance batch placing this one, when this is a
      *      block definition batch being instantiated.
-     * @return {Generator<Primitive>}
+     * @returns {Generator<Primitive>}
      */
     *Read(instanceBatch = null) {
         if (this.key.IsInstanced()) {
@@ -236,8 +236,8 @@ class BatchReader {
     }
 
     /** Resolve the deferred color of a block definition batch against this instance batch.
-     * @param definitionBatch {BatchReader}
-     * @return {number} RGB value.
+     * @param {BatchReader} definitionBatch
+     * @returns {number} RGB value.
      */
     _ResolveInstanceColor(definitionBatch) {
         const color = definitionBatch.key.color
@@ -311,7 +311,7 @@ class BatchReader {
         }
     }
 
-    /** @return {{count: number, Apply: function(number, number[][])}} Applies instance transform
+    /** @returns {{count: number, Apply: function(number, number[][])}} Applies instance transform
      *      number `i` to a list of vertices, in place.
      */
     _CreateTransformer() {

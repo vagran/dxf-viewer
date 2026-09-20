@@ -104,8 +104,8 @@ export class DxfScene {
     }
 
     /** Build the scene from the provided parsed DXF.
-     * @param dxf {{}} Parsed DXF file.
-     * @param fontFetchers {?Function[]} List of font fetchers. Fetcher should return promise with
+     * @param {{}} dxf Parsed DXF file.
+     * @param {?Function[]} fontFetchers List of font fetchers. Fetcher should return promise with
      *  loaded font object (opentype.js). They are invoked only when necessary. Each glyph is being
      *  searched sequentially in each provided font.
      */
@@ -206,7 +206,7 @@ export class DxfScene {
         delete this.textRenderer
     }
 
-    /** @return False to suppress the specified entity, true to permit rendering. */
+    /** @returns {boolean} False to suppress the specified entity, true to permit rendering. */
     _FilterEntity(entity) {
         if (entity.hidden) {
             return false
@@ -360,8 +360,8 @@ export class DxfScene {
         }
     }
     /**
-     * @param entity {Entity}
-     * @param blockCtx {?BlockContext}
+     * @param {Entity} entity
+     * @param {?BlockContext} blockCtx
      */
     _ProcessEntity(entity, blockCtx = null) {
         switch (entity.type) {
@@ -383,10 +383,10 @@ export class DxfScene {
     }
 
     /**
-     * @param entity
-     * @param vertex
-     * @param blockCtx {?BlockContext}
-     * @return {number}
+     * @param {object} entity Raw DXF entity.
+     * @param {?object} vertex Polyline vertex the line type is queried for, if any.
+     * @param {?BlockContext} blockCtx
+     * @returns {number}
      */
     _GetLineType(entity, vertex = null, blockCtx = null) {
         //XXX lookup
@@ -417,10 +417,11 @@ export class DxfScene {
 
     /** Generate vertices for bulged line segment.
      *
-     * @param vertices Generated vertices pushed here.
-     * @param startVtx Starting vertex. Assuming it is already present in the vertices array.
-     * @param endVtx Ending vertex.
-     * @param bulge Bulge value (see DXF specification).
+     * @param {Vector2[]} vertices Generated vertices pushed here.
+     * @param {{x: number, y: number}} startVtx Starting vertex. Assuming it is already present in
+     *  the vertices array.
+     * @param {{x: number, y: number}} endVtx Ending vertex.
+     * @param {number} bulge Bulge value (see DXF specification).
      */
     _GenerateBulgeVertices(vertices, startVtx, endVtx, bulge) {
         const a = 4 * Math.atan(bulge)
@@ -471,20 +472,25 @@ export class DxfScene {
 
     /** Generate vertices for arc segment.
      *
-     * @param vertices Generated vertices pushed here.
-     * @param {{x, y}} center  Center vector.
-     * @param {number} radius
-     * @param {?number} startAngle Start angle in radians. Zero if not specified. Arc is drawn in
-     *  CCW direction from start angle towards end angle.
-     * @param {?number} endAngle Optional end angle in radians. Full circle is drawn if not
+     * @param {object} params
+     * @param {Vector2[]} params.vertices Generated vertices pushed here.
+     * @param {{x: number, y: number}} params.center Center vector.
+     * @param {number} params.radius
+     * @param {?number} params.startAngle Start angle in radians. Zero if not specified. Arc is
+     *  drawn in CCW direction from start angle towards end angle.
+     * @param {?number} params.endAngle Optional end angle in radians. Full circle is drawn if not
      *  specified.
-     * @param {?number} tessellationAngle Arc tessellation angle in radians, default value is taken
-     *  from scene options.
-     * @param {?number} yRadius Specify to get ellipse arc. `radius` parameter used as X radius.
-     * @param {?Matrix3} transform Optional transform matrix for the arc. Applied as last operation.
-     * @param {?number} rotation Optional rotation angle for generated arc. Mostly for ellipses.
-     * @param {?boolean} cwAngleDir Angles counted in clockwise direction from X positive direction.
-     * @return {Vector2[]} List of generated vertices.
+     * @param {?number} params.tessellationAngle Arc tessellation angle in radians, default value
+     *  is taken from scene options.
+     * @param {?number} params.yRadius Specify to get ellipse arc. `radius` parameter used as X
+     *  radius.
+     * @param {?Matrix3} params.transform Optional transform matrix for the arc. Applied as last
+     *  operation.
+     * @param {?number} params.rotation Optional rotation angle for generated arc. Mostly for
+     *  ellipses.
+     * @param {?boolean} params.ccwAngleDir True (the default) counts angles counter-clockwise from
+     *  the positive X direction, false counts them clockwise.
+     * @returns {Vector2[]} List of generated vertices.
      */
     _GenerateArcVertices({vertices, center, radius, startAngle = null, endAngle = null,
                           tessellationAngle = null, yRadius = null, transform = null,
@@ -703,9 +709,9 @@ export class DxfScene {
 
 
     /** Create line segments for point marker.
-     * @param vertices
-     * @param markType
-     * @param position {?{x,y}} point center position, default is zero.
+     * @param {Vector2[]} vertices Generated vertices pushed here.
+     * @param {number} markType One of PdMode values.
+     * @param {?{x: number, y: number}} position point center position, default is zero.
      */
     _CreatePointMarker(vertices, markType, position = null) {
         const _this = this
@@ -766,13 +772,13 @@ export class DxfScene {
      * Shared by the two ways a marker is drawn: once at the origin for the instanced shape block,
      * and inline at the point's own position when the point is inside a block definition.
      *
-     * @param position {{x, y}} Centre of the marker.
-     * @param layer {?string}
-     * @param color {number}
-     * @param lineType {?number}
-     * @param includeDot {Boolean} False for the shape block, whose dot comes from the instance
+     * @param {{x: number, y: number}} position Centre of the marker.
+     * @param {?string} layer
+     * @param {number} color
+     * @param {?number} lineType
+     * @param {Boolean} includeDot False for the shape block, whose dot comes from the instance
      *  translations instead -- that is what `scene.pointShapeHasDot` tells the renderer.
-     * @return {Generator<Entity>}
+     * @returns {Generator<Entity>}
      */
     *_GeneratePointShapeEntities(position, layer, color, lineType, includeDot) {
         const markType = this.pdMode & PdMode.MARK_MASK
@@ -953,12 +959,12 @@ export class DxfScene {
     }
 
     /**
-     * @param entity
-     * @param blockCtx {?BlockContext}
-     * @param reportInvalid {Boolean} Warn about geometry which cannot be laid out. Only the call
+     * @param {object} entity Raw DXF DIMENSION entity.
+     * @param {?BlockContext} blockCtx
+     * @param {Boolean} reportInvalid Warn about geometry which cannot be laid out. Only the call
      *  which renders the dimension does, so that a dimension the font pre-scan also builds is not
      *  reported twice.
-     * @return {?LinearDimension} Dimension handler instance, null if not possible to create from
+     * @returns {?LinearDimension} Dimension handler instance, null if not possible to create from
      * the provided entity.
      */
     _CreateLinearDimension(entity, blockCtx = null, reportInvalid = true) {
@@ -1017,10 +1023,10 @@ export class DxfScene {
      *
      * A dimension's geometry lives in a block, so BYBLOCK means the DIMENSION entity's own color.
      *
-     * @param value {?number} Raw variable value.
-     * @param entity {{}} The DIMENSION entity.
-     * @param blockCtx {?BlockContext}
-     * @return {number} RGB value, or a ColorCode sentinel when inside a block definition, exactly
+     * @param {?number} value Raw variable value.
+     * @param {{}} entity The DIMENSION entity.
+     * @param {?BlockContext} blockCtx
+     * @returns {number} RGB value, or a ColorCode sentinel when inside a block definition, exactly
      *  as _GetEntityColor would return.
      */
     _ResolveDimStyleColor(value, entity, blockCtx) {
@@ -1135,7 +1141,7 @@ export class DxfScene {
      * @param {Vector2[]} loop Loop vertices. Transformed in-place if transform specified.
      * @param {Matrix3 | null} transform
      * @param {number[] | null} result Resulting coordinates appended to this array.
-     * @return {number[]} Each pair of numbers form vertex coordinate. This format is required for
+     * @returns {number[]} Each pair of numbers form vertex coordinate. This format is required for
      *  `earcut` library.
      */
     _TransformBoundaryLoop(loop, transform, result) {
@@ -1293,12 +1299,12 @@ export class DxfScene {
      * Generate segments for one line of a hatch pattern. The pattern line defines a whole family
      * of parallel lines, each one `offset` further than the previous one; this covers the part of
      * the family which intersects the hatch bounding box.
-     * @param line {Object} Pattern line definition.
-     * @param calc {HatchCalculator}
-     * @param patTransform {Matrix3} Pattern transform, identity matrix when the pattern is taken
+     * @param {Object} line Pattern line definition.
+     * @param {HatchCalculator} calc
+     * @param {Matrix3} patTransform Pattern transform, identity matrix when the pattern is taken
      *  from the lines definition embedded into the HATCH entity.
-     * @param offsetInLineSpace {Boolean} Pattern offsets are already rotated by the line angle.
-     * @param renderParams {Object} `layer`, `color` and OCS `transform` for produced entities.
+     * @param {Boolean} offsetInLineSpace Pattern offsets are already rotated by the line angle.
+     * @param {Object} renderParams `layer`, `color` and OCS `transform` for produced entities.
      */
     *_DecomposeHatchPatternLine(line, calc, patTransform, offsetInLineSpace, renderParams) {
         let offsetX
@@ -1380,11 +1386,11 @@ export class DxfScene {
     /**
      * Generate segments for a single line of a hatch pattern line family, clipping it against the
      * boundary loops and applying the dash pattern if there is one.
-     * @param dashes {?number[]} Dash pattern of the pattern line, negative values are spaces.
-     * @param calc {HatchCalculator}
-     * @param lineParams {Object} Position of the line in line space (`y`, `xBase`, `xStart`,
+     * @param {?number[]} dashes Dash pattern of the pattern line, negative values are spaces.
+     * @param {HatchCalculator} calc
+     * @param {Object} lineParams Position of the line in line space (`y`, `xBase`, `xStart`,
      *  `xEnd`), `ocsTransform` back into OCS, and `dashPatLength` (null for a solid line).
-     * @param renderParams {Object} `layer`, `color` and OCS `transform` for produced entities.
+     * @param {Object} renderParams `layer`, `color` and OCS `transform` for produced entities.
      */
     *_DecomposeHatchLine(dashes, calc, {y, xBase, xStart, xEnd, ocsTransform, dashPatLength},
                          {layer, color, transform}) {
@@ -1479,7 +1485,7 @@ export class DxfScene {
      * @property {Boolean} isOutermost
      */
 
-    /** @return {HatchBoundaryLoop[]} Each loop is a list of points in OCS coordinates. */
+    /** @returns {HatchBoundaryLoop[]} Each loop is a list of points in OCS coordinates. */
     _GetHatchBoundaryLoops(entity) {
         if (!entity.boundaryLoops) {
             return []
@@ -1679,8 +1685,8 @@ export class DxfScene {
 
     /**
      * Updates batches directly.
-     * @param entity
-     * @param blockCtx {?BlockContext} Nested block insert when non-null.
+     * @param {object} entity Raw DXF INSERT entity.
+     * @param {?BlockContext} blockCtx Nested block insert when non-null.
      */
     _ProcessInsert(entity, blockCtx = null) {
         if (blockCtx) {
@@ -1764,12 +1770,12 @@ export class DxfScene {
     /**
      * Generate entities for shaped polyline (e.g. line resulting in mesh). All segments are shaped
      * (have start/end width). Segments may be bulge.
-     * @param vertices
-     * @param layer
-     * @param color
-     * @param lineType
-     * @param shape {Boolean} True if closed polyline.
-     * @return {Generator<Entity>}
+     * @param {Array<{x: number, y: number}>} vertices
+     * @param {?string} layer
+     * @param {number} color
+     * @param {?number} lineType
+     * @param {Boolean} shape True if closed polyline.
+     * @returns {Generator<Entity>}
      */
     *_GenerateShapedPolyline(vertices, layer, color, lineType, shape) {
         //XXX
@@ -1785,9 +1791,11 @@ export class DxfScene {
 
     /** Mirror entity vertices if necessary in case of extrusionDirection with negative Z specified.
      *
-     * @param entity Entity to check.
-     * @param vertices {?{x,y}[]} Vertices array to use instead of entity vertices attribute.
-     * @return {{x,y}[]} Vertices array with mirrored X if necessary. All attributes preserved.
+     * @param {object} entity Entity to check.
+     * @param {?Array<{x: number, y: number}>} vertices Vertices array to use instead of entity
+     *  vertices attribute.
+     * @returns {Array<{x: number, y: number}>} Vertices array with mirrored X if necessary. All
+     *  attributes preserved.
      */
     _MirrorEntityVertices(entity, vertices = null) {
         if (!entity.extrusionDirection || entity.extrusionDirection.z >= 0) {
@@ -2051,14 +2059,14 @@ export class DxfScene {
 
     /** Get a point on a B-spline.
      * https://github.com/thibauts/b-spline
-     * @param t {number} Point position on spline, [0..1].
-     * @param degree {number} B-spline degree.
-     * @param points {number[][]} Control points. Each point should have the same dimension which
+     * @param {number} t Point position on spline, [0..1].
+     * @param {number} degree B-spline degree.
+     * @param {number[][]} points Control points. Each point should have the same dimension which
      *  defines dimension of the result.
-     * @param knots {?number[]} Knot vector. Should have size `points.length + degree + 1`. Default
+     * @param {?number[]} knots Knot vector. Should have size `points.length + degree + 1`. Default
      *  is uniform spline.
-     * @param weights {?number} Optional weights vector.
-     * @return {number[]} Resulting point on the specified position.
+     * @param {?number} weights Optional weights vector.
+     * @returns {number[]} Resulting point on the specified position.
      */
     _InterpolateSpline(t, degree, points, knots = null, weights = null) {
         let i, j, s, l             // function-scoped iteration variables
@@ -2147,8 +2155,8 @@ export class DxfScene {
     }
 
     /**
-     * @param entity {Entity}
-     * @param blockCtx {?BlockContext}
+     * @param {Entity} entity
+     * @param {?BlockContext} blockCtx
      */
     _ProcessPoints(entity, blockCtx = null) {
         const key = new BatchingKey(entity.layer, blockCtx?.name,
@@ -2160,8 +2168,8 @@ export class DxfScene {
     }
 
     /**
-     * @param entity {Entity}
-     * @param blockCtx {?BlockContext}
+     * @param {Entity} entity
+     * @param {?BlockContext} blockCtx
      */
     _ProcessLineSegments(entity, blockCtx = null) {
         if (entity.vertices.length % 2 !== 0) {
@@ -2176,8 +2184,8 @@ export class DxfScene {
     }
 
     /**
-     * @param entity {Entity}
-     * @param blockCtx {?BlockContext}
+     * @param {Entity} entity
+     * @param {?BlockContext} blockCtx
      */
     _ProcessPolyline(entity, blockCtx = null) {
         if (entity.vertices.length < 2) {
@@ -2226,8 +2234,8 @@ export class DxfScene {
     }
 
     /**
-     * @param entity {Entity}
-     * @param blockCtx {?BlockContext}
+     * @param {Entity} entity
+     * @param {?BlockContext} blockCtx
      */
     _ProcessTriangles(entity, blockCtx = null) {
         if (entity.vertices.length < 3) {
@@ -2254,9 +2262,9 @@ export class DxfScene {
 
     /** Resolve entity color.
      *
-     * @param entity
-     * @param blockCtx {?BlockContext}
-     * @return {number} RGB color value. For block entity it also may be one of ColorCode values
+     * @param {object} entity Raw DXF entity.
+     * @param {?BlockContext} blockCtx
+     * @returns {number} RGB color value. For block entity it also may be one of ColorCode values
      *  which are resolved on block instantiation.
      */
     _GetEntityColor(entity, blockCtx = null) {
@@ -2302,7 +2310,7 @@ export class DxfScene {
         return 0
     }
 
-    /** @return {?string} Layer name, null for block entity. */
+    /** @returns {?string} Layer name, null for block entity. */
     _GetEntityLayer(entity, blockCtx = null) {
         if (entity.hasOwnProperty("layer") && entity.layer != null) {
             return entity.layer
@@ -2313,7 +2321,9 @@ export class DxfScene {
         return blockCtx ? null : "0"
     }
 
-    /** @returns {TextStyle | null}  */
+    /** @returns {?object} Text style record from the STYLE table, null if the entity names
+     *  none or it is not found.
+     */
     _GetEntityTextStyle(entity) {
         if (entity.hasOwnProperty("styleName")) {
             return this.fontStyles.get(entity.styleName) ?? null
@@ -2323,7 +2333,7 @@ export class DxfScene {
 
     /** Check extrusionDirection property of the entity and return corresponding transform matrix.
      *
-     * @return {?Matrix3} Null if not transform required.
+     * @returns {?Matrix3} Null if not transform required.
      */
     _GetEntityExtrusionTransform(entity) {
         //XXX For now just mirror X axis if extrusion Z is negative. No full support for arbitrary
@@ -2337,7 +2347,7 @@ export class DxfScene {
         return new Matrix3().makeScale(-1, 1)
     }
 
-    /** @return {RenderBatch} */
+    /** @returns {RenderBatch} */
     _GetBatch(key) {
         let batch = this.batches.find({key})
         if (batch !== null) {
@@ -2358,9 +2368,9 @@ export class DxfScene {
     /**
      * Apply all necessary final transforms to a vertex before just before storing it in a rendering
      * batch.
-     * @param v {{x: number, y: number}}
-     * @param blockCtx {BlockContext}
-     * @return {{x: number, y: number}}
+     * @param {{x: number, y: number}} v
+     * @param {BlockContext} blockCtx
+     * @returns {{x: number, y: number}}
      */
     _TransformVertex(v, blockCtx = null) {
         if (blockCtx) {
@@ -2371,7 +2381,7 @@ export class DxfScene {
         return {x: v.x - this.origin.x, y: v.y - this.origin.y}
     }
 
-    /** @param v {{x,y}} Vertex to extend bounding box with and set origin. */
+    /** @param {{x: number, y: number}} v Vertex to extend bounding box with and set origin. */
     _UpdateBounds(v) {
         if (this.bounds === null) {
             this.bounds = {minX: v.x, maxX: v.x, minY: v.y, maxY: v.y}
@@ -2462,7 +2472,7 @@ class RenderBatch {
     }
 
     /**
-     * @param matrix {Matrix3} 3x3 Transform matrix. Assuming 2D affine transform so only top 3x2
+     * @param {Matrix3} matrix 3x3 Transform matrix. Assuming 2D affine transform so only top 3x2
      *  sub-matrix is taken.
      */
     PushInstanceTransform(matrix) {
@@ -2477,8 +2487,8 @@ class RenderBatch {
     /** This method actually reserves space for the specified number of indexed vertices in some
      * chunk. The returned object should be used to push exactly the same amount vertices and any
      * number of their referring indices.
-     * @param verticesCount Number of vertices in the chunk.
-     * @return {IndexedChunkWriter}
+     * @param {number} verticesCount Number of vertices in the chunk.
+     * @returns {IndexedChunkWriter}
      */
     PushChunk(verticesCount) {
         if (verticesCount > INDEXED_CHUNK_SIZE) {
@@ -2506,8 +2516,8 @@ class RenderBatch {
     /** Merge other batch into this one. They should have the same geometry type. Instanced batches
      * are disallowed.
      *
-     * @param batch {RenderBatch}
-     * @param transform {?Matrix3} Optional transform to apply for merged vertices.
+     * @param {RenderBatch} batch
+     * @param {?Matrix3} transform Optional transform to apply for merged vertices.
      */
     Merge(batch, transform = null) {
         if (this.key.geometryType !== batch.key.geometryType) {
@@ -2547,7 +2557,7 @@ class RenderBatch {
         }
     }
 
-    /** @return Vertices buffer required size in bytes. */
+    /** @returns {number} Vertices buffer required size in bytes. */
     GetVerticesBufferSize() {
         if (this.key.IsIndexed()) {
             let size = 0
@@ -2562,7 +2572,7 @@ class RenderBatch {
         }
     }
 
-    /** @return Indices buffer required size in bytes. */
+    /** @returns {number} Indices buffer required size in bytes. */
     GetIndicesBufferSize() {
         if (this.key.IsIndexed()) {
             let size = 0
@@ -2575,7 +2585,7 @@ class RenderBatch {
         }
     }
 
-    /** @return Instances transforms buffer required size in bytes. */
+    /** @returns {number} Instances transforms buffer required size in bytes. */
     GetTransformsSize() {
         if (this.key.geometryType === BatchingKey.GeometryType.BLOCK_INSTANCE) {
             return this.transforms.GetSize() * Float32Array.BYTES_PER_ELEMENT
@@ -2627,7 +2637,7 @@ class RenderBatch {
 }
 
 class Block {
-    /** @param data {{}} Raw DXF entity. */
+    /** @param {{}} data Raw DXF entity. */
     constructor(data) {
         this.data = data
         /* Number of times referenced from top-level entities (INSERT). */
@@ -2636,7 +2646,7 @@ class Block {
         this.nestedUseCount = 0
         /* Total number of vertices in this block. Used for flattening decision. */
         this.verticesCount = 0
-        /* Offset {x, y} to apply for all vertices. Used to move origin near vertices location to
+        /* Offset {x,y} to apply for all vertices. Used to move origin near vertices location to
          * minimize precision loss.
          */
         this.offset = null
@@ -2648,7 +2658,7 @@ class Block {
     }
 
     /** Set block flattening flag based on usage statistics.
-     * @return {Boolean} New flatten flag state.
+     * @returns {Boolean} New flatten flag state.
      */
     SetFlatten() {
         if (!this.HasGeometry()) {
@@ -2663,7 +2673,7 @@ class Block {
         return this.flatten
     }
 
-    /** @return {Boolean} True if has something to draw. */
+    /** @returns {Boolean} True if has something to draw. */
     HasGeometry() {
         /* Offset is set on first geometry vertex encountered. */
         return this.offset !== null
@@ -2678,7 +2688,7 @@ class Block {
         this.nestedUseCount++
     }
 
-    /** @return {BlockContext} Context for block definition. */
+    /** @returns {BlockContext} Context for block definition. */
     DefinitionContext() {
         return new BlockContext(this, BlockContext.Type.DEFINITION)
     }
@@ -2720,7 +2730,7 @@ class BlockContext {
         this.blockPath = [this.name]
     }
 
-    /** @return {string} Block name */
+    /** @returns {string} Block name */
     get name() {
         return this.block.data.name
     }
@@ -2728,21 +2738,21 @@ class BlockContext {
     /** Check if instantiating the specified block would re-enter a block which is already being
      * expanded, which would recurse indefinitely.
      *
-     * @param blockName {string} Name of the block referenced by a nested `INSERT`.
-     * @return {Boolean} True if the reference closes a cycle.
+     * @param {string} blockName Name of the block referenced by a nested `INSERT`.
+     * @returns {Boolean} True if the reference closes a cycle.
      */
     IsRecursiveReference(blockName) {
         return this.blockPath.includes(blockName)
     }
 
-    /** @return {string} Block reference chain, for diagnostic messages. */
+    /** @returns {string} Block reference chain, for diagnostic messages. */
     DescribeBlockPath(blockName) {
         return this.blockPath.concat(blockName).join(" -> ")
     }
 
     /**
-     * @param v {{x,y}}
-     * @return {{x,y}}
+     * @param {{x: number, y: number}} v
+     * @returns {{x: number, y: number}}
      */
     TransformVertex(v) {
         const result = new Vector2(v.x, v.y).applyMatrix3(this.transform)
@@ -2768,8 +2778,8 @@ class BlockContext {
 
     /**
      * Get transform for block instance.
-     * @param entity Raw DXF INSERT entity.
-     * @return {Matrix3} Transform matrix for block instance to apply to the block definition.
+     * @param {object} entity Raw DXF INSERT entity.
+     * @returns {Matrix3} Transform matrix for block instance to apply to the block definition.
      */
     GetInsertionTransform(entity) {
         const mInsert = new Matrix3().makeTranslation(-this.origin.x, -this.origin.y)
@@ -2793,9 +2803,9 @@ class BlockContext {
 
     /**
      * Create context for nested block.
-     * @param block {Block} Nested block.
-     * @param entity Raw DXF INSERT entity.
-     * @return {BlockContext} Context to use for nested block entities.
+     * @param {Block} block Nested block.
+     * @param {object} entity Raw DXF INSERT entity.
+     * @returns {BlockContext} Context to use for nested block entities.
      */
     NestedBlockContext(block, entity) {
         block.RegisterNestedUse(this.block)
@@ -2880,13 +2890,14 @@ class IndexedChunkWriter {
  * entity always shares single material.
  */
 export class Entity {
-    /** @param type {number} See Entity.Type
-     * @param vertices {{x, y}[]}
-     * @param indices {?number[]} Indices for indexed geometry.
-     * @param layer {?string}
-     * @param color {number}
-     * @param lineType {?number}
-     * @param shape {Boolean} true if closed shape.
+    /** @param {object} params
+     * @param {number} params.type See Entity.Type
+     * @param {Array<{x: number, y: number}>} params.vertices
+     * @param {?number[]} params.indices Indices for indexed geometry.
+     * @param {?string} params.layer
+     * @param {number} params.color
+     * @param {?number} params.lineType
+     * @param {Boolean} params.shape true if closed shape.
      */
     constructor({type, vertices, indices = null, layer = null, color, lineType = 0,
                  shape = false}) {
