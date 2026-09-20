@@ -10,7 +10,13 @@ export class DxfFetcher {
         this.encoding = encoding
     }
 
-    /** @param {Function} progressCbk (phase, receivedSize, totalSize) */
+    /** Fetch the file and parse it. The result is the same parsed document `DxfViewer` works
+     * from, so this is the way to read a drawing without rendering it.
+     *
+     * @param {?Function} progressCbk Called as (phase, receivedSize, totalSize) while the file is
+     *  read. Phase is "fetch" while downloading and "parse" once parsing starts.
+     * @returns {Promise<object>} The parsed document. Rejects on an HTTP error or a parse failure.
+     */
     async Fetch(progressCbk = null) {
         const response = await fetch(this.url)
         /* Without this the error body is fed to the parser as if it were a drawing, and an HTTP

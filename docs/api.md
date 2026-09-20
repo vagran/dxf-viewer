@@ -15,14 +15,29 @@ else in `src/` is internal and may change without notice.
 <dd><p>Fetches and parses DXF file.</p>
 </dd>
 <dt><a href="#Pattern">Pattern</a></dt>
-<dd></dd>
+<dd><p>A hatch pattern: the line families a hatched area is filled with, and the name they are
+registered under. Built-in patterns are registered at import time; <code>RegisterPattern()</code> adds
+more, and <code>LookupPattern()</code> finds one by name.</p>
+</dd>
+</dl>
+
+## Members
+
+<dl>
+<dt><a href="#DxfSceneOptions">DxfSceneOptions</a></dt>
+<dd><p>Default values for <code>sceneOptions</code>, the scene generation options a viewer is constructed
+with. An option left out takes its value from here.</p>
+</dd>
 </dl>
 
 ## Constants
 
 <dl>
 <dt><a href="#MessageLevel">MessageLevel</a></dt>
-<dd><p>Level in &quot;message&quot; events.</p>
+<dd><p>Level in &quot;message&quot; events, published as <code>DxfViewer.MessageLevel</code>.</p>
+</dd>
+<dt><a href="#TextRendererOptions">TextRendererOptions</a></dt>
+<dd><p>Default values for the text rendering options — the <code>textOptions</code> member of <code>sceneOptions</code>.</p>
 </dd>
 </dl>
 
@@ -40,8 +55,16 @@ else in `src/` is internal and may change without notice.
 ## Typedefs
 
 <dl>
+<dt><a href="#LayerInfo">LayerInfo</a> : <code>object</code></dt>
+<dd><p>One layer of the loaded drawing, as <code>GetLayers()</code> reports it.</p>
+</dd>
+<dt><a href="#Bounds">Bounds</a> : <code>object</code></dt>
+<dd><p>Model-space bounding box of the loaded drawing, in the drawing&#39;s own coordinates rather than
+the scene&#39;s — <code>GetOrigin()</code> is not subtracted.</p>
+</dd>
 <dt><a href="#PatternLineDef">PatternLineDef</a></dt>
-<dd></dd>
+<dd><p>One line family of a hatch pattern: a line repeated at a fixed offset to fill the area.</p>
+</dd>
 </dl>
 
 <a name="DxfViewer"></a>
@@ -53,26 +76,46 @@ The representation class for the viewer, based on Three.js WebGL renderer.
 
 * [DxfViewer](#DxfViewer)
     * [new DxfViewer(domContainer, options)](#new_DxfViewer_new)
-    * [.HasRenderer()](#DxfViewer+HasRenderer) ⇒ <code>boolean</code>
-    * [.GetRenderer()](#DxfViewer+GetRenderer) ⇒ <code>three.WebGLRenderer</code> \| <code>null</code>
-    * [.GetCanvas()](#DxfViewer+GetCanvas) ⇒ <code>HTMLCanvasElement</code>
-    * [.GetDxf()](#DxfViewer+GetDxf) ⇒ <code>object</code>
-    * [.SetSize(width, height)](#DxfViewer+SetSize)
-    * [.Load(params)](#DxfViewer+Load)
-    * [.Render()](#DxfViewer+Render)
-    * [.GetLayers(nonEmptyOnly)](#DxfViewer+GetLayers) ⇒ <code>Iterable.&lt;{name:String, color:number}&gt;</code>
-    * [.ShowLayer(name, show)](#DxfViewer+ShowLayer)
-    * [.SetClearColor(color)](#DxfViewer+SetClearColor)
-    * [.Clear()](#DxfViewer+Clear)
-    * [.Destroy()](#DxfViewer+Destroy)
-    * [.SetView(center, width)](#DxfViewer+SetView)
-    * [.FitView(minX, maxX, minY, maxY, padding)](#DxfViewer+FitView)
-    * [.GetScene()](#DxfViewer+GetScene) ⇒ <code>three.Scene</code>
-    * [.GetCamera()](#DxfViewer+GetCamera) ⇒ <code>three.OrthographicCamera</code>
-    * [.GetOrigin()](#DxfViewer+GetOrigin) ⇒ <code>three.Vector2</code>
-    * [.GetBounds()](#DxfViewer+GetBounds) ⇒ <code>Object</code>
-    * [.Subscribe(eventName, eventHandler)](#DxfViewer+Subscribe)
-    * [.Unsubscribe(eventName, eventHandler)](#DxfViewer+Unsubscribe)
+    * _instance_
+        * [.HasRenderer()](#DxfViewer+HasRenderer) ⇒ <code>boolean</code>
+        * [.GetRenderer()](#DxfViewer+GetRenderer) ⇒ <code>three.WebGLRenderer</code> \| <code>null</code>
+        * [.GetCanvas()](#DxfViewer+GetCanvas) ⇒ <code>HTMLCanvasElement</code>
+        * [.GetDxf()](#DxfViewer+GetDxf) ⇒ <code>object</code>
+        * [.SetSize(width, height)](#DxfViewer+SetSize)
+        * [.Load(params)](#DxfViewer+Load) ⇒ <code>Promise</code>
+        * [.Render()](#DxfViewer+Render)
+        * [.GetLayers(nonEmptyOnly)](#DxfViewer+GetLayers) ⇒ [<code>Iterable.&lt;LayerInfo&gt;</code>](#LayerInfo)
+        * [.ShowLayer(name, show)](#DxfViewer+ShowLayer)
+        * [.SetClearColor(color)](#DxfViewer+SetClearColor)
+        * [.Clear()](#DxfViewer+Clear)
+        * [.Destroy()](#DxfViewer+Destroy)
+        * [.SetView(center, width)](#DxfViewer+SetView)
+        * [.FitView(minX, maxX, minY, maxY, padding)](#DxfViewer+FitView)
+        * [.GetScene()](#DxfViewer+GetScene) ⇒ <code>three.Scene</code>
+        * [.GetCamera()](#DxfViewer+GetCamera) ⇒ <code>three.OrthographicCamera</code>
+        * [.GetOrigin()](#DxfViewer+GetOrigin) ⇒ <code>three.Vector2</code>
+        * [.GetBounds()](#DxfViewer+GetBounds) ⇒ [<code>Bounds</code>](#Bounds)
+        * [.Subscribe(eventName, eventHandler)](#DxfViewer+Subscribe)
+        * [.Unsubscribe(eventName, eventHandler)](#DxfViewer+Unsubscribe)
+    * _static_
+        * [.DefaultOptions](#DxfViewer.DefaultOptions)
+            * [.canvasWidth](#DxfViewer.DefaultOptions.canvasWidth)
+            * [.canvasHeight](#DxfViewer.DefaultOptions.canvasHeight)
+            * [.autoResize](#DxfViewer.DefaultOptions.autoResize)
+            * [.clearColor](#DxfViewer.DefaultOptions.clearColor)
+            * [.clearAlpha](#DxfViewer.DefaultOptions.clearAlpha)
+            * [.canvasAlpha](#DxfViewer.DefaultOptions.canvasAlpha)
+            * [.canvasPremultipliedAlpha](#DxfViewer.DefaultOptions.canvasPremultipliedAlpha)
+            * [.antialias](#DxfViewer.DefaultOptions.antialias)
+            * [.colorCorrection](#DxfViewer.DefaultOptions.colorCorrection)
+            * [.blackWhiteInversion](#DxfViewer.DefaultOptions.blackWhiteInversion)
+            * [.pointSize](#DxfViewer.DefaultOptions.pointSize)
+            * [.sceneOptions](#DxfViewer.DefaultOptions.sceneOptions)
+            * [.retainParsedDxf](#DxfViewer.DefaultOptions.retainParsedDxf)
+            * [.preserveDrawingBuffer](#DxfViewer.DefaultOptions.preserveDrawingBuffer)
+            * [.fileEncoding](#DxfViewer.DefaultOptions.fileEncoding)
+            * [.renderer](#DxfViewer.DefaultOptions.renderer) : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>
+        * [.SetupWorker()](#DxfViewer.SetupWorker)
 
 <a name="new_DxfViewer_new"></a>
 
@@ -81,7 +124,7 @@ The representation class for the viewer, based on Three.js WebGL renderer.
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
 | domContainer | <code>HTMLElement</code> |  | Container element to create the canvas in. Usually empty  div. Should not have padding if auto-resize feature is used. |
-| options | <code>object</code> | <code></code> | Some options can be overridden if specified. See  DxfViewer.DefaultOptions. |
+| options | <code>object</code> | <code></code> | Overrides for any of the defaults. See  [DefaultOptions](#DxfViewer.DefaultOptions) for the full set and what each one does. |
 
 <a name="DxfViewer+HasRenderer"></a>
 
@@ -119,10 +162,12 @@ Resize the canvas, keeping the current view centre and scale.
 
 <a name="DxfViewer+Load"></a>
 
-### dxfViewer.Load(params)
+### dxfViewer.Load(params) ⇒ <code>Promise</code>
 Load DXF into the viewer. Old content is discarded, state is reset.
 
 **Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
+**Returns**: <code>Promise</code> - Resolves once the drawing is loaded and first rendered. Rejects if the
+ file cannot be fetched or parsed.  
 
 | Param | Type | Description |
 | --- | --- | --- |
@@ -142,9 +187,9 @@ Draw the current scene into the canvas. The viewer renders on its own whenever t
 **Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
 <a name="DxfViewer+GetLayers"></a>
 
-### dxfViewer.GetLayers(nonEmptyOnly) ⇒ <code>Iterable.&lt;{name:String, color:number}&gt;</code>
+### dxfViewer.GetLayers(nonEmptyOnly) ⇒ [<code>Iterable.&lt;LayerInfo&gt;</code>](#LayerInfo)
 **Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
-**Returns**: <code>Iterable.&lt;{name:String, color:number}&gt;</code> - List of layer names.  
+**Returns**: [<code>Iterable.&lt;LayerInfo&gt;</code>](#LayerInfo) - The drawing's layers, in the order the file defines them.  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -210,10 +255,10 @@ Set view to fit the specified bounds.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
-| minX | <code>number</code> |  |  |
-| maxX | <code>number</code> |  |  |
-| minY | <code>number</code> |  |  |
-| maxY | <code>number</code> |  |  |
+| minX | <code>number</code> |  | Left edge of the area to fit, in scene coordinates. |
+| maxX | <code>number</code> |  | Right edge. |
+| minY | <code>number</code> |  | Bottom edge. |
+| maxY | <code>number</code> |  | Top edge. |
 | padding | <code>number</code> | <code>0.1</code> | Fraction of the fitted size to leave as a margin. |
 
 <a name="DxfViewer+GetScene"></a>
@@ -234,10 +279,9 @@ Set view to fit the specified bounds.
 **Returns**: <code>three.Vector2</code> - Scene origin in global drawing coordinates.  
 <a name="DxfViewer+GetBounds"></a>
 
-### dxfViewer.GetBounds() ⇒ <code>Object</code>
+### dxfViewer.GetBounds() ⇒ [<code>Bounds</code>](#Bounds)
 **Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
-**Returns**: <code>Object</code> - Scene bounds in model
-     space coordinates. Null if empty scene.  
+**Returns**: [<code>Bounds</code>](#Bounds) - Bounds of the loaded drawing, null if the scene is empty.  
 <a name="DxfViewer+Subscribe"></a>
 
 ### dxfViewer.Subscribe(eventName, eventHandler)
@@ -255,7 +299,7 @@ Subscribe to the specified event. The following events are defined:
 
 | Param | Type | Description |
 | --- | --- | --- |
-| eventName | <code>string</code> |  |
+| eventName | <code>string</code> | One of the names above, unprefixed. |
 | eventHandler | <code>function</code> | Accepts event object. |
 
 <a name="DxfViewer+Unsubscribe"></a>
@@ -266,11 +310,166 @@ Subscribe() call.
 
 **Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
 
-| Param | Type |
-| --- | --- |
-| eventName | <code>string</code> | 
-| eventHandler | <code>function</code> | 
+| Param | Type | Description |
+| --- | --- | --- |
+| eventName | <code>string</code> | The name passed to Subscribe(). |
+| eventHandler | <code>function</code> | The handler passed to Subscribe(). |
 
+<a name="DxfViewer.DefaultOptions"></a>
+
+### DxfViewer.DefaultOptions
+Default values for the options the constructor accepts. An option left out of the object
+passed to `new DxfViewer()` takes its value from here, so this list is also the full set of
+options.
+
+**Kind**: static property of [<code>DxfViewer</code>](#DxfViewer)  
+
+* [.DefaultOptions](#DxfViewer.DefaultOptions)
+    * [.canvasWidth](#DxfViewer.DefaultOptions.canvasWidth)
+    * [.canvasHeight](#DxfViewer.DefaultOptions.canvasHeight)
+    * [.autoResize](#DxfViewer.DefaultOptions.autoResize)
+    * [.clearColor](#DxfViewer.DefaultOptions.clearColor)
+    * [.clearAlpha](#DxfViewer.DefaultOptions.clearAlpha)
+    * [.canvasAlpha](#DxfViewer.DefaultOptions.canvasAlpha)
+    * [.canvasPremultipliedAlpha](#DxfViewer.DefaultOptions.canvasPremultipliedAlpha)
+    * [.antialias](#DxfViewer.DefaultOptions.antialias)
+    * [.colorCorrection](#DxfViewer.DefaultOptions.colorCorrection)
+    * [.blackWhiteInversion](#DxfViewer.DefaultOptions.blackWhiteInversion)
+    * [.pointSize](#DxfViewer.DefaultOptions.pointSize)
+    * [.sceneOptions](#DxfViewer.DefaultOptions.sceneOptions)
+    * [.retainParsedDxf](#DxfViewer.DefaultOptions.retainParsedDxf)
+    * [.preserveDrawingBuffer](#DxfViewer.DefaultOptions.preserveDrawingBuffer)
+    * [.fileEncoding](#DxfViewer.DefaultOptions.fileEncoding)
+    * [.renderer](#DxfViewer.DefaultOptions.renderer) : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>
+
+<a name="DxfViewer.DefaultOptions.canvasWidth"></a>
+
+#### DefaultOptions.canvasWidth
+Canvas width in pixels. Ignored when `autoResize` is set.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>400</code>  
+<a name="DxfViewer.DefaultOptions.canvasHeight"></a>
+
+#### DefaultOptions.canvasHeight
+Canvas height in pixels. Ignored when `autoResize` is set.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>300</code>  
+<a name="DxfViewer.DefaultOptions.autoResize"></a>
+
+#### DefaultOptions.autoResize
+Automatically resize canvas when the container is resized. This options utilizes
+ ResizeObserver API which is still not fully standardized. The specified canvas size is
+ ignored if the option is enabled.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
+<a name="DxfViewer.DefaultOptions.clearColor"></a>
+
+#### DefaultOptions.clearColor
+Frame buffer clear color.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>black</code>  
+<a name="DxfViewer.DefaultOptions.clearAlpha"></a>
+
+#### DefaultOptions.clearAlpha
+Frame buffer clear color alpha value.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>1</code>  
+<a name="DxfViewer.DefaultOptions.canvasAlpha"></a>
+
+#### DefaultOptions.canvasAlpha
+Use alpha channel in a framebuffer.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
+<a name="DxfViewer.DefaultOptions.canvasPremultipliedAlpha"></a>
+
+#### DefaultOptions.canvasPremultipliedAlpha
+Assume premultiplied alpha in a framebuffer.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>true</code>  
+<a name="DxfViewer.DefaultOptions.antialias"></a>
+
+#### DefaultOptions.antialias
+Use antialiasing. May degrade performance on poor hardware.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>true</code>  
+<a name="DxfViewer.DefaultOptions.colorCorrection"></a>
+
+#### DefaultOptions.colorCorrection
+Correct entities colors to ensure that they are always visible with the current background
+color.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
+<a name="DxfViewer.DefaultOptions.blackWhiteInversion"></a>
+
+#### DefaultOptions.blackWhiteInversion
+Simpler version of colorCorrection - just invert pure white or black entities if they are
+invisible on current background color.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>true</code>  
+<a name="DxfViewer.DefaultOptions.pointSize"></a>
+
+#### DefaultOptions.pointSize
+Size in pixels for rasterized points (dot mark).
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>2</code>  
+<a name="DxfViewer.DefaultOptions.sceneOptions"></a>
+
+#### DefaultOptions.sceneOptions
+Scene generation options — how the drawing is turned into geometry. See
+ [DxfSceneOptions](#DxfSceneOptions).
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+<a name="DxfViewer.DefaultOptions.retainParsedDxf"></a>
+
+#### DefaultOptions.retainParsedDxf
+Retain the simple object representing the parsed DXF - will consume a lot of additional
+memory.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
+<a name="DxfViewer.DefaultOptions.preserveDrawingBuffer"></a>
+
+#### DefaultOptions.preserveDrawingBuffer
+Whether to preserve the buffers until manually cleared or overwritten.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
+<a name="DxfViewer.DefaultOptions.fileEncoding"></a>
+
+#### DefaultOptions.fileEncoding
+Encoding to use for decoding DXF file text content. DXF files newer than DXF R2004 (AC1018)
+use UTF-8 encoding. Older files use some code page which is specified in $DWGCODEPAGE header
+variable. Currently parser is implemented in such a way that encoding must be specified
+before the content is parsed so there is no chance to use this variable dynamically. This may
+be a subject for future changes. The specified value should be suitable for passing as
+`TextDecoder` constructor `label` parameter.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>utf-8</code>  
+<a name="DxfViewer.DefaultOptions.renderer"></a>
+
+#### DefaultOptions.renderer : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>
+The Webgl renderer to use. If not specified, a new renderer will be created.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+<a name="DxfViewer.SetupWorker"></a>
+
+### DxfViewer.SetupWorker()
+Set up the worker side of the loading pipeline. A worker script handed to `Load()` through
+`params.workerFactory` must call this at its top level and do nothing else.
+
+**Kind**: static method of [<code>DxfViewer</code>](#DxfViewer)  
 <a name="DxfFetcher"></a>
 
 ## DxfFetcher
@@ -280,7 +479,7 @@ Fetches and parses DXF file.
 
 * [DxfFetcher](#DxfFetcher)
     * [new DxfFetcher(url, encoding)](#new_DxfFetcher_new)
-    * [.Fetch(progressCbk)](#DxfFetcher+Fetch)
+    * [.Fetch(progressCbk)](#DxfFetcher+Fetch) ⇒ <code>Promise.&lt;object&gt;</code>
 
 <a name="new_DxfFetcher_new"></a>
 
@@ -293,21 +492,30 @@ Fetches and parses DXF file.
 
 <a name="DxfFetcher+Fetch"></a>
 
-### dxfFetcher.Fetch(progressCbk)
+### dxfFetcher.Fetch(progressCbk) ⇒ <code>Promise.&lt;object&gt;</code>
+Fetch the file and parse it. The result is the same parsed document `DxfViewer` works
+from, so this is the way to read a drawing without rendering it.
+
 **Kind**: instance method of [<code>DxfFetcher</code>](#DxfFetcher)  
+**Returns**: <code>Promise.&lt;object&gt;</code> - The parsed document. Rejects on an HTTP error or a parse failure.  
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
-| progressCbk | <code>function</code> | <code></code> | (phase, receivedSize, totalSize) |
+| progressCbk | <code>function</code> | <code></code> | Called as (phase, receivedSize, totalSize) while the file is  read. Phase is "fetch" while downloading and "parse" once parsing starts. |
 
 <a name="Pattern"></a>
 
 ## Pattern
+A hatch pattern: the line families a hatched area is filled with, and the name they are
+registered under. Built-in patterns are registered at import time; `RegisterPattern()` adds
+more, and `LookupPattern()` finds one by name.
+
 **Kind**: global class  
 
 * [Pattern](#Pattern)
     * [new Pattern(lines, name, offsetInLineSpace)](#new_Pattern_new)
     * _instance_
+        * [.name](#Pattern+name) : <code>string</code>
         * [.isQcadDefault](#Pattern+isQcadDefault)
         * [.ContradictsNamedPattern(named)](#Pattern+ContradictsNamedPattern) ⇒ <code>boolean</code>
     * _static_
@@ -319,10 +527,16 @@ Fetches and parses DXF file.
 
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
-| lines | [<code>Array.&lt;PatternLineDef&gt;</code>](#PatternLineDef) |  |  |
+| lines | [<code>Array.&lt;PatternLineDef&gt;</code>](#PatternLineDef) |  | The line families making up the pattern. |
 | name | <code>string</code> | <code>null</code> | Pattern name, null for an unnamed pattern. |
 | offsetInLineSpace | <code>boolean</code> | <code>true</code> | Line offset is defined in line space when true, in pattern  space when false. Pattern space offset is the observed behavior of AutoDesk viewer for  patterns defined in hatch entity itself. |
 
+<a name="Pattern+name"></a>
+
+### pattern.name : <code>string</code>
+Name the pattern is registered under, null for an unnamed one.
+
+**Kind**: instance property of [<code>Pattern</code>](#Pattern)  
 <a name="Pattern+isQcadDefault"></a>
 
 ### pattern.isQcadDefault
@@ -367,12 +581,96 @@ Parse a pattern from the content of a .pat file.
 | --- | --- | --- |
 | content | <code>string</code> | Whole file content. |
 
+<a name="DxfSceneOptions"></a>
+
+## DxfSceneOptions
+Default values for `sceneOptions`, the scene generation options a viewer is constructed
+with. An option left out takes its value from here.
+
+**Kind**: global variable  
+
+* [DxfSceneOptions](#DxfSceneOptions)
+    * [.arcTessellationAngle](#DxfSceneOptions.arcTessellationAngle)
+    * [.minArcTessellationSubdivisions](#DxfSceneOptions.minArcTessellationSubdivisions)
+    * [.wireframeMesh](#DxfSceneOptions.wireframeMesh)
+    * [.suppressPaperSpace](#DxfSceneOptions.suppressPaperSpace)
+    * [.textOptions](#DxfSceneOptions.textOptions)
+
+<a name="DxfSceneOptions.arcTessellationAngle"></a>
+
+### DxfSceneOptions.arcTessellationAngle
+Target angle for each segment of tessellated arc, in radians.
+
+**Kind**: static property of [<code>DxfSceneOptions</code>](#DxfSceneOptions)  
+**Default**: <code>10 degrees</code>  
+<a name="DxfSceneOptions.minArcTessellationSubdivisions"></a>
+
+### DxfSceneOptions.minArcTessellationSubdivisions
+Divide arc to at least the specified number of segments.
+
+**Kind**: static property of [<code>DxfSceneOptions</code>](#DxfSceneOptions)  
+**Default**: <code>8</code>  
+<a name="DxfSceneOptions.wireframeMesh"></a>
+
+### DxfSceneOptions.wireframeMesh
+Render meshes (3DFACE group, POLYLINE polyface mesh) as wireframe instead of solid.
+
+**Kind**: static property of [<code>DxfSceneOptions</code>](#DxfSceneOptions)  
+**Default**: <code>false</code>  
+<a name="DxfSceneOptions.suppressPaperSpace"></a>
+
+### DxfSceneOptions.suppressPaperSpace
+Suppress paper-space entities when true (only model-space is rendered).
+
+**Kind**: static property of [<code>DxfSceneOptions</code>](#DxfSceneOptions)  
+**Default**: <code>false</code>  
+<a name="DxfSceneOptions.textOptions"></a>
+
+### DxfSceneOptions.textOptions
+Text rendering options. See [TextRendererOptions](#TextRendererOptions).
+
+**Kind**: static property of [<code>DxfSceneOptions</code>](#DxfSceneOptions)  
 <a name="MessageLevel"></a>
 
 ## MessageLevel
-Level in "message" events.
+Level in "message" events, published as `DxfViewer.MessageLevel`.
 
 **Kind**: global constant  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| INFO | <code>string</code> | Informational, nothing is wrong. |
+| WARN | <code>string</code> | The drawing loaded but something in it was not rendered as authored. |
+| ERROR | <code>string</code> | The drawing could not be loaded. |
+
+<a name="TextRendererOptions"></a>
+
+## TextRendererOptions
+Default values for the text rendering options — the `textOptions` member of `sceneOptions`.
+
+**Kind**: global constant  
+
+* [TextRendererOptions](#TextRendererOptions)
+    * [.curveSubdivision](#TextRendererOptions.curveSubdivision)
+    * [.fallbackChar](#TextRendererOptions.fallbackChar)
+
+<a name="TextRendererOptions.curveSubdivision"></a>
+
+### TextRendererOptions.curveSubdivision
+Number of segments for each curve in a glyph. Currently Three.js does not have more
+adequate angle-based or length-based tessellation option.
+
+**Kind**: static property of [<code>TextRendererOptions</code>](#TextRendererOptions)  
+**Default**: <code>2</code>  
+<a name="TextRendererOptions.fallbackChar"></a>
+
+### TextRendererOptions.fallbackChar
+Character to use when the specified fonts does not contain necessary glyph. Several ones can
+be specified, the first one available is used.
+
+**Kind**: static property of [<code>TextRendererOptions</code>](#TextRendererOptions)  
+**Default**: <code>�?</code>  
 <a name="RegisterPattern"></a>
 
 ## RegisterPattern(pattern, isMetric)
@@ -398,9 +696,41 @@ Find a registered pattern by name, case-insensitively.
 | name | <code>string</code> | Pattern name. |
 | isMetric | <code>boolean</code> | Which registry to search. See RegisterPattern(). |
 
+<a name="LayerInfo"></a>
+
+## LayerInfo : <code>object</code>
+One layer of the loaded drawing, as `GetLayers()` reports it.
+
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| name | <code>string</code> | Layer name as the drawing spells it. This is what `ShowLayer()` takes. |
+| displayName | <code>string</code> | Name to show in a user interface. |
+| color | <code>number</code> | Layer color as an RGB value, after correction against the background. |
+
+<a name="Bounds"></a>
+
+## Bounds : <code>object</code>
+Model-space bounding box of the loaded drawing, in the drawing's own coordinates rather than
+the scene's — `GetOrigin()` is not subtracted.
+
+**Kind**: global typedef  
+**Properties**
+
+| Name | Type |
+| --- | --- |
+| minX | <code>number</code> | 
+| maxX | <code>number</code> | 
+| minY | <code>number</code> | 
+| maxY | <code>number</code> | 
+
 <a name="PatternLineDef"></a>
 
 ## PatternLineDef
+One line family of a hatch pattern: a line repeated at a fixed offset to fill the area.
+
 **Kind**: global typedef  
 **Properties**
 

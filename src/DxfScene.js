@@ -3042,18 +3042,30 @@ export const ColorCode = Object.freeze({
     BY_BLOCK: -2
 })
 
+/** Default values for `sceneOptions`, the scene generation options a viewer is constructed
+ * with. An option left out takes its value from here.
+ */
 DxfScene.DefaultOptions = {
-    /** Target angle for each segment of tessellated arc. */
-    arcTessellationAngle: 10 / 180 * Math.PI,
-    /** Divide arc to at least the specified number of segments. */
-    minArcTessellationSubdivisions: 8,
-    /** Render meshes (3DFACE group, POLYLINE polyface mesh) as wireframe instead of solid. */
-    wireframeMesh: false,
-    /** Suppress paper-space entities when true (only model-space is rendered). */
-    suppressPaperSpace: false,
-    /** Text rendering options. Read from the leaf module rather than from
-     * TextRenderer.DefaultOptions, which is not yet initialized at this point when the module graph
-     * is entered through TextRenderer.js. See TextRendererOptions.js.
+    /** Target angle for each segment of tessellated arc, in radians.
+     * @default 10 degrees
      */
+    arcTessellationAngle: 10 / 180 * Math.PI,
+    /** Divide arc to at least the specified number of segments.
+     * @default
+     */
+    minArcTessellationSubdivisions: 8,
+    /** Render meshes (3DFACE group, POLYLINE polyface mesh) as wireframe instead of solid.
+     * @default
+     */
+    wireframeMesh: false,
+    /** Suppress paper-space entities when true (only model-space is rendered).
+     * @default
+     */
+    suppressPaperSpace: false,
+    /* Read from the leaf module rather than from TextRenderer.DefaultOptions, which is not yet
+     * initialized at this point when the module graph is entered through TextRenderer.js. See
+     * TextRendererOptions.js.
+     */
+    /** Text rendering options. See {@link TextRendererOptions}. */
     textOptions: DefaultTextOptions
 }

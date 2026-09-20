@@ -5,7 +5,8 @@ import {Vector2} from "three"
  */
 const ANGLE_EPS = 1e-6
 
-/**
+/** One line family of a hatch pattern: a line repeated at a fixed offset to fill the area.
+ *
  * @typedef PatternLineDef
  * @property {number} angle Line angle in radians.
  * @property {?Vector2} base Base point for scaling, rotation and anchoring. [0,0] if not specified.
@@ -14,9 +15,13 @@ const ANGLE_EPS = 1e-6
  *  spaces, positive for dashes, zero for dots.
  */
 
+/** A hatch pattern: the line families a hatched area is filled with, and the name they are
+ * registered under. Built-in patterns are registered at import time; `RegisterPattern()` adds
+ * more, and `LookupPattern()` finds one by name.
+ */
 export class Pattern {
     /**
-     * @param {PatternLineDef[]} lines
+     * @param {PatternLineDef[]} lines The line families making up the pattern.
      * @param {?string} name Pattern name, null for an unnamed pattern.
      * @param {boolean} offsetInLineSpace Line offset is defined in line space when true, in pattern
      *  space when false. Pattern space offset is the observed behavior of AutoDesk viewer for
@@ -24,6 +29,7 @@ export class Pattern {
      */
     constructor(lines, name = null, offsetInLineSpace = true) {
         this.lines = lines
+        /** @type {?string} Name the pattern is registered under, null for an unnamed one. */
         this.name = name
         this.offsetInLineSpace = offsetInLineSpace
     }

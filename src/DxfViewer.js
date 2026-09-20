@@ -8,12 +8,32 @@ import {OrbitControls} from "./OrbitControls.js"
 import {RBTree} from "./RBTree.js"
 
 
-/** Level in "message" events. */
+/** Level in "message" events, published as `DxfViewer.MessageLevel`.
+ * @property {string} INFO Informational, nothing is wrong.
+ * @property {string} WARN The drawing loaded but something in it was not rendered as authored.
+ * @property {string} ERROR The drawing could not be loaded.
+ */
 const MessageLevel = Object.freeze({
     INFO: "info",
     WARN: "warn",
     ERROR: "error"
 })
+
+/** One layer of the loaded drawing, as `GetLayers()` reports it.
+ * @typedef {object} LayerInfo
+ * @property {string} name Layer name as the drawing spells it. This is what `ShowLayer()` takes.
+ * @property {string} displayName Name to show in a user interface.
+ * @property {number} color Layer color as an RGB value, after correction against the background.
+ */
+
+/** Model-space bounding box of the loaded drawing, in the drawing's own coordinates rather than
+ * the scene's — `GetOrigin()` is not subtracted.
+ * @typedef {object} Bounds
+ * @property {number} minX
+ * @property {number} maxX
+ * @property {number} minY
+ * @property {number} maxY
+ */
 
 
 /** The representation class for the viewer, based on Three.js WebGL renderer. */
@@ -22,8 +42,8 @@ export class DxfViewer {
     /**
      * @param {HTMLElement} domContainer Container element to create the canvas in. Usually empty
      *  div. Should not have padding if auto-resize feature is used.
-     * @param {?object} options Some options can be overridden if specified. See
-     *  DxfViewer.DefaultOptions.
+     * @param {?object} options Overrides for any of the defaults. See
+     *  {@link DxfViewer.DefaultOptions} for the full set and what each one does.
      */
     constructor(domContainer, options = null) {
         this.domContainer = domContainer
@@ -201,6 +221,8 @@ export class DxfViewer {
      *  * "prepare"
      * @param {?Function} params.workerFactory Factory for worker creation. The worker script
      *  should invoke DxfViewer.SetupWorker() function.
+     * @returns {Promise} Resolves once the drawing is loaded and first rendered. Rejects if the
+     *  file cannot be fetched or parsed.
      */
     async Load({url, fonts = null, progressCbk = null, workerFactory = null}) {
         if (url === null || url === undefined) {
@@ -282,7 +304,7 @@ export class DxfViewer {
     }
 
     /** @param {boolean} nonEmptyOnly Skip layers which carry no geometry.
-     * @returns {Iterable<{name:String, color:number}>} List of layer names.
+     * @returns {Iterable<LayerInfo>} The drawing's layers, in the order the file defines them.
      */
     GetLayers(nonEmptyOnly = false) {
         const result = []
@@ -418,10 +440,10 @@ export class DxfViewer {
     }
 
     /** Set view to fit the specified bounds.
-     * @param {number} minX
-     * @param {number} maxX
-     * @param {number} minY
-     * @param {number} maxY
+     * @param {number} minX Left edge of the area to fit, in scene coordinates.
+     * @param {number} maxX Right edge.
+     * @param {number} minY Bottom edge.
+     * @param {number} maxY Top edge.
      * @param {number} padding Fraction of the fitted size to leave as a margin.
      */
     FitView(minX, maxX, minY, maxY, padding = 0.1) {
@@ -455,10 +477,7 @@ export class DxfViewer {
         return this.origin
     }
 
-    /**
-     * @returns {?{maxX: number, maxY: number, minX: number, minY: number}} Scene bounds in model
-     *      space coordinates. Null if empty scene.
-     */
+    /** @returns {?Bounds} Bounds of the loaded drawing, null if the scene is empty. */
     GetBounds() {
         return this.bounds
     }
@@ -473,7 +492,7 @@ export class DxfViewer {
      *  * "viewChanged"
      *  * "message" - Some message from the viewer. {message: string, level: string}.
      *
-     * @param {string} eventName
+     * @param {string} eventName One of the names above, unprefixed.
      * @param {function} eventHandler Accepts event object.
      */
     Subscribe(eventName, eventHandler) {
@@ -484,8 +503,8 @@ export class DxfViewer {
     /** Unsubscribe from previously subscribed event. The arguments should match previous
      * Subscribe() call.
      *
-     * @param {string} eventName
-     * @param {function} eventHandler
+     * @param {string} eventName The name passed to Subscribe().
+     * @param {function} eventHandler The handler passed to Subscribe().
      */
     Unsubscribe(eventName, eventHandler) {
         this._EnsureRenderer()
@@ -758,41 +777,71 @@ export class DxfViewer {
 
 DxfViewer.MessageLevel = MessageLevel
 
+/** Default values for the options the constructor accepts. An option left out of the object
+ * passed to `new DxfViewer()` takes its value from here, so this list is also the full set of
+ * options.
+ */
 DxfViewer.DefaultOptions = {
+    /** Canvas width in pixels. Ignored when `autoResize` is set.
+     * @default
+     */
     canvasWidth: 400,
+    /** Canvas height in pixels. Ignored when `autoResize` is set.
+     * @default
+     */
     canvasHeight: 300,
     /** Automatically resize canvas when the container is resized. This options utilizes
      *  ResizeObserver API which is still not fully standardized. The specified canvas size is
      *  ignored if the option is enabled.
+     * @default
      */
     autoResize: false,
-    /** Frame buffer clear color. */
+    /** Frame buffer clear color.
+     * @default black
+     */
     clearColor: new three.Color("#000"),
-    /** Frame buffer clear color alpha value. */
+    /** Frame buffer clear color alpha value.
+     * @default
+     */
     clearAlpha: 1.0,
-    /** Use alpha channel in a framebuffer. */
+    /** Use alpha channel in a framebuffer.
+     * @default
+     */
     canvasAlpha: false,
-    /** Assume premultiplied alpha in a framebuffer. */
+    /** Assume premultiplied alpha in a framebuffer.
+     * @default
+     */
     canvasPremultipliedAlpha: true,
-    /** Use antialiasing. May degrade performance on poor hardware. */
+    /** Use antialiasing. May degrade performance on poor hardware.
+     * @default
+     */
     antialias: true,
     /** Correct entities colors to ensure that they are always visible with the current background
      * color.
+     * @default
      */
     colorCorrection: false,
     /** Simpler version of colorCorrection - just invert pure white or black entities if they are
      * invisible on current background color.
+     * @default
      */
     blackWhiteInversion: true,
-    /** Size in pixels for rasterized points (dot mark). */
+    /** Size in pixels for rasterized points (dot mark).
+     * @default
+     */
     pointSize: 2,
-    /** Scene generation options. */
+    /** Scene generation options — how the drawing is turned into geometry. See
+     *  {@link DxfSceneOptions}.
+     */
     sceneOptions: DxfScene.DefaultOptions,
     /** Retain the simple object representing the parsed DXF - will consume a lot of additional
      * memory.
+     * @default
      */
     retainParsedDxf: false,
-    /** Whether to preserve the buffers until manually cleared or overwritten. */
+    /** Whether to preserve the buffers until manually cleared or overwritten.
+     * @default
+     */
     preserveDrawingBuffer: false,
     /** Encoding to use for decoding DXF file text content. DXF files newer than DXF R2004 (AC1018)
      * use UTF-8 encoding. Older files use some code page which is specified in $DWGCODEPAGE header
@@ -800,6 +849,7 @@ DxfViewer.DefaultOptions = {
      * before the content is parsed so there is no chance to use this variable dynamically. This may
      * be a subject for future changes. The specified value should be suitable for passing as
      * `TextDecoder` constructor `label` parameter.
+     * @default
      */
     fileEncoding: "utf-8",
     /**
@@ -809,6 +859,9 @@ DxfViewer.DefaultOptions = {
     renderer: undefined
 }
 
+/** Set up the worker side of the loading pipeline. A worker script handed to `Load()` through
+ * `params.workerFactory` must call this at its top level and do nothing else.
+ */
 DxfViewer.SetupWorker = function() {
     new DxfWorker(self, true)
 }

@@ -126,6 +126,11 @@ export declare class Pattern {
 
     readonly name: string | null
 
+    /** Whether this definition has the shape QCAD writes into every hatch it exports: one solid
+     * line at 45 degrees, whatever the pattern the entity names.
+     */
+    readonly isQcadDefault: boolean
+
     static ParsePatFile(content: string): Pattern
 
     /** Whether this pattern cannot be the same as `named`, comparing only what an embedded
