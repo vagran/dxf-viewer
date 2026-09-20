@@ -518,6 +518,10 @@ class TextBox {
                 curColor = item.color
                 this.curParagraph.SetColor(curColor)
                 break
+
+            case MTextFormatParser.EntityType.STACK:
+                this.curParagraph.FeedStack(item.numerator, item.denominator, item.divider)
+                break
             }
         }
     }
@@ -636,13 +640,7 @@ class TextBox {
                     if (chunkIdx === 0 || chunkIdx !== line.startChunkIdx) {
                         x += chunk.GetSpacingWidth()
                     }
-                    const v = new Vector2(x, y)
-                    v.applyMatrix3(transform)
-                    if (chunk.block) {
-                        yield* chunk.block.Render(v, null, rotation, null,
-                                                  HAlign.LEFT, VAlign.BASELINE,
-                                                  color, layer)
-                    }
+                    yield* chunk.Render(x, y, transform, rotation, color, layer)
                 }
                 y -= lineHeight
             }
@@ -669,17 +667,34 @@ TextBox.Paragraph = class {
         if (shape === null) {
             return
         }
-        if (this.curChunk === null) {
+        if (this.curChunk === null || this.curChunk.stack !== null) {
             this._AddChunk()
         }
         this.curChunk.PushChar(c, shape)
     }
 
     FeedSpace() {
-        if (this.curChunk === null || this.curChunk.lastChar !== null) {
+        if (this.curChunk === null || this.curChunk.lastChar !== null ||
+            this.curChunk.stack !== null) {
+
             this._AddChunk()
         }
         this.curChunk.PushSpace()
+    }
+
+    /** Feed stacked text (\S format code). It always occupies a chunk of its own.
+     * @param {string} numerator
+     * @param {string} denominator
+     * @param {string} divider One of "^", "/", "#".
+     */
+    FeedStack(numerator, denominator, divider) {
+        if (this.curChunk === null || this.curChunk.lastChar !== null ||
+            this.curChunk.stack !== null) {
+
+            this._AddChunk()
+        }
+        this.curChunk.PushStack(numerator, denominator, divider,
+                                this.textBox.charShapeProvider)
     }
 
     SetAlignment(alignment) {
@@ -799,11 +814,12 @@ TextBox.Paragraph.Chunk = class {
         this.spaceStartKerning = null
         this.spaceEndKerning = null
         this.block = null
+        this.stack = null
         this.position = null
     }
 
     PushSpace() {
-        if (this.block) {
+        if (this.block || this.stack) {
             throw new Error("Illegal operation")
         }
         this.leadingSpaces++
@@ -845,20 +861,62 @@ TextBox.Paragraph.Chunk = class {
         this.lastShape = shape
     }
 
+    /** Fill the chunk with stacked text (\S format code).
+     * @param {string} numerator
+     * @param {string} denominator
+     * @param {string} divider One of "^", "/", "#".
+     * @param {function(string): ?CharShape} charShapeProvider
+     */
+    PushStack(numerator, denominator, divider, charShapeProvider) {
+        if (this.spaceStartKerning === null) {
+            /* Kerning against a stack is not defined, so leading spaces keep their bare width. */
+            this.spaceStartKerning = 0
+            this.spaceEndKerning = 0
+        }
+        this.stack = new TextStack(this.fontSize, this.color, divider)
+        this.stack.Fill(numerator, denominator, charShapeProvider)
+    }
+
     GetSpacingWidth() {
         return (this.leadingSpaces * this.paragraph.textBox.spaceShape.advance +
             this.spaceStartKerning + this.spaceEndKerning) * this.fontSize
     }
 
     GetWidth(withSpacing) {
-        if (this.block === null) {
+        let width
+        if (this.stack !== null) {
+            width = this.stack.GetWidth()
+        } else if (this.block !== null) {
+            width = this.block.GetCurrentPosition()
+        } else {
             return 0
         }
-        let width = this.block.GetCurrentPosition()
         if (withSpacing) {
             width += this.GetSpacingWidth()
         }
         return width
+    }
+
+    /** @param {number} x Chunk position in the text box.
+     * @param {number} y Text line baseline in the text box.
+     * @param {Matrix3} transform Text box transform.
+     * @param {?number} rotation Text box rotation, deg.
+     * @param {number} color
+     * @param {?string} layer
+     * @returns {Generator<Entity>} Rendering entities.
+     */
+    *Render(x, y, transform, rotation, color, layer) {
+        if (this.stack !== null) {
+            yield* this.stack.Render(x, y, transform, rotation, color, layer)
+            return
+        }
+        if (this.block === null) {
+            return
+        }
+        const v = new Vector2(x, y)
+        v.applyMatrix3(transform)
+        yield* this.block.Render(v, null, rotation, null, HAlign.LEFT, VAlign.BASELINE,
+                                 color, layer)
     }
 }
 
@@ -1087,3 +1145,123 @@ class TextBlock {
         }
     }
 }
+
+/** Encapsulates layout calculations for stacked text (\S format code) - a pair of text pieces
+ * drawn one above the other, optionally separated by a divider line.
+ */
+class TextStack {
+    /**
+     * @param {number} fontSize Font size of the surrounding text.
+     * @param {?number} color
+     * @param {string} divider One of "^" (no divider line), "/" (horizontal divider line) or "#"
+     *  (slanted divider line).
+     */
+    constructor(fontSize, color, divider) {
+        this.fontSize = fontSize
+        this.color = color
+        this.divider = divider
+        //XXX The stack height the drawing carries, and any \H scope around the code, are both
+        // ignored, so the pieces are always drawn at the AutoCAD default fraction of the
+        // surrounding text height.
+        this.partSize = fontSize * TextStack.SIZE_RATIO
+        this.top = new TextBlock(this.partSize, color)
+        this.bottom = new TextBlock(this.partSize, color)
+    }
+
+    /**
+     * @param {string} numerator
+     * @param {string} denominator
+     * @param {function(string): ?CharShape} charShapeProvider
+     */
+    Fill(numerator, denominator, charShapeProvider) {
+        for (const [text, block] of [[numerator, this.top], [denominator, this.bottom]]) {
+            for (const c of text) {
+                const shape = charShapeProvider(c)
+                if (shape !== null) {
+                    block.PushChar(c, shape)
+                }
+            }
+        }
+    }
+
+    /** @returns {number} Width occupied by the stack. */
+    GetWidth() {
+        const top = this.top.GetCurrentPosition()
+        const bottom = this.bottom.GetCurrentPosition()
+        if (this.divider === "#") {
+            /* Diagonal stack places the pieces side by side. */
+            return top + bottom
+        }
+        return Math.max(top, bottom)
+    }
+
+    /** @param {number} x Chunk position in the text box.
+     * @param {number} y Baseline of the surrounding text in the text box.
+     * @param {Matrix3} transform Text box transform.
+     * @param {?number} rotation Text box rotation, deg.
+     * @param {number} color
+     * @param {?string} layer
+     * @returns {Generator<Entity>} Rendering entities.
+     */
+    *Render(x, y, transform, rotation, color, layer) {
+        const size = this.partSize
+        const width = this.GetWidth()
+        const topWidth = this.top.GetCurrentPosition()
+        const bottomWidth = this.bottom.GetCurrentPosition()
+        /* Baseline to baseline, leaving the same gap between the pieces ezdxf does. The pair
+         * spans from the bottom baseline to the top of the upper piece, and is centered on the
+         * middle of the surrounding text, so that a divider line runs where a horizontal fraction
+         * bar is expected.
+         */
+        const separation = size * (2 * TextStack.HEIGHT_SCALE - 1)
+        const middle = y + this.fontSize / 2
+        const bottomY = middle - (separation + size) / 2
+        const topY = bottomY + separation
+        let topX, bottomX
+        if (this.divider === "#") {
+            topX = x
+            bottomX = x + topWidth
+        } else {
+            topX = x + (width - topWidth) / 2
+            bottomX = x + (width - bottomWidth) / 2
+        }
+
+        const Place = (px, py) => new Vector2(px, py).applyMatrix3(transform)
+
+        yield* this.top.Render(Place(topX, topY), null, rotation, null,
+                               HAlign.LEFT, VAlign.BASELINE, color, layer)
+        yield* this.bottom.Render(Place(bottomX, bottomY), null, rotation, null,
+                                  HAlign.LEFT, VAlign.BASELINE, color, layer)
+
+        if (this.divider === "^") {
+            return
+        }
+        let vertices
+        if (this.divider === "/") {
+            vertices = [Place(x, middle), Place(x + width, middle)]
+        } else {
+            /* The slanted line crosses the junction of the two pieces, spanning the full stack
+             * height.
+             */
+            const slant = size / 2
+            vertices = [Place(x + topWidth - slant, bottomY),
+                        Place(x + topWidth + slant, topY + size)]
+        }
+        yield new Entity({
+            type: Entity.Type.LINE_SEGMENTS,
+            vertices,
+            layer,
+            color: this.color ?? color
+        })
+    }
+}
+
+/** Size of each stacked piece relative to the surrounding text height. Matches the AutoCAD
+ * default stack height.
+ */
+TextStack.SIZE_RATIO = 0.7
+
+/** Height of the pair relative to the two pieces together, so the part above 1 is the gap between
+ * them. The value ezdxf lays fractions out with.
+ */
+TextStack.HEIGHT_SCALE = 1.2

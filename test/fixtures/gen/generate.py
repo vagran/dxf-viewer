@@ -587,6 +587,31 @@ def _MText(doc, msp):
     msp.add_mtext("A\\C3;B", dxfattribs={"char_height": 2, "color": 1, "insert": (0, 10)})
 
 
+@Fixture("mtext-stacked")
+def _MTextStacked(doc, msp):
+    """MTEXT with the \\S stacking code in each of its forms.
+
+    The whole user data of a \\S code lies between the code and its terminating ";", so a parser
+    that skips the code skips the text with it -- which is how a table cell holding nothing but a
+    stacked pair came out blank. The divider decides what is drawn between the two pieces: "^"
+    nothing, "/" a horizontal line, "#" a slanted one.
+    """
+    attribs = {"char_height": 2, "color": 1}
+    # A tolerance-style stack. The space after "^" is how a producer keeps the caret from being
+    # read as a control character, and belongs to the encoding rather than to the text.
+    msp.add_mtext("\\SA^ B;", dxfattribs={**attribs, "insert": (0, 40)})
+    # The two divider lines.
+    msp.add_mtext("\\SA/B;", dxfattribs={**attribs, "insert": (0, 30)})
+    msp.add_mtext("\\SA#B;", dxfattribs={**attribs, "insert": (0, 20)})
+    # The shape the issue was reported with: a stack inside a height scope, followed by plain text
+    # which has to stay on the same line beside it.
+    msp.add_mtext("{\\H0.7x;\\SA^ B;}I", dxfattribs={**attribs, "insert": (0, 10)})
+    # No divider at all: nothing is stacked and the user data is plain text. The escaping rules
+    # around the divider have no geometry to show for them and are covered in
+    # test/unit/text-format.test.mjs instead -- none of ^, / and # is in the test font.
+    msp.add_mtext("\\SAB;", dxfattribs={**attribs, "insert": (0, 0)})
+
+
 @Fixture("text-missing-glyph")
 def _TextMissingGlyph(doc, msp):
     """Text containing a character no loaded font covers.

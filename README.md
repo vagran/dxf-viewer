@@ -53,7 +53,9 @@ time. Most significant reason for missing implementation is lack of correspondin
    waste for the buffer).
  * Text styling. Currently, text rendering is using just the specified fonts in the specified order.
    DXF style and font attributes are ignored. Text glyphs are always rendered infilled.
- * Advanced formatting support for MTEXT (fonts, coloring, stacking).
+ * Advanced formatting support for MTEXT (fonts, text height). Stacked text is rendered, but
+   the height codes around it are not, so its size is the AutoCAD default rather than the one
+   the drawing asks for. Color is honored per paragraph rather than per span.
  * Line patterns - all lines are rendered in continuous style for now. I am going to use 1-D texture
    generated on preparation stage, texture coordinates (which should account pattern continuity flag
    in DXF vertices attributes), and a dedicated shader to implement this feature.

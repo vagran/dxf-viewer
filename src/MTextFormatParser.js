@@ -16,7 +16,9 @@ const State = Object.freeze({
     PARAGRAPH2: 4,
     PARAGRAPH3: 5,
     /* Parsing \Cxxx color code. */
-    COLOR: 6
+    COLOR: 6,
+    /* Parsing \S stacking code user data. */
+    STACK: 7
 })
 
 const EntityType = Object.freeze({
@@ -29,7 +31,12 @@ const EntityType = Object.freeze({
      */
     PARAGRAPH_ALIGNMENT: 4,
     /** \Cxxx color code. "color" property specified (index resolved to actual color value). */
-    COLOR: 5
+    COLOR: 5,
+    /** \S stacking code. "numerator", "denominator" and "divider" properties specified. The
+     * divider is "^" for a tolerance-style stack without a divider line, "/" for a horizontal
+     * fraction, "#" for a diagonal one.
+     */
+    STACK: 6
     /* Many others are not yet implemented. */
 })
 
@@ -44,6 +51,11 @@ const longFormats = new Set([
 
 const validEscapes = new Set([
     "\\", "{", "}"
+])
+
+/** Characters which separate numerator from denominator in a \S stacking code. */
+const stackDividers = new Set([
+    "^", "/", "#"
 ])
 
 export class MTextFormatParser {
@@ -87,6 +99,53 @@ export class MTextFormatParser {
             }
             /* We actually allow whole color table indices for better compatibility. */
             curEntities.push({type: EntityType.COLOR, color: colorTable[colorIndex]})
+        }
+
+        /** Consume a \S stacking code user data, which spans from the character after "S" to the
+         * terminating ";". Backslash escapes both the divider characters and the terminator, so
+         * the whole expression is scanned here rather than by the main state machine.
+         *
+         * @param {number} start Index of the first character after "S".
+         * @returns {number} Index of the terminating ";", or the text length if not terminated.
+         */
+        function EmitStack(start) {
+            let numerator = ""
+            let denominator = null
+            let divider = null
+            let pos = start
+            for (; pos < n; pos++) {
+                let c = text.charAt(pos)
+                if (c === "\\" && pos + 1 < n) {
+                    pos++
+                    c = text.charAt(pos)
+                } else if (c === ";") {
+                    break
+                } else if (divider === null && stackDividers.has(c)) {
+                    divider = c
+                    denominator = ""
+                    continue
+                }
+                if (denominator === null) {
+                    numerator += c
+                } else {
+                    denominator += c
+                }
+            }
+            if (divider === null) {
+                /* No divider - nothing is stacked, the user data is plain text. */
+                if (numerator !== "") {
+                    curEntities.push({type: EntityType.TEXT, content: numerator})
+                }
+                return pos
+            }
+            if (divider === "^" && denominator.startsWith(" ")) {
+                /* Producers put a space after "^" so that the caret is not taken for a control
+                 * character. It belongs to the encoding, not to the text.
+                 */
+                denominator = denominator.slice(1)
+            }
+            curEntities.push({type: EntityType.STACK, numerator, denominator, divider})
+            return pos
         }
 
         function PushScope() {
@@ -160,6 +219,9 @@ export class MTextFormatParser {
                         state = State.COLOR
                         textStart = curPos + 1
                         continue
+                    case "S":
+                        state = State.STACK
+                        continue
                     }
                     state = State.SKIP_FORMAT
                     continue
@@ -195,6 +257,14 @@ export class MTextFormatParser {
                 }
                 continue
 
+            case State.STACK: {
+                const end = EmitStack(curPos)
+                curPos = end
+                textStart = end + 1
+                state = State.TEXT
+                continue
+            }
+
             case State.COLOR:
                 if (c === ";") {
                     EmitColor()
@@ -229,6 +299,9 @@ export class MTextFormatParser {
             for (const item of items) {
                 if (item.type === EntityType.TEXT) {
                     yield item.content
+                } else if (item.type === EntityType.STACK) {
+                    yield item.numerator
+                    yield item.denominator
                 } else if (item.type === EntityType.SCOPE) {
                     yield *TraverseItems(item.content)
                 }

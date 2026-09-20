@@ -65,6 +65,8 @@ function Parse(text) {
             return {align: item.alignment}
         case EntityType.COLOR:
             return {color: item.color}
+        case EntityType.STACK:
+            return {stack: [item.numerator, item.divider, item.denominator]}
         default:
             return {unknown: item.type}
         }
@@ -113,4 +115,47 @@ test("GetText yields the text and nothing else, flattening scopes", () => {
     const parser = new MTextFormatParser()
     parser.Parse("a{b\\Pc}\\C1;d")
     assert.deepStrictEqual([...parser.GetText()], ["a", "b", "c", "d"])
+})
+
+/* The \S stacking code is the one format code whose user data is the text itself: it runs from the
+ * code to the terminating ";", so a parser that skips the code drops the text with it.
+ */
+
+test("\\S splits its user data at the divider", () => {
+    assert.deepStrictEqual(Parse("\\SA^ B;"), [{stack: ["A", "^", "B"]}],
+                           "the space after ^ belongs to the encoding, not to the text")
+    assert.deepStrictEqual(Parse("\\S1/2;"), [{stack: ["1", "/", "2"]}])
+    assert.deepStrictEqual(Parse("\\S1#4;"), [{stack: ["1", "#", "4"]}])
+})
+
+test("text around a stack is kept", () => {
+    assert.deepStrictEqual(Parse("{\\H0.7x;\\SA^ B;}tail"),
+                           [{scope: [{stack: ["A", "^", "B"]}]}, {text: "tail"}],
+                           "the reported case: a stack in a height scope, followed by plain text")
+    assert.deepStrictEqual(Parse("5\\S1/2; in"),
+                           [{text: "5"}, {stack: ["1", "/", "2"]}, {text: " in"}])
+})
+
+test("only the first divider splits, and an escaped one does not", () => {
+    assert.deepStrictEqual(Parse("\\Sa/b/c;"), [{stack: ["a", "/", "b/c"]}],
+                           "later dividers are part of the denominator")
+    assert.deepStrictEqual(Parse("\\Sa\\/b^ c;"), [{stack: ["a/b", "^", "c"]}])
+    assert.deepStrictEqual(Parse("\\Sa\\;b^ c;"), [{stack: ["a;b", "^", "c"]}],
+                           "an escaped semicolon does not terminate the expression")
+})
+
+test("a stack with no divider is plain text", () => {
+    assert.deepStrictEqual(Parse("\\Sabc;"), [{text: "abc"}])
+    assert.deepStrictEqual(Parse("\\S;tail"), [{text: "tail"}], "empty user data yields nothing")
+})
+
+test("an unterminated stack runs to the end of the text", () => {
+    assert.deepStrictEqual(Parse("\\Sa^ b"), [{stack: ["a", "^", "b"]}])
+})
+
+test("GetText yields both halves of a stack", () => {
+    const parser = new MTextFormatParser()
+    parser.Parse("\\Sa^ b;c")
+    assert.deepStrictEqual([...parser.GetText()], ["a", "b", "c"],
+                           "the font pre-scan reads this, so a missing half means a missing font")
 })
