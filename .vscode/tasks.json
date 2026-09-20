@@ -162,6 +162,95 @@
             "problemMatcher": ["$eslint-stylish"]
         },
         {
+            // Checks the JSDoc comments in src/ — tag order, missing types, and a documented
+            // parameter name that the signature does not have. Needs nothing installed; see
+            // test/checkdoc.mjs for what it does and does not cover.
+            "label": "checkdoc",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "checkdoc"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": {
+                "owner": "checkdoc",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^\\s+(\\S+):(\\d+): (.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }
+            }
+        },
+        {
+            // Checks the JSDoc in just the file in the active editor.
+            "label": "checkdoc (current file)",
+            "type": "process",
+            "command": "node",
+            "args": ["test/checkdoc.mjs", "${relativeFile}"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": {
+                "owner": "checkdoc",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^\\s+(\\S+):(\\d+): (.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }
+            }
+        },
+        {
+            // Type-checks the JSDoc in src/ against the code, failing only on the codes that mean
+            // a comment is wrong. See test/checktypes.mjs for what is gated and why.
+            "label": "checktypes",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "checktypes"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": {
+                "owner": "checktypes",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(\\S+):(\\d+): (TS\\d+): (.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "code": 3,
+                    "message": 4
+                }
+            }
+        },
+        {
+            // The same, plus every diagnostic the gate ignores - the type-model noise that typing
+            // the DXF entity model would address. A survey, not a gate.
+            "label": "checktypes (all)",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "checktypes", "--", "--all"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            // Regenerates docs/api.md from the JSDoc on the public exports. The result is
+            // committed, and CI fails if a push leaves it stale, so run this after changing a
+            // doc comment on anything reachable from src/index.js.
+            "label": "docs",
+            "type": "process",
+            "command": "npm",
+            "args": ["run", "docs"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
             // Applies the same rules in place. Review the diff: src/parser/ and src/RBTree.js are
             // forks, and formatting them is what makes their upstream diffs harder to read.
             "label": "format",

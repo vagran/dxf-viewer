@@ -27,6 +27,20 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
 - **`scene.test.mjs`** — builds every drawing in `fixtures/` and compares a canonical dump of the
   result against `expected/<name>.dump`. This is the test that covers what the library is actually
   for; everything above it is hygiene.
+- **`checkdoc.mjs`** — not a test but a gate, run as `npm run checkdoc` and in CI. It reads the
+  JSDoc in `src/` and reports tag order, missing types and a documented parameter name the
+  signature does not have. `jsdoc` reports none of those: it accepts `@param name {Type}`, accepts
+  a name the function has no parameter for, and accepts no type at all, so each renders as
+  something wrong rather than as an error. It has no dependencies and takes file arguments, so
+  `node test/checkdoc.mjs src/DxfScene.js` narrows it to one file.
+- **`checktypes.mjs`** — the other documentation gate, `npm run checktypes`. It runs
+  `tsc --checkJs` over `src/` and fails only on the diagnostics that mean a comment is wrong: a
+  type name that does not resolve, and the JSDoc-specific `TS8###` family. Checking all of `src/`
+  reports ~175, and nearly all of them say that a parsed DXF entity is documented as `{object}`,
+  so every property read off one is "property does not exist" — typing that model is a separate
+  project. `npm run checktypes -- --all` lists what is ignored. It overlaps `checkdoc` on exactly
+  one rule and replaces none of it: the compiler accepts either tag order, accepts a `@param` with
+  no type, and uses its own type grammar rather than jsdoc's.
 - **`unit/`** — one file per area, over the modules that are pure functions: `math` (Matrix2 and
   the segment intersection helpers), `buffer` (DynamicBuffer), `batching-key` (the comparator, and
   the prefix-contiguity that batch lookup depends on), `text-format` (the `%%`-code substitution

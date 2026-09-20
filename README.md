@@ -22,6 +22,11 @@ from is shown in its toolbar — please quote that if you report something again
 npm install dxf-viewer
 ```
 
+## API
+
+[docs/api.md](docs/api.md) documents the public exports — `DxfViewer`, `DxfFetcher`, `Pattern` and
+the pattern registry functions. It is generated from the source comments, so it follows the code.
+
 ## Features
 
  * File fetching, parsing and preparation for rendering is separated in such a way that it can be

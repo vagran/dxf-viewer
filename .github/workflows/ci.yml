@@ -41,6 +41,52 @@ jobs:
       # broken by hand.
       - run: npm run lint
 
+  checkdoc:
+    name: checkdoc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      # Tag order, missing types, and a documented parameter the signature does not have. jsdoc
+      # itself reports none of those, which is why this is a script rather than a generator run.
+      #
+      # No `npm ci`: the script imports nothing but node builtins, and leaving the install out is
+      # what keeps that true — add a dependency to it and this job is where it shows up.
+      - run: npm run checkdoc
+
+  checktypes:
+    name: checktypes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      # Needs the install: this one runs tsc, unlike checkdoc.
+      - run: npm ci
+      # `tsc --checkJs` over src/, failing only on the diagnostics that mean a comment is wrong —
+      # a type name that does not resolve, a JSDoc tag that disagrees with the code. The type-model
+      # diagnostics are reported by `npm run checktypes -- --all` and never gate.
+      - run: npm run checktypes
+
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run docs
+      # Regenerating must be a no-op. A diff here means docs/api.md and the JSDoc it is generated
+      # from have drifted apart — the comments changed and the committed output did not.
+      - run: git diff --exit-code docs
+
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest

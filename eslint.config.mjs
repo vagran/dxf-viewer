@@ -28,7 +28,11 @@ export default [
         ]
     },
     {
-        files: ["src/**/*.js", "test/**/*.mjs", "*.mjs"],
+        /* jsdoc/ holds the inputs for `npm run docs`. Its plugin is CommonJS, because jsdoc
+         * loads it with require(), but it uses no CommonJS syntax the module parser here
+         * would reject, and the formatting rules are the project's like everywhere else.
+         */
+        files: ["src/**/*.js", "test/**/*.mjs", "*.mjs", "jsdoc/**/*.cjs"],
 
         languageOptions: {
             ecmaVersion: "latest",

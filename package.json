@@ -21,6 +21,9 @@
         "lint": "eslint .",
         "format": "eslint --fix .",
         "smoke": "node test/smoke.mjs",
+        "checkdoc": "node test/checkdoc.mjs",
+        "checktypes": "node test/checktypes.mjs",
+        "docs": "jsdoc2md --no-cache --configure jsdoc/config.json --template jsdoc/template.hbs --files src/DxfViewer.js src/DxfFetcher.js src/Pattern.js > docs/api.md",
         "svg": "node --max-old-space-size=6144 test/svg.mjs",
         "query": "python3 test/tools/dxfq.py",
         "index": "python3 test/tools/dxfidx.py",
@@ -43,6 +46,7 @@
     "devDependencies": {
         "@stylistic/eslint-plugin": "^5.10.0",
         "eslint": "^10.10.0",
+        "jsdoc-to-markdown": "^9.1.3",
         "typescript": "^7.0.2"
     }
 }

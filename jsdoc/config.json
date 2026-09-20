@@ -1,0 +1,6 @@
+{
+    "plugins": ["./jsdoc/public-api.cjs"],
+    "source": {
+        "includePattern": ".+\\.js$"
+    }
+}

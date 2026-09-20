@@ -1,0 +1,22 @@
+{
+    /* Type-checks the JSDoc in src/ against the code it documents — see test/checktypes.mjs, which
+     * is what runs this and decides which of the resulting diagnostics are gated. Nothing is
+     * emitted and no declaration file is involved; this is about the comments, not the build.
+     *
+     * `strict` is off deliberately. The DXF entity model is untyped by design — a parsed entity is
+     * whatever the file contained — so strict null and property checks would report thousands of
+     * lines that no reasonable change could fix. The diagnostics worth gating survive without it.
+     */
+    "compilerOptions": {
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "strict": false,
+        "skipLibCheck": true,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "target": "es2022",
+        "lib": ["es2022", "dom"]
+    },
+    "include": ["../src/**/*.js"]
+}
