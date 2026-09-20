@@ -905,7 +905,50 @@ DxfParser.prototype._parse = function(dxfString) {
         }
     }
 
+    /** Turn the DIMSTYLE arrowhead block handles into block names.
+     *
+     * Group codes 342, 343 and 344 hold the handle of the BLOCK_RECORD an arrowhead is defined by;
+     * the name forms (group codes 5, 6 and 7) are obsolete since R2000 and are simply absent from
+     * anything a modern CAD writes. A handle cannot be followed while the DIMSTYLE table is being
+     * read, because the BLOCKS section normally comes after TABLES, so this runs once the whole
+     * file is parsed. The handle wins over a name given by the obsolete code, should a file carry
+     * both.
+     */
+    var resolveDimStyleBlocks = function() {
+        var dimStyles = dxf.tables && dxf.tables.dimstyle && dxf.tables.dimstyle.dimStyles
+        if (!dimStyles || !dxf.blocks) {
+            return
+        }
+        /* A block carries its BLOCK_RECORD handle as its owner handle. */
+        var blockNames = new Map()
+        for (var name in dxf.blocks) {
+            var ownerHandle = dxf.blocks[name].ownerHandle
+            if (ownerHandle !== undefined) {
+                blockNames.set(ownerHandle, name)
+            }
+        }
+        var vars = ["DIMBLK", "DIMBLK1", "DIMBLK2"]
+        for (var styleName in dimStyles) {
+            var style = dimStyles[styleName]
+            for (var i = 0; i < vars.length; i++) {
+                var handleVar = vars[i] + "_handle"
+                if (!style.hasOwnProperty(handleVar)) {
+                    continue
+                }
+                var handle = style[handleVar]
+                delete style[handleVar]
+                if (blockNames.has(handle)) {
+                    style[vars[i]] = blockNames.get(handle)
+                } else {
+                    log.warn("Unresolved " + vars[i] + " block handle in dimension style " +
+                             styleName + ": " + handle)
+                }
+            }
+        }
+    }
+
     parseAll()
+    resolveDimStyleBlocks()
     return dxf
 }
 

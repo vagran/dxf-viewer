@@ -30,6 +30,7 @@ import sys
 
 import ezdxf
 from ezdxf.enums import TextEntityAlignment
+from ezdxf.render.arrows import ARROWS
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
@@ -678,6 +679,43 @@ def _DimensionColors(doc, msp):
     msp.add_linear_dim(base=(0, 20), p1=(0, 15), p2=(10, 15),
                        dxfattribs={"color": 7, "layer": "DIMS"},
                        override={"dimclrd": 256, "dimclre": 256, "dimclrt": 256}).commit()
+
+
+@Fixture("dimension-arrowhead")
+def _DimensionArrowhead(doc, msp):
+    """Dimensions whose arrowheads are chosen by DIMBLK rather than left at the default arrow.
+
+    The variable names a block, and since R2000 it is written as that block's *handle* (group codes
+    342, 343, 344) -- the name forms 5, 6 and 7 are obsolete and absent from anything a modern CAD
+    writes, which is what ezdxf produces here too. The parser has to follow the handle back to a
+    name once the whole file is read, so this fixture covers the indirection as much as the shapes.
+
+    Four styles, one dimension each, bottom to top:
+
+      * ARCHTICK  -- the reported case (issue #80): an architectural tick instead of an arrow.
+      * NONE      -- no arrowhead at all, so the dimension line stands alone.
+      * SAH       -- DIMSAH selects DIMBLK1 and DIMBLK2 per end; a tick on the first, the default
+                     arrow on the second (an empty DIMBLK2 means the default, not "none").
+      * DOT       -- an arrowhead block that is not synthesized, which must fall back to the
+                     default arrow rather than draw nothing.
+
+    set_arrows() also writes the arrowhead blocks themselves, "_CLOSEDFILLED" among them although
+    nothing names it, which is why the dump has block batches no INSERT ever reaches.
+    """
+    tick = doc.dimstyles.duplicate_entry("Standard", "TICK")
+    tick.set_arrows(blk=ARROWS.architectural_tick)
+    none = doc.dimstyles.duplicate_entry("Standard", "NONE")
+    none.set_arrows(blk=ARROWS.none)
+    sah = doc.dimstyles.duplicate_entry("Standard", "SAH")
+    sah.set_arrows(blk1=ARROWS.architectural_tick)
+    sah.dxf.dimsah = 1
+    dot = doc.dimstyles.duplicate_entry("Standard", "DOT")
+    dot.set_arrows(blk=ARROWS.dot)
+
+    for i, style in enumerate(("TICK", "NONE", "SAH", "DOT")):
+        y = i * 20
+        msp.add_linear_dim(base=(0, y + 5), p1=(0, y), p2=(10, y), dimstyle=style,
+                           dxfattribs={"color": 1})
 
 
 @Fixture("dimension-degenerate")

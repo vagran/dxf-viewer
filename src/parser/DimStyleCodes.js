@@ -27,7 +27,16 @@ const codes = new Map([
     [7, "DIMBLK2"],
     [75, "DIMSE1"],
     [76, "DIMSE2"],
-    [78, "DIMZIN"]
+    [78, "DIMZIN"],
+    /* The arrowhead block variables above name their block directly, which the specification marks
+     * obsolete; since R2000 the same three variables carry the handle of the referenced BLOCK
+     * instead, and a file written for R2000 or later has only these. The handles are turned back
+     * into names by resolveDimStyleBlocks() once the whole file is read, because the BLOCKS section
+     * may follow the TABLES section.
+     */
+    [342, "DIMBLK_handle"],
+    [343, "DIMBLK1_handle"],
+    [344, "DIMBLK2_handle"]
 ])
 
 export default codes

@@ -66,8 +66,10 @@ time. Most significant reason for missing implementation is lack of correspondin
  * Some features in hatching implementation: outer hatching style, solid/gradient infill, MPolygon
    support, double lines, boundaries defined by external entities.
  * Block instancing in a grid. Grid attributes are ignored now.
- * Dimensions-specific features and styles (various pre-defined arrowhead blocks, text positioning
-   tuning, limits and tolerances). Dimensions types other than linear ones.
+ * Dimensions-specific features and styles (text positioning tuning, limits and tolerances).
+   Dimensions types other than linear ones. Of the arrowhead blocks a dimension style may name
+   (`DIMBLK`, `DIMBLK1`, `DIMBLK2`), only ticks, oblique strokes and "none" are drawn; any other
+   one falls back to the default closed filled arrow, since the named block is not instantiated.
  * Leaders
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored. MIF encoded characters (`\M+nXXXX`) are decoded, except for the Johab code

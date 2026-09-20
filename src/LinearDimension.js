@@ -41,6 +41,47 @@ const arrowHeadShape = {
     indices: [0, 1, 2]
 }
 
+/** Arrowhead shapes which can be drawn without instantiating the block DIMBLK names. */
+const ArrowHead = Object.freeze({
+    /** The default closed filled arrow. */
+    ARROW: 0,
+    /** A stroke across the dimension point. */
+    TICK: 1,
+    /** Nothing drawn. */
+    NONE: 2
+})
+
+/** Classify a DIMBLK/DIMBLK1/DIMBLK2 value.
+ *
+ * The variable names the block an arrowhead is drawn from. AutoCAD's predefined arrowheads are
+ * ordinary blocks with reserved names ("_ARCHTICK", "_NONE", ...), which a file may also spell
+ * without the leading underscore; an unset or empty value means the default closed filled arrow.
+ *
+ * //XXX Only the shapes this class already draws are recognized. A drawing naming any other
+ * arrowhead block - "_DOT", "_INTEGRAL", or one of its own - gets the default arrow, since
+ * instantiating the block is not implemented.
+ *
+ * @param {?string} blockName DIMBLK variable value.
+ * @returns {number} One of ArrowHead.
+ */
+function GetArrowHead(blockName) {
+    if (typeof blockName !== "string") {
+        return ArrowHead.ARROW
+    }
+    switch (blockName.toUpperCase().replace(/^_/, "")) {
+    case "ARCHTICK":
+    case "OBLIQUE":
+        /* Both are a stroke through the dimension point, differing only in line width, which is
+         * not implemented.
+         */
+        return ArrowHead.TICK
+    case "NONE":
+        return ArrowHead.NONE
+    default:
+        return ArrowHead.ARROW
+    }
+}
+
 /** Encapsulates all calculations about linear dimensions layout. */
 export class LinearDimension {
 
@@ -102,6 +143,13 @@ export class LinearDimension {
         const textColor = this.styleResolver("DIMCLRT")
         const arrowSize = (this.styleResolver("DIMASZ") ?? 1) * dimScale
         const tickSize = (this.styleResolver("DIMTSZ") ?? 0) * dimScale
+        /* Arrowhead block for each end. DIMSAH selects a separate block per end, otherwise DIMBLK
+         * applies to both. A non-zero DIMTSZ draws ticks whatever they name.
+         */
+        const arrowHeads = this.styleResolver("DIMSAH") ?
+            [GetArrowHead(this.styleResolver("DIMBLK1")),
+             GetArrowHead(this.styleResolver("DIMBLK2"))] :
+            Array(2).fill(GetArrowHead(this.styleResolver("DIMBLK")))
 
         let textAnchor = this.params.textAnchor
         let flipArrows = false
@@ -173,15 +221,20 @@ export class LinearDimension {
                 flip = !flip
             }
 
+            const arrowHead = tickSize > 0 ? ArrowHead.TICK : arrowHeads[i]
+            if (arrowHead == ArrowHead.NONE) {
+                continue
+            }
+            /* DIMTSZ sizes a tick it asks for itself; an arrowhead block is sized by DIMASZ like
+             * the default arrow.
+             */
+            const size = arrowHead == ArrowHead.TICK && tickSize > 0 ? tickSize : arrowSize
+
             let transform = new Matrix3().identity()
-            if (tickSize > 0) {
-                MatrixScale(transform, tickSize, tickSize)
-            } else {
-                MatrixScale(transform, arrowSize, arrowSize)
-                /* Tick is not flipped. */
-                if (flip) {
-                    MatrixScale(transform, -1, 1)
-                }
+            MatrixScale(transform, size, size)
+            /* Tick is not flipped. */
+            if (arrowHead != ArrowHead.TICK && flip) {
+                MatrixScale(transform, -1, 1)
             }
 
             const angle = -this.vDim.angle()
@@ -189,7 +242,7 @@ export class LinearDimension {
 
             MatrixTranslate(transform, dimPt.x, dimPt.y)
 
-            if (tickSize > 0) {
+            if (arrowHead == ArrowHead.TICK) {
                 this._CreateTick(result, transform, dimColor)
             } else {
                 this._CreateArrowShape(result, transform, dimColor)
