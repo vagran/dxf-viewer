@@ -499,6 +499,82 @@ const MTextAttachment = Object.freeze({
     BOTTOM_RIGHT: 9
 })
 
+/** Code point ranges of scripts written without spaces between words. A line may be broken
+ * between any two adjacent characters of such a script, which is the only way MTEXT with no
+ * spaces in it ever wraps. Inclusive pairs, sorted by the lower bound.
+ */
+const UNSPACED_SCRIPT_RANGES = [
+    /* Hangul jamo. */
+    [0x1100, 0x11ff],
+    /* CJK radicals and punctuation, kana, bopomofo, Hangul compatibility jamo, CJK strokes,
+     * enclosed CJK letters, and the unified ideographs together with extension A.
+     */
+    [0x2e80, 0x9fff],
+    /* Yi syllables and radicals. */
+    [0xa000, 0xa4cf],
+    /* Hangul jamo extended A, Hangul syllables, Hangul jamo extended B. */
+    [0xa960, 0xd7fb],
+    /* CJK compatibility ideographs. */
+    [0xf900, 0xfaff],
+    /* CJK compatibility forms and small form variants. */
+    [0xfe10, 0xfe6f],
+    /* Full-width forms, without the half-width latin and katakana blocks that follow them. */
+    [0xff01, 0xff60],
+    /* Full-width currency and other signs. */
+    [0xffe0, 0xffe6],
+    /* CJK unified ideographs extension B and everything after it. */
+    [0x20000, 0x3ffff]
+]
+
+/** Characters which may not begin a line, so that trailing punctuation is not carried over to the
+ * next one.
+ */
+const NO_BREAK_BEFORE = new Set(
+    ",.;:!?%)]}\"'" +
+    "\u3001\u3002\uff0c\uff0e\uff1b\uff1a\uff01\uff1f\uff05\uff09\uff3d\uff5d" +
+    "\u3009\u300b\u300d\u300f\u3011\u3015\u3017\u3019\u301b\u301f\uff60" +
+    "\u30fc\u301c\uff5e\u30fb\u2026\u2025\u3005\u3006\u201d\u2019")
+
+/** Characters which may not end a line, so that opening punctuation is not left hanging at the end
+ * of one.
+ */
+const NO_BREAK_AFTER = new Set(
+    "([{$" +
+    "\uff08\uff3b\uff5b\u3008\u300a\u300c\u300e\u3010\u3014\u3016\u3018\u301a" +
+    "\u301d\uff5f\u201c\u2018\uffe5\uff04")
+
+/**
+ * @param {string} c Single character, possibly a surrogate pair.
+ * @returns {boolean} True if the character belongs to a script written without word spacing.
+ */
+function IsUnspacedScript(c) {
+    const cp = c.codePointAt(0)
+    for (const [lo, hi] of UNSPACED_SCRIPT_RANGES) {
+        if (cp < lo) {
+            return false
+        }
+        if (cp <= hi) {
+            return true
+        }
+    }
+    return false
+}
+
+/** Check if a line may be broken between two adjacent characters. Only scripts written without
+ * word spacing are considered - anywhere else a break opportunity is a space, which the chunk
+ * splitting in Paragraph.FeedSpace() already provides. Kinsoku rules keep punctuation which
+ * cannot start or end a line on the proper side of the break.
+ * @param {string} prev Character preceding the candidate break position.
+ * @param {string} cur Character following it.
+ * @returns {boolean}
+ */
+function IsBreakOpportunity(prev, cur) {
+    if (!IsUnspacedScript(prev) && !IsUnspacedScript(cur)) {
+        return false
+    }
+    return !NO_BREAK_AFTER.has(prev) && !NO_BREAK_BEFORE.has(cur)
+}
+
 /** Encapsulates layout calculations for a multiline-line text block. */
 class TextBox {
     /**
@@ -733,7 +809,13 @@ TextBox.Paragraph = class {
         if (shape === null) {
             return
         }
-        if (this.curChunk === null || this.curChunk.stack !== null) {
+        /* A chunk is the unit lines are built from, so a break opportunity inside a run of
+         * characters has to start a new one. Scripts written without spaces have no other one.
+         */
+        if (this.curChunk === null || this.curChunk.stack !== null ||
+            (this.curChunk.lastChar !== null &&
+             IsBreakOpportunity(this.curChunk.lastChar, c))) {
+
             this._AddChunk()
         }
         this.curChunk.PushChar(c, shape)
@@ -981,8 +1063,7 @@ TextBox.Paragraph.Chunk = class {
         }
         const v = new Vector2(x, y)
         v.applyMatrix3(transform)
-        yield* this.block.Render(v, null, rotation, null, HAlign.LEFT, VAlign.BASELINE,
-                                 color, layer)
+        yield* this.block.RenderAtPenOrigin(v, rotation, color, layer)
     }
 }
 
@@ -1196,6 +1277,36 @@ class TextBlock {
         MatrixRotateCW(transform, rotation)
         MatrixTranslate(transform, insertionPos.x, insertionPos.y)
 
+        yield* this._RenderGlyphs(transform, color, layer)
+    }
+
+    /** Render the block with its pen origin - the start of the baseline, ahead of the first
+     * glyph's left side bearing - placed at the specified position. Text box chunks are laid out
+     * by accumulated pen advances, so anchoring one to its ink box instead would shift it left by
+     * its own first glyph's bearing.
+     * @param {Vector2} position Pen origin position.
+     * @param {?number} rotation Rotation, deg.
+     * @param {number} color
+     * @param {?string} layer
+     * @returns {Generator<Entity>} Rendering entities.
+     */
+    *RenderAtPenOrigin(position, rotation, color, layer) {
+        if (this.bounds === null) {
+            return
+        }
+        const transform = new Matrix3()
+        MatrixRotateCW(transform, rotation ? -rotation * Math.PI / 180 : 0)
+        MatrixTranslate(transform, position.x, position.y)
+        yield* this._RenderGlyphs(transform, color, layer)
+    }
+
+    /**
+     * @param {Matrix3} transform Applied to each glyph vertex.
+     * @param {number} color
+     * @param {?string} layer
+     * @returns {Generator<Entity>} Rendering entities.
+     */
+    *_RenderGlyphs(transform, color, layer) {
         for (const glyph of this.glyphs) {
             if (glyph.vertices) {
                 for (const v of glyph.vertices) {
@@ -1294,10 +1405,8 @@ class TextStack {
 
         const Place = (px, py) => new Vector2(px, py).applyMatrix3(transform)
 
-        yield* this.top.Render(Place(topX, topY), null, rotation, null,
-                               HAlign.LEFT, VAlign.BASELINE, color, layer)
-        yield* this.bottom.Render(Place(bottomX, bottomY), null, rotation, null,
-                                  HAlign.LEFT, VAlign.BASELINE, color, layer)
+        yield* this.top.RenderAtPenOrigin(Place(topX, topY), rotation, color, layer)
+        yield* this.bottom.RenderAtPenOrigin(Place(bottomX, bottomY), rotation, color, layer)
 
         if (this.divider === "^") {
             return

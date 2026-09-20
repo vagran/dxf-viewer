@@ -1,0 +1,30 @@
+origin (0.25, 18)
+bounds (0.25, -5.3333) (3.9722, 20)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 2
+  INDEXED_TRIANGLES layer="0" block=- color=00ff00 lineType=0 chunks=1 vertices=40 indices=30
+  INDEXED_TRIANGLES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=40 indices=30
+primitives 20
+  TRIANGLE layer="0" color=00ff00 (0.2778, -3.1111) (0.2778, -5.3333) (0.8333, -5.3333)
+  TRIANGLE layer="0" color=00ff00 (0.2778, 0.2222) (0.2778, -2) (0.8333, -2)
+  TRIANGLE layer="0" color=00ff00 (0.8333, -2) (0.8333, 0.2222) (0.2778, 0.2222)
+  TRIANGLE layer="0" color=00ff00 (0.8333, -5.3333) (0.8333, -3.1111) (0.2778, -3.1111)
+  TRIANGLE layer="0" color=00ff00 (1.3889, -3.1111) (1.3889, -5.3333) (1.9444, -5.3333)
+  TRIANGLE layer="0" color=00ff00 (1.3889, 0.2222) (1.3889, -2) (1.9444, -2)
+  TRIANGLE layer="0" color=00ff00 (1.9444, -2) (1.9444, 0.2222) (1.3889, 0.2222)
+  TRIANGLE layer="0" color=00ff00 (1.9444, -5.3333) (1.9444, -3.1111) (1.3889, -3.1111)
+  TRIANGLE layer="0" color=00ff00 (2.4722, 0) (2.4722, -2) (3.9722, -2)
+  TRIANGLE layer="0" color=00ff00 (3.9722, -2) (3.9722, 0) (2.4722, 0)
+  TRIANGLE layer="0" color=ff0000 (0.25, 12.3333) (0.25, 11.3333) (1.75, 11.3333)
+  TRIANGLE layer="0" color=ff0000 (0.25, 16.6667) (0.25, 14.6667) (1.75, 14.6667)
+  TRIANGLE layer="0" color=ff0000 (0.25, 20) (0.25, 18) (1.75, 18)
+  TRIANGLE layer="0" color=ff0000 (1.75, 11.3333) (1.75, 12.3333) (0.25, 12.3333)
+  TRIANGLE layer="0" color=ff0000 (1.75, 14.6667) (1.75, 16.6667) (0.25, 16.6667)
+  TRIANGLE layer="0" color=ff0000 (1.75, 18) (1.75, 20) (0.25, 20)
+  TRIANGLE layer="0" color=ff0000 (2.25, 12.3333) (2.25, 11.3333) (3.75, 11.3333)
+  TRIANGLE layer="0" color=ff0000 (2.25, 15.1667) (2.25, 14.6667) (2.75, 14.6667)
+  TRIANGLE layer="0" color=ff0000 (2.75, 14.6667) (2.75, 15.1667) (2.25, 15.1667)
+  TRIANGLE layer="0" color=ff0000 (3.75, 11.3333) (3.75, 12.3333) (2.25, 12.3333)

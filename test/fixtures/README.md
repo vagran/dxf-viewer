@@ -55,6 +55,7 @@ measurement in the tests is *font units / 720*.
 | `I` | 200×800 box, advance 400 | a different advance, so layout cannot ignore advance widths |
 | space | no outline, advance 500 | |
 | `Z` | *absent* | the missing-glyph path and `hasMissingChars` |
+| U+4E00, U+4E8C, U+3001 | boxes with advance 720 | line breaking in a script written without spaces. Their advance is exactly the text height, so an MTEXT reference width reads as a character count |
 
 One kerning pair is declared, `A` followed by `B`, at −120 units.
 

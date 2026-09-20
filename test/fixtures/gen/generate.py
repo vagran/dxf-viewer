@@ -612,6 +612,27 @@ def _MTextStacked(doc, msp):
     msp.add_mtext("\\SAB;", dxfattribs={**attribs, "insert": (0, 0)})
 
 
+@Fixture("mtext-wrap")
+def _MTextWrap(doc, msp):
+    """MTEXT wrapped at the width of its reference rectangle.
+
+    Lines are assembled from chunks, and a space is the only chunk boundary a space-separated
+    script offers -- so text written without spaces came out as one unbroken line however narrow
+    the box was. A run of such characters has to offer a break between the characters themselves.
+
+    The test font gives U+4E00, U+4E8C and U+3001 an advance of exactly the text height, so the
+    reference width of 5 below is two and a half characters.
+    """
+    # The ideographic comma is what makes the first line three characters wide: a break before it
+    # is suppressed, so it stays with the character it follows instead of opening the next line.
+    msp.add_mtext("\u4e00\u4e00\u3001\u4e8c\u4e8c",
+                  dxfattribs={"char_height": 2, "color": 1, "insert": (0, 20), "width": 5})
+    # A break is offered where the two scripts meet, but not inside the latin run -- "II" is 2.2222
+    # wide, so the second one would otherwise wrap on its own.
+    msp.add_mtext("II\u4e00II",
+                  dxfattribs={"char_height": 2, "color": 3, "insert": (0, 0), "width": 5})
+
+
 @Fixture("text-missing-glyph")
 def _TextMissingGlyph(doc, msp):
     """Text containing a character no loaded font covers.
@@ -798,6 +819,9 @@ def _WriteFont():
       I  a narrow 200x800 box with a smaller advance, so layout cannot ignore advance widths
       space  no outline, advance 500
     "Z" is deliberately absent, to exercise the missing-glyph path and `hasMissingChars`.
+
+    U+4E00, U+4E8C and U+3001 are there so that line breaking in a script written without spaces
+    has something to break.
     """
     glyphs = {}
 
@@ -831,10 +855,25 @@ def _WriteFont():
     _Rect(pen, 100, 300, 500, 400)
     glyphs["hyphen"] = pen.glyph()
 
+    # Three characters from a script written without spaces between words, for the MTEXT wrapping
+    # fixture. Their advance is 720 units -- the scale is font units / 720 -- so each one advances
+    # exactly the text height and a reference rectangle width can be read as a character count.
+    pen = TTGlyphPen(None)
+    _Rect(pen, 90, 0, 630, 720)
+    glyphs["cjkOne"] = pen.glyph()
+    pen = TTGlyphPen(None)
+    _Rect(pen, 90, 0, 630, 360)
+    glyphs["cjkTwo"] = pen.glyph()
+    pen = TTGlyphPen(None)
+    _Rect(pen, 90, 0, 270, 180)
+    glyphs["cjkComma"] = pen.glyph()
+
     order = ([".notdef", "space", "A", "B", "I"] +
-             [digit_names[str(d)] for d in range(10)] + ["period", "hyphen"])
+             [digit_names[str(d)] for d in range(10)] +
+             ["period", "hyphen", "cjkOne", "cjkTwo", "cjkComma"])
     advances = {".notdef": 500, "space": 500, "A": 1000, "B": 1000, "I": 400,
-                "period": 300, "hyphen": 600}
+                "period": 300, "hyphen": 600,
+                "cjkOne": 720, "cjkTwo": 720, "cjkComma": 720}
     for name in digit_names.values():
         advances[name] = 600
 
@@ -842,6 +881,7 @@ def _WriteFont():
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap({0x20: "space", 0x41: "A", 0x42: "B", 0x49: "I",
                           0x2E: "period", 0x2D: "hyphen",
+                          0x4E00: "cjkOne", 0x4E8C: "cjkTwo", 0x3001: "cjkComma",
                           **{0x30 + d: digit_names[str(d)] for d in range(10)}})
     fb.setupGlyf(glyphs)
     fb.setupHorizontalMetrics({name: (advances[name], 100) for name in order})
