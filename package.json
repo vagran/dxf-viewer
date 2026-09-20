@@ -1,6 +1,6 @@
 {
     "name": "dxf-viewer",
-    "version": "1.0.48",
+    "version": "1.0.49",
     "description": "JavaScript DXF file viewer",
     "main": "src/index.js",
     "types": "src/index.d.ts",
