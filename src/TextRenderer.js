@@ -922,6 +922,13 @@ TextBox.Paragraph = class {
                     }
                     if (curWidth !== 0) {
                         CommitLine()
+                        /* The chunk now starts a line, and a line-leading chunk is rendered at
+                         * its position with no spacing in front of it. Its width was measured
+                         * with that spacing, so measure it again or the rest of the line is
+                         * shifted right by the spaces, and the line width used to align it is
+                         * overstated by the same amount.
+                         */
+                        chunkWidth = chunk.GetWidth(curWidth, false)
                     }
                 }
             }

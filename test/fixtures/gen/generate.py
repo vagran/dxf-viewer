@@ -634,6 +634,30 @@ def _MTextWrap(doc, msp):
                   dxfattribs={"char_height": 2, "color": 3, "insert": (0, 0), "width": 5})
 
 
+@Fixture("mtext-wrap-spacing")
+def _MTextWrapSpacing(doc, msp):
+    """MTEXT whose wrapped line begins with a chunk that carries leading spaces.
+
+    A chunk holds the spaces that precede it, and a chunk which begins a continuation line is
+    drawn without them -- so the width the line was measured with has to drop them too. Measured
+    with the spaces, the running width is too large by one space for the rest of that line: the
+    next word wraps when it would have fitted, and the line width that centers or right-aligns
+    the line is overstated by the same amount.
+
+    At char_height 2 the test font gives "A" and "B" an advance of 1000/720 * 2 = 2.7778, "I"
+    400/720 * 2 = 1.1111 and a space 500/720 * 2 = 1.3889.
+    """
+    attribs = {"char_height": 2, "color": 1}
+    # "AA" is 5.5556 and " BB" 6.9444 with its space, so "BB" wraps. " II" is 3.6111; it fits on
+    # the second line at 5.5556 + 3.6111 = 9.1667, but not at 6.9444 + 3.6111 = 10.5556. So the
+    # space decides whether this is two lines or three.
+    msp.add_mtext("AA BB II", dxfattribs={**attribs, "insert": (0, 10), "width": 10})
+    # The same overstatement moves a line that does not change its wrapping. "BB" alone occupies
+    # the second line either way, but centering it in the box of 6 shifts it by (6 - 5.5556) / 2
+    # = 0.2222 rather than by (6 - 6.9444) / 2 = -0.4722.
+    msp.add_mtext("\\pxqc;AA BB", dxfattribs={**attribs, "insert": (0, 0), "width": 6})
+
+
 @Fixture("mtext-caret")
 def _MTextCaret(doc, msp):
     """MTEXT caret control codes: "^J" is a line break and "^I" a tabulator.
