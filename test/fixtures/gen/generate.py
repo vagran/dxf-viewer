@@ -634,6 +634,35 @@ def _MTextWrap(doc, msp):
                   dxfattribs={"char_height": 2, "color": 3, "insert": (0, 0), "width": 5})
 
 
+@Fixture("mtext-caret")
+def _MTextCaret(doc, msp):
+    """MTEXT caret control codes: "^J" is a line break and "^I" a tabulator.
+
+    Caret notation is an *encoding* rather than a format code -- "^" and a letter stand for the
+    control character 64 below it -- so a parser that does not decode it renders the two
+    characters literally, which is what these drawings used to show.
+
+    The default tab stops are at 4, 8, 12, ... times the entity's character height, so at 8, 16
+    and 24 here. "A" is 1000/720 * 2 = 2.7778 wide, which is what makes the first tab visible:
+    it carries the next glyph to 8 rather than to 2.7778.
+
+    "^ " is the way a literal caret is written, and an unrecognised "^X" keeps both characters.
+    Neither has any geometry to show for it -- the test font has no caret glyph -- so both live
+    in test/unit/text-format.test.mjs instead, as the \\S divider escapes do.
+    """
+    attribs = {"char_height": 2, "color": 1}
+    # A line feed, which behaves exactly as \P does.
+    msp.add_mtext("A^JB", dxfattribs={**attribs, "insert": (0, 30)})
+    # "^M" is the carriage return of a CRLF pair; the break is the "^J", so this is one break and
+    # not two, and no space is left behind on either line.
+    msp.add_mtext("A^M^JB", dxfattribs={**attribs, "insert": (0, 20)})
+    # One tabulator: "B" starts at the first stop, 8.
+    msp.add_mtext("A^IB", dxfattribs={**attribs, "insert": (0, 10)})
+    # Consecutive tabulators each advance a whole stop, to 16 -- which is how a drawing that has
+    # no table entity builds one out of MTEXT.
+    msp.add_mtext("A^I^IB", dxfattribs={**attribs, "insert": (0, 0)})
+
+
 @Fixture("text-missing-glyph")
 def _TextMissingGlyph(doc, msp):
     """Text containing a character no loaded font covers.

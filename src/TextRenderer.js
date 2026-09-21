@@ -499,6 +499,13 @@ const MTextAttachment = Object.freeze({
     BOTTOM_RIGHT: 9
 })
 
+/** Spacing of the default MTEXT tab stops, as a factor of the entity's initial character height:
+ * they sit at 4, 8, 12, ... times it. A paragraph may name its own stops with the "t" argument of
+ * a "\p" code, which suppresses these; that argument is not read yet.
+ * See local/ezdxf/docs/source/dxfinternals/entities/mtext.rst.
+ */
+const DEFAULT_TAB_STOP_INTERVAL = 4
+
 /** Code point ranges of scripts written without spaces between words. A line may be broken
  * between any two adjacent characters of such a script, which is the only way MTEXT with no
  * spaces in it ever wraps. Inclusive pairs, sorted by the lower bound.
@@ -631,6 +638,10 @@ class TextBox {
 
             case MTextFormatParser.EntityType.NON_BREAKING_SPACE:
                 this.curParagraph.FeedChar(" ")
+                break
+
+            case MTextFormatParser.EntityType.TAB:
+                this.curParagraph.FeedTab()
                 break
 
             case MTextFormatParser.EntityType.PARAGRAPH_ALIGNMENT:
@@ -812,7 +823,7 @@ TextBox.Paragraph = class {
         /* A chunk is the unit lines are built from, so a break opportunity inside a run of
          * characters has to start a new one. Scripts written without spaces have no other one.
          */
-        if (this.curChunk === null || this.curChunk.stack !== null ||
+        if (this.curChunk === null || this.curChunk.stack !== null || this.curChunk.isTab ||
             (this.curChunk.lastChar !== null &&
              IsBreakOpportunity(this.curChunk.lastChar, c))) {
 
@@ -823,11 +834,19 @@ TextBox.Paragraph = class {
 
     FeedSpace() {
         if (this.curChunk === null || this.curChunk.lastChar !== null ||
-            this.curChunk.stack !== null) {
+            this.curChunk.stack !== null || this.curChunk.isTab) {
 
             this._AddChunk()
         }
         this.curChunk.PushSpace()
+    }
+
+    /** Feed a tabulator (\^I control code). It always occupies a chunk of its own, because its
+     * width is not known until the chunk's position in the line is.
+     */
+    FeedTab() {
+        this._AddChunk()
+        this.curChunk.PushTab()
     }
 
     /** Feed stacked text (\S format code). It always occupies a chunk of its own.
@@ -837,7 +856,7 @@ TextBox.Paragraph = class {
      */
     FeedStack(numerator, denominator, divider) {
         if (this.curChunk === null || this.curChunk.lastChar !== null ||
-            this.curChunk.stack !== null) {
+            this.curChunk.stack !== null || this.curChunk.isTab) {
 
             this._AddChunk()
         }
@@ -880,8 +899,13 @@ TextBox.Paragraph = class {
 
         for (; curChunkIdx < this.chunks.length; curChunkIdx++) {
             const chunk = this.chunks[curChunkIdx]
-            let chunkWidth = chunk.GetWidth(startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
-            if (boxWidth !== null && boxWidth !== 0) {
+            let chunkWidth = chunk.GetWidth(curWidth,
+                                            startChunkIdx === 0 || curChunkIdx !== startChunkIdx)
+            /* A tabulator is whitespace, so a line never breaks on one - the word after it
+             * breaks instead. Its width was also measured from the position it holds now, and a
+             * commit here would move it to the start of the line and leave that width stale.
+             */
+            if (boxWidth !== null && boxWidth !== 0 && !chunk.isTab) {
                 if (curWidth + chunkWidth > boxWidth) {
                     if (curChunkIdx == 0 && chunk.leadingSpaces > 0) {
                         /* Special handling for initial leading spaces. In case the first word with
@@ -894,7 +918,7 @@ TextBox.Paragraph = class {
                             new TextBox.Paragraph.Line(this, startChunkIdx, startChunkIdx, 0))
                         /* Trim leading spaces in next line with the word. */
                         chunk.leadingSpaces = 0
-                        chunkWidth = chunk.GetWidth(false)
+                        chunkWidth = chunk.GetWidth(curWidth, false)
                     }
                     if (curWidth !== 0) {
                         CommitLine()
@@ -964,13 +988,24 @@ TextBox.Paragraph.Chunk = class {
         this.block = null
         this.stack = null
         this.position = null
+        this.isTab = false
     }
 
     PushSpace() {
-        if (this.block || this.stack) {
+        if (this.block || this.stack || this.isTab) {
             throw new Error("Illegal operation")
         }
         this.leadingSpaces++
+    }
+
+    /** Make this chunk a tabulator. It holds no glyphs; its width is the distance from wherever
+     * it lands to the next tab stop, so it is resolved in GetWidth() rather than here.
+     */
+    PushTab() {
+        if (this.block || this.stack || this.leadingSpaces) {
+            throw new Error("Illegal operation")
+        }
+        this.isTab = true
     }
 
     /**
@@ -1030,7 +1065,19 @@ TextBox.Paragraph.Chunk = class {
             this.spaceStartKerning + this.spaceEndKerning) * this.fontSize
     }
 
-    GetWidth(withSpacing) {
+    /** @param {number} xPos Where the chunk starts within its line. Only a tabulator's width
+     *  depends on it.
+     * @param {boolean} withSpacing Whether to include the leading spaces.
+     * @returns {number} Chunk width.
+     */
+    GetWidth(xPos, withSpacing) {
+        if (this.isTab) {
+            const step = DEFAULT_TAB_STOP_INTERVAL * this.paragraph.textBox.fontSize
+            if (!(step > 0)) {
+                return 0
+            }
+            return (Math.floor(xPos / step) + 1) * step - xPos
+        }
         let width
         if (this.stack !== null) {
             width = this.stack.GetWidth()

@@ -18,7 +18,9 @@ const State = Object.freeze({
     /* Parsing \Cxxx color code. */
     COLOR: 6,
     /* Parsing \S stacking code user data. */
-    STACK: 7
+    STACK: 7,
+    /* Parsing the character after "^" in a caret control code. */
+    CARET: 8
 })
 
 const EntityType = Object.freeze({
@@ -36,7 +38,9 @@ const EntityType = Object.freeze({
      * divider is "^" for a tolerance-style stack without a divider line, "/" for a horizontal
      * fraction, "#" for a diagonal one.
      */
-    STACK: 6
+    STACK: 6,
+    /** "^I" tabulator control code. Advances to the next tab stop. */
+    TAB: 7
     /* Many others are not yet implemented. */
 })
 
@@ -194,6 +198,11 @@ export class MTextFormatParser {
                     state = State.ESCAPE
                     continue
                 }
+                if (c === "^") {
+                    EmitText()
+                    state = State.CARET
+                    continue
+                }
                 continue
 
             case State.ESCAPE:
@@ -235,6 +244,42 @@ export class MTextFormatParser {
                     textStart = curPos - 1
                 }
                 state = State.TEXT
+                continue
+
+            case State.CARET:
+                /* Caret notation: "^" and a letter stand for the control character 64 below it.
+                 * Unlike the backslash codes this is an *encoding*, not formatting, so the caret
+                 * never reaches the text - which is why "^ " is how a producer writes a literal
+                 * one, and why the space after "^" in a \S stack is not part of the denominator.
+                 */
+                switch (c) {
+                case "I":
+                    EmitEntity(EntityType.TAB)
+                    break
+                case "J":
+                    /* Line feed. */
+                    EmitEntity(EntityType.PARAGRAPH)
+                    break
+                case "M":
+                    /* Carriage return, always paired with "^J" - the line break is that one. */
+                    break
+                case " ":
+                    curEntities.push({type: EntityType.TEXT, content: "^"})
+                    break
+                default:
+                    /* Not a code this parser knows. Keep the caret as text and reprocess the
+                     * character in TEXT state, so a "{", "}" or "\" following it is not eaten.
+                     */
+                    //XXX the rest of the caret range is left verbatim rather than decoded to its
+                    // control character, which AutoCAD shows as a box
+                    curEntities.push({type: EntityType.TEXT, content: "^"})
+                    textStart = curPos
+                    state = State.TEXT
+                    curPos--
+                    continue
+                }
+                state = State.TEXT
+                textStart = curPos + 1
                 continue
 
             case State.PARAGRAPH1:

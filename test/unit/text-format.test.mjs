@@ -98,6 +98,8 @@ function Parse(text) {
             return {color: item.color}
         case EntityType.STACK:
             return {stack: [item.numerator, item.divider, item.denominator]}
+        case EntityType.TAB:
+            return "tab"
         default:
             return {unknown: item.type}
         }
@@ -140,6 +142,50 @@ test("\\pxq sets paragraph alignment", () => {
         assert.deepStrictEqual(Parse(`\\pxq${alignment};text`),
                                [{align: alignment}, {text: "text"}])
     }
+})
+
+/* Caret notation is an encoding rather than a format code: "^" and a letter stand for the control
+ * character 64 below it. Left undecoded, the two characters reach the glyph layer as text.
+ */
+
+test("^J is a line break, like \\P", () => {
+    assert.deepStrictEqual(Parse("a^Jb"), [{text: "a"}, "paragraph", {text: "b"}])
+})
+
+test("^M is the carriage return of a CRLF pair and yields nothing on its own", () => {
+    assert.deepStrictEqual(Parse("a^M^Jb"), [{text: "a"}, "paragraph", {text: "b"}],
+                           "the pair is one break, not two")
+    assert.deepStrictEqual(Parse("a^Mb"), [{text: "a"}, {text: "b"}],
+                           "and never becomes a space")
+})
+
+test("^I is a tabulator", () => {
+    assert.deepStrictEqual(Parse("a^Ib"), [{text: "a"}, "tab", {text: "b"}])
+    assert.deepStrictEqual(Parse("^I^Ia"), ["tab", "tab", {text: "a"}],
+                           "consecutive tabulators each stand on their own")
+})
+
+test("^ is how a literal caret is written", () => {
+    assert.deepStrictEqual(Parse("a^ b"), [{text: "a"}, {text: "^"}, {text: "b"}],
+                           "the space belongs to the encoding, not to the text")
+})
+
+test("an unrecognised caret code keeps both characters", () => {
+    assert.deepStrictEqual(Parse("a^Zb"), [{text: "a"}, {text: "^"}, {text: "Zb"}])
+    assert.deepStrictEqual(Parse("a^{b}"),
+                           [{text: "a"}, {text: "^"}, {scope: [{text: "b"}]}],
+                           "the character after it is reprocessed, so a scope still opens")
+})
+
+test("a caret inside \\S user data is the stack divider, not a control code", () => {
+    assert.deepStrictEqual(Parse("\\SA^ B;"), [{stack: ["A", "^", "B"]}])
+    assert.deepStrictEqual(Parse("\\SA^ B;x^Jy"),
+                           [{stack: ["A", "^", "B"]}, {text: "x"}, "paragraph", {text: "y"}],
+                           "and the code after it is still decoded")
+})
+
+test("a trailing lone caret is dropped", () => {
+    assert.deepStrictEqual(Parse("a^"), [{text: "a"}])
 })
 
 test("GetText yields the text and nothing else, flattening scopes", () => {
