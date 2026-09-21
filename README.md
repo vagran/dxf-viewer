@@ -56,9 +56,11 @@ time. Most significant reason for missing implementation is lack of correspondin
  * Advanced formatting support for MTEXT (fonts, text height). Stacked text is rendered, but
    the height codes around it are not, so its size is the AutoCAD default rather than the one
    the drawing asks for. Color is honored per paragraph rather than per span.
- * Custom MTEXT tab stops. A tabulator advances to the next default stop, at a multiple of four
-   times the character height; the per-paragraph stops of a `\pxt` code, and their left, right
-   and center variants, are ignored.
+ * MTEXT paragraph properties other than alignment. Alignment (the `q` argument of a `\p` code)
+   is honored wherever it appears in the argument list; the indents (`i`, `l`, `r`), the line
+   spacing (`s`) and the tab stops (`t`) are parsed over but ignored. A tabulator therefore
+   advances to the next default stop, at a multiple of four times the character height, rather
+   than to a stop the paragraph names.
  * Line patterns - all lines are rendered in continuous style for now. I am going to use 1-D texture
    generated on preparation stage, texture coordinates (which should account pattern continuity flag
    in DXF vertices attributes), and a dedicated shader to implement this feature.

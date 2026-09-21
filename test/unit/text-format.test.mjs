@@ -144,6 +144,42 @@ test("\\pxq sets paragraph alignment", () => {
     }
 })
 
+/* "\p" carries a comma separated argument list, and producers disagree about its order and about
+ * where the "x" marker goes. Reading it as the fixed sequence "\pxq<c>;" dropped the alignment of
+ * every other spelling, two of which are in the corpus.
+ */
+
+test("paragraph alignment is found wherever it sits in the argument list", () => {
+    const cases = [
+        ["\\pqc;", "no x marker at all"],
+        ["\\pxsm1,qc;", "after a line spacing argument"],
+        ["\\pxi-3,l3,qc;", "after two indents"],
+        ["\\pxr0.76667,sm1,qc,t34.258;", "between an indent and a tab stop list"],
+        ["\\pxqc,t4;", "before a tab stop list"],
+        ["\\pxt4,qc;", "and after one"]
+    ]
+    for (const [code, what] of cases) {
+        assert.deepStrictEqual(Parse(`${code}text`), [{align: "c"}, {text: "text"}], what)
+    }
+})
+
+test("an argument list with no alignment yields none", () => {
+    for (const code of ["\\pi-2.65;", "\\pl0;", "\\pt1.8;", "\\pxt683;"]) {
+        assert.deepStrictEqual(Parse(`${code}text`), [{text: "text"}], code)
+    }
+})
+
+test("q* resets the alignment to the default", () => {
+    assert.deepStrictEqual(Parse("\\pq*;text"), [{align: "*"}, {text: "text"}],
+                           "which TextBox reads as no alignment, the same as \"j\"")
+    assert.deepStrictEqual(Parse("\\pi*,l*,r*,q*,t;text"), [{align: "*"}, {text: "text"}],
+                           "the sequence BricsCAD writes to reset every argument")
+})
+
+test("q with nothing after it does not swallow the terminator", () => {
+    assert.deepStrictEqual(Parse("\\pxq;text"), [{text: "text"}])
+})
+
 /* Caret notation is an encoding rather than a format code: "^" and a letter stand for the control
  * character 64 below it. Left undecoded, the two characters reach the glyph layer as text.
  */

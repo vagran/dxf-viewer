@@ -1,0 +1,33 @@
+origin (2.5, 38)
+bounds (0.2778, -12) (9.7222, 40.2222)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 1
+  INDEXED_TRIANGLES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=96 indices=72
+primitives 24
+  TRIANGLE layer="0" color=ff0000 (0.2778, -9.7778) (0.2778, -12) (2.5, -12)
+  TRIANGLE layer="0" color=ff0000 (2.5, -12) (2.5, -9.7778) (0.2778, -9.7778)
+  TRIANGLE layer="0" color=ff0000 (2.5, 10.2222) (2.5, 8) (4.7222, 8)
+  TRIANGLE layer="0" color=ff0000 (2.5, 20.2222) (2.5, 18) (4.7222, 18)
+  TRIANGLE layer="0" color=ff0000 (2.5, 30.2222) (2.5, 28) (4.7222, 28)
+  TRIANGLE layer="0" color=ff0000 (2.5, 40.2222) (2.5, 38) (4.7222, 38)
+  TRIANGLE layer="0" color=ff0000 (3.0556, -9.7778) (3.0556, -12) (5.2778, -12)
+  TRIANGLE layer="0" color=ff0000 (4.7222, 0.2222) (4.7222, -2) (6.9444, -2)
+  TRIANGLE layer="0" color=ff0000 (4.7222, 18) (4.7222, 20.2222) (2.5, 20.2222)
+  TRIANGLE layer="0" color=ff0000 (4.7222, 28) (4.7222, 30.2222) (2.5, 30.2222)
+  TRIANGLE layer="0" color=ff0000 (4.7222, 38) (4.7222, 40.2222) (2.5, 40.2222)
+  TRIANGLE layer="0" color=ff0000 (4.7222, 8) (4.7222, 10.2222) (2.5, 10.2222)
+  TRIANGLE layer="0" color=ff0000 (5.2778, -12) (5.2778, -9.7778) (3.0556, -9.7778)
+  TRIANGLE layer="0" color=ff0000 (5.2778, 10.2222) (5.2778, 8) (7.5, 8)
+  TRIANGLE layer="0" color=ff0000 (5.2778, 20.2222) (5.2778, 18) (7.5, 18)
+  TRIANGLE layer="0" color=ff0000 (5.2778, 30.2222) (5.2778, 28) (7.5, 28)
+  TRIANGLE layer="0" color=ff0000 (5.2778, 40.2222) (5.2778, 38) (7.5, 38)
+  TRIANGLE layer="0" color=ff0000 (6.9444, -2) (6.9444, 0.2222) (4.7222, 0.2222)
+  TRIANGLE layer="0" color=ff0000 (7.5, 0.2222) (7.5, -2) (9.7222, -2)
+  TRIANGLE layer="0" color=ff0000 (7.5, 18) (7.5, 20.2222) (5.2778, 20.2222)
+  TRIANGLE layer="0" color=ff0000 (7.5, 28) (7.5, 30.2222) (5.2778, 30.2222)
+  TRIANGLE layer="0" color=ff0000 (7.5, 38) (7.5, 40.2222) (5.2778, 40.2222)
+  TRIANGLE layer="0" color=ff0000 (7.5, 8) (7.5, 10.2222) (5.2778, 10.2222)
+  TRIANGLE layer="0" color=ff0000 (9.7222, -2) (9.7222, 0.2222) (7.5, 0.2222)

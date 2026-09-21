@@ -634,6 +634,32 @@ def _MTextWrap(doc, msp):
                   dxfattribs={"char_height": 2, "color": 3, "insert": (0, 0), "width": 5})
 
 
+@Fixture("mtext-paragraph-align")
+def _MTextParagraphAlign(doc, msp):
+    """The spellings of a "\\p" argument list which carry a paragraph alignment.
+
+    The list is comma separated and producers disagree about the order of its arguments and about
+    where the "x" marker goes, so the alignment has to be found wherever it sits rather than at a
+    fixed offset. All four centered spellings below have to place the text identically.
+
+    "AA" is 2 * 1000/720 * 2 = 5.5556 wide in a box of 10, so centering offsets it by 2.2222 and
+    right alignment by 4.4444. The kerned pair "AB" is avoided so the arithmetic stays plain.
+    """
+    attribs = {"char_height": 2, "color": 1, "width": 10}
+    # The spelling that already worked, as the reference the others have to match.
+    msp.add_mtext("\\pxqc;AA", dxfattribs={**attribs, "insert": (0, 40)})
+    # No "x" marker at all.
+    msp.add_mtext("\\pqc;AA", dxfattribs={**attribs, "insert": (0, 30)})
+    # Behind a line spacing argument, as georekon.dxf writes it.
+    msp.add_mtext("\\pxsm1,qc;AA", dxfattribs={**attribs, "insert": (0, 20)})
+    # Behind two indents and in front of a tab stop list.
+    msp.add_mtext("\\pxi-3,l3,qc,t4;AA", dxfattribs={**attribs, "insert": (0, 10)})
+    # Right alignment, so the fixture fails if every paragraph is merely centered.
+    msp.add_mtext("\\pxqr;AA", dxfattribs={**attribs, "insert": (0, 0)})
+    # "q*" resets to the default, which for a top-left attachment point is left.
+    msp.add_mtext("\\pq*;AA", dxfattribs={**attribs, "insert": (0, -10)})
+
+
 @Fixture("mtext-wrap-spacing")
 def _MTextWrapSpacing(doc, msp):
     """MTEXT whose wrapped line begins with a chunk that carries leading spaces.

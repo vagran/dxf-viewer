@@ -11,16 +11,16 @@ const State = Object.freeze({
     ESCAPE: 1,
     /* Skip currently unsupported format codes till ';' */
     SKIP_FORMAT: 2,
-    /* For \pxq* paragraph formatting. Not found documentation yet, so temporal naming for now. */
-    PARAGRAPH1: 3,
-    PARAGRAPH2: 4,
-    PARAGRAPH3: 5,
+    /* Scanning the argument list of a \p paragraph properties code, until its ";". */
+    PARAGRAPH_PROPS: 3,
+    /* The character after "q" in that list, which is the alignment. */
+    PARAGRAPH_ALIGN: 4,
     /* Parsing \Cxxx color code. */
-    COLOR: 6,
+    COLOR: 5,
     /* Parsing \S stacking code user data. */
-    STACK: 7,
+    STACK: 6,
     /* Parsing the character after "^" in a caret control code. */
-    CARET: 8
+    CARET: 7
 })
 
 const EntityType = Object.freeze({
@@ -29,7 +29,8 @@ const EntityType = Object.freeze({
     PARAGRAPH: 2,
     NON_BREAKING_SPACE: 3,
     /** "alignment" property is either "r", "c", "l", "j", "d" for right, center, left, justify
-     * (seems to be the same as left), distribute (justify) alignment.
+     * (seems to be the same as left), distribute (justify) alignment, or "*" to reset to the
+     * default. Anything else is treated as the default as well.
      */
     PARAGRAPH_ALIGNMENT: 4,
     /** \Cxxx color code. "color" property specified (index resolved to actual color value). */
@@ -222,7 +223,7 @@ export class MTextFormatParser {
                 if (longFormats.has(c)) {
                     switch (c) {
                     case "p":
-                        state = State.PARAGRAPH1
+                        state = State.PARAGRAPH_PROPS
                         continue
                     case "C":
                         state = State.COLOR
@@ -282,17 +283,35 @@ export class MTextFormatParser {
                 textStart = curPos + 1
                 continue
 
-            case State.PARAGRAPH1:
-                state = c === "x" ? State.PARAGRAPH2 : State.SKIP_FORMAT
+            case State.PARAGRAPH_PROPS:
+                /* "\p" introduces a comma separated argument list: "i", "l" and "r" indents,
+                 * "q" alignment, "t" tab stops, "s" line spacing, and an "x" marker whose
+                 * placement has no rule. Only alignment is acted on, and the order the rest
+                 * arrives in varies between producers, so every other character is skipped one
+                 * at a time rather than tokenized - which is also what ezdxf does, and is why
+                 * "\pxsm1,qc;" and "\pqc;" mean the same thing as "\pxqc;".
+                 * See local/ezdxf/docs/source/dxfinternals/entities/mtext.rst.
+                 */
+                if (c === ";") {
+                    textStart = curPos + 1
+                    state = State.TEXT
+                    continue
+                }
+                if (c === "q") {
+                    state = State.PARAGRAPH_ALIGN
+                }
                 continue
 
-            case State.PARAGRAPH2:
-                state = c === "q" ? State.PARAGRAPH3 : State.SKIP_FORMAT
-                continue
-
-            case State.PARAGRAPH3:
+            case State.PARAGRAPH_ALIGN:
+                if (c === ";") {
+                    /* "q" with no alignment after it. The terminator is still the list's. */
+                    textStart = curPos + 1
+                    state = State.TEXT
+                    continue
+                }
+                /* "*" resets to the default, which is what an unrecognized letter yields too. */
                 curEntities.push({type: EntityType.PARAGRAPH_ALIGNMENT, alignment: c})
-                state = State.SKIP_FORMAT
+                state = State.PARAGRAPH_PROPS
                 continue
 
             case State.SKIP_FORMAT:
