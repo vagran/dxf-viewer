@@ -709,6 +709,7 @@ One layer of the loaded drawing, as `GetLayers()` reports it.
 | name | <code>string</code> | Layer name as the drawing spells it. This is what `ShowLayer()` takes. |
 | displayName | <code>string</code> | Name to show in a user interface. |
 | color | <code>number</code> | Layer color as an RGB value, after correction against the background. |
+| visible | <code>boolean</code> | Whether the layer is currently shown. It starts out false for a      layer the drawing has switched off, and follows `ShowLayer()` afterwards. |
 
 <a name="Bounds"></a>
 

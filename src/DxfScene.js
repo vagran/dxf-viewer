@@ -2443,7 +2443,12 @@ export class DxfScene {
             scene.layers.push({
                 name: layer.name,
                 displayName: layer.displayName,
-                color: layer.color
+                color: layer.color,
+                /* A layer switched off keeps its geometry - unlike a frozen one it is a view
+                 * setting the user may turn back on, so the viewer hides the objects rather than
+                 * the scene dropping them. Absent group 62 means the layer is on.
+                 */
+                visible: layer.visible ?? true
             })
         }
 

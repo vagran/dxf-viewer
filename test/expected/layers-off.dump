@@ -1,0 +1,14 @@
+origin (0, 0)
+bounds (0, 0) (10, 2)
+hasMissingChars no
+layers 4
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+  "OFF" color=ff0000 off
+  "ON" color=00ff00
+batches 2
+  LINES layer="OFF" block=- color=ff0000 lineType=0 vertices=4
+  LINES layer="ON" block=- color=00ff00 lineType=0 vertices=4
+primitives 2
+  POLYLINE layer="OFF" color=ff0000 (0, 0) (10, 0)
+  POLYLINE layer="ON" color=00ff00 (0, 2) (10, 2)

@@ -24,6 +24,8 @@ const MessageLevel = Object.freeze({
  * @property {string} name Layer name as the drawing spells it. This is what `ShowLayer()` takes.
  * @property {string} displayName Name to show in a user interface.
  * @property {number} color Layer color as an RGB value, after correction against the background.
+ * @property {boolean} visible Whether the layer is currently shown. It starts out false for a
+ *      layer the drawing has switched off, and follows `ShowLayer()` afterwards.
  */
 
 /** Model-space bounding box of the loaded drawing, in the drawing's own coordinates rather than
@@ -244,9 +246,10 @@ export class DxfViewer {
         this.hasMissingChars = scene.hasMissingChars
 
         for (const layer of scene.layers) {
-            this.layers.set(layer.name, new Layer(layer.name, layer.displayName, layer.color))
+            this.layers.set(layer.name,
+                            new Layer(layer.name, layer.displayName, layer.color, layer.visible))
         }
-        this.defaultLayer = this.layers.get("0") ?? new Layer("0", "0", 0)
+        this.defaultLayer = this.layers.get("0") ?? new Layer("0", "0", 0, true)
 
         /* Load all blocks on the first pass. */
         for (const batch of scene.batches) {
@@ -315,7 +318,8 @@ export class DxfViewer {
             result.push({
                 name: lyr.name,
                 displayName: lyr.displayName,
-                color: this._TransformColor(lyr.color)
+                color: this._TransformColor(lyr.color),
+                visible: lyr.visible
             })
         }
         return result
@@ -331,6 +335,7 @@ export class DxfViewer {
         if (!layer) {
             return
         }
+        layer.visible = show
         for (const obj of layer.objects) {
             obj.visible = show
         }
@@ -589,6 +594,9 @@ export class DxfViewer {
             this.scene.add(obj)
             const layer = obj._dxfViewerLayer ?? this.defaultLayer
             layer.PushObject(obj)
+            if (!layer.visible) {
+                obj.visible = false
+            }
         }
     }
 
@@ -1074,10 +1082,11 @@ class Batch {
 }
 
 class Layer {
-    constructor(name, displayName, color) {
+    constructor(name, displayName, color, visible) {
         this.name = name
         this.displayName = displayName
         this.color = color
+        this.visible = visible
         this.objects = []
     }
 

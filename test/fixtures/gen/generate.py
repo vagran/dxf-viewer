@@ -886,6 +886,27 @@ def _LayersFrozen(doc, msp):
         msp.add_line((0, 2 * i), (10, 2 * i), dxfattribs={"layer": layer, "color": 256})
 
 
+@Fixture("layers-off")
+def _LayersOff(doc, msp):
+    """A layer switched off, which LAYER group 62 marks by making the colour negative.
+
+    Off and frozen are different states and this is the one the user can undo: AutoCAD keeps the
+    geometry of an off layer loaded and lets the layer be switched back on, where a frozen layer
+    is gone until the drawing is regenerated. So the entities below have to reach the scene and
+    the batches have to be there -- only the layer is reported as not visible, which is what the
+    viewer hides the objects by.
+    """
+    # ezdxf writes group 62 from the colour, so the sign is set through the attribute directly.
+    doc.layers.add("OFF", color=1).dxf.color = -1
+    doc.layers.add("ON", color=3)
+    # Off *and* frozen. Frozen wins, and the layer does not reach the scene at all.
+    off_frozen = doc.layers.add("OFF_FROZEN", color=5)
+    off_frozen.dxf.color = -5
+    off_frozen.dxf.flags = 1
+    for i, layer in enumerate(("OFF", "ON", "OFF_FROZEN")):
+        msp.add_line((0, 2 * i), (10, 2 * i), dxfattribs={"layer": layer, "color": 256})
+
+
 @Fixture("mesh-3dface")
 def _Mesh3dFace(doc, msp):
     """3DFACE, which decomposes into triangles rather than lines."""

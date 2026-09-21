@@ -144,7 +144,9 @@ export function FormatDump(scene) {
     const layers = [...reader.GetLayers()]
     lines.push(`layers ${layers.length}`)
     for (const layer of layers) {
-        lines.push(`  ${Name(layer.name)} color=${Color(layer.color)}`)
+        /* Only a switched-off layer is annotated, so the common case stays terse. */
+        lines.push(`  ${Name(layer.name)} color=${Color(layer.color)}` +
+                   `${layer.visible === false ? " off" : ""}`)
     }
 
     lines.push(`batches ${scene.batches.length}`)

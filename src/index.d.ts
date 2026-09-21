@@ -51,7 +51,9 @@ export type DxfViewerLoadParams = {
 export type LayerInfo = {
     name: string,
     displayName: string,
-    color: number
+    color: number,
+    /** False for a layer the drawing has switched off. Follows ShowLayer() afterwards. */
+    visible: boolean
 }
 
 export type EventName = "loaded" | "cleared" | "destroyed" | "resized" | "pointerdown" |
