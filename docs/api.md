@@ -97,6 +97,8 @@ The representation class for the viewer, based on Three.js WebGL renderer.
         * [.GetBounds()](#DxfViewer+GetBounds) ⇒ [<code>Bounds</code>](#Bounds)
         * [.Subscribe(eventName, eventHandler)](#DxfViewer+Subscribe)
         * [.Unsubscribe(eventName, eventHandler)](#DxfViewer+Unsubscribe)
+        * [.CanvasToSceneCoord(x, y)](#DxfViewer+CanvasToSceneCoord) ⇒ <code>Object</code>
+        * [.SceneToCanvasCoord(x, y)](#DxfViewer+SceneToCanvasCoord) ⇒ <code>Object</code>
     * _static_
         * [.DefaultOptions](#DxfViewer.DefaultOptions)
             * [.canvasWidth](#DxfViewer.DefaultOptions.canvasWidth)
@@ -114,6 +116,7 @@ The representation class for the viewer, based on Three.js WebGL renderer.
             * [.retainParsedDxf](#DxfViewer.DefaultOptions.retainParsedDxf)
             * [.preserveDrawingBuffer](#DxfViewer.DefaultOptions.preserveDrawingBuffer)
             * [.fileEncoding](#DxfViewer.DefaultOptions.fileEncoding)
+            * [.pointerMoveEvent](#DxfViewer.DefaultOptions.pointerMoveEvent)
             * [.renderer](#DxfViewer.DefaultOptions.renderer) : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>
         * [.SetupWorker()](#DxfViewer.SetupWorker)
 
@@ -292,6 +295,7 @@ Subscribe to the specified event. The following events are defined:
  * "resized" - viewport size changed. Details: {width, height}
  * "pointerdown" - Details: {domEvent, position:{x,y}}, position is in scene coordinates.
  * "pointerup"
+ * "pointermove" - only emitted when the `pointerMoveEvent` option is set.
  * "viewChanged"
  * "message" - Some message from the viewer. {message: string, level: string}.
 
@@ -314,6 +318,37 @@ Subscribe() call.
 | --- | --- | --- |
 | eventName | <code>string</code> | The name passed to Subscribe(). |
 | eventHandler | <code>function</code> | The handler passed to Subscribe(). |
+
+<a name="DxfViewer+CanvasToSceneCoord"></a>
+
+### dxfViewer.CanvasToSceneCoord(x, y) ⇒ <code>Object</code>
+Scene coordinates of a point on the canvas. The result is in the scene's coordinate
+system, so `GetOrigin()` has to be added to it to get the drawing's own coordinates. It is
+not clamped: a point outside the canvas maps to a point outside the view.
+
+**Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
+**Returns**: <code>Object</code> - Scene coordinate.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| x | <code>number</code> | Canvas X coordinate, in pixels from the left edge. |
+| y | <code>number</code> | Canvas Y coordinate, in pixels from the top edge. |
+
+<a name="DxfViewer+SceneToCanvasCoord"></a>
+
+### dxfViewer.SceneToCanvasCoord(x, y) ⇒ <code>Object</code>
+Canvas coordinates of a point in the scene, the inverse of `CanvasToSceneCoord()`. Takes
+scene coordinates, so subtract `GetOrigin()` from a drawing coordinate first. The result is
+not clamped and may lie outside the canvas when the point is out of view, which is what
+lets a caller decide for itself whether to place, clip or drop an overlay.
+
+**Kind**: instance method of [<code>DxfViewer</code>](#DxfViewer)  
+**Returns**: <code>Object</code> - Canvas coordinate, in pixels from the top-left corner.  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| x | <code>number</code> | Scene X coordinate. |
+| y | <code>number</code> | Scene Y coordinate. |
 
 <a name="DxfViewer.DefaultOptions"></a>
 
@@ -340,6 +375,7 @@ options.
     * [.retainParsedDxf](#DxfViewer.DefaultOptions.retainParsedDxf)
     * [.preserveDrawingBuffer](#DxfViewer.DefaultOptions.preserveDrawingBuffer)
     * [.fileEncoding](#DxfViewer.DefaultOptions.fileEncoding)
+    * [.pointerMoveEvent](#DxfViewer.DefaultOptions.pointerMoveEvent)
     * [.renderer](#DxfViewer.DefaultOptions.renderer) : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>
 
 <a name="DxfViewer.DefaultOptions.canvasWidth"></a>
@@ -457,6 +493,15 @@ be a subject for future changes. The specified value should be suitable for pass
 
 **Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
 **Default**: <code>utf-8</code>  
+<a name="DxfViewer.DefaultOptions.pointerMoveEvent"></a>
+
+#### DefaultOptions.pointerMoveEvent
+Emit the "pointermove" event. It is off by default because it fires at the pointer's
+rate and each one unprojects the cursor into scene coordinates, which is wasted work for
+the majority of viewers that only care about clicks.
+
+**Kind**: static property of [<code>DefaultOptions</code>](#DxfViewer.DefaultOptions)  
+**Default**: <code>false</code>  
 <a name="DxfViewer.DefaultOptions.renderer"></a>
 
 #### DefaultOptions.renderer : <code>three.WebGLRenderer</code> \| <code>undefined</code> \| <code>null</code>

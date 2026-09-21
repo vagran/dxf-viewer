@@ -32,7 +32,8 @@ const options: DxfViewerOptions = {
     canvasWidth: 800,
     autoResize: true,
     sceneOptions: {suppressPaperSpace: true, textOptions: {fallbackChar: "?"}},
-    retainParsedDxf: true
+    retainParsedDxf: true,
+    pointerMoveEvent: true
 }
 const viewer = new DxfViewer(container, options)
 new DxfViewer(container, null)
@@ -62,12 +63,18 @@ viewer.GetBounds()
 viewer.GetRenderer()
 viewer.HasRenderer()
 viewer.GetDxf()
+
+const scenePos: {x: number, y: number} = viewer.CanvasToSceneCoord(10, 20)
+const canvasPos: {x: number, y: number} = viewer.SceneToCanvasCoord(scenePos.x, scenePos.y)
+viewer.SceneToCanvasCoord(canvasPos.x, canvasPos.y)
+
 viewer.Clear()
 viewer.Destroy()
 
 const OnLoaded = (): void => {}
 viewer.Subscribe("loaded", OnLoaded)
 viewer.Unsubscribe("loaded", OnLoaded)
+viewer.Subscribe("pointermove", OnLoaded)
 
 /* ---- DxfViewer: statics ---- */
 

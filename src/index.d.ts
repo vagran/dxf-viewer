@@ -38,6 +38,10 @@ export type DxfViewerOptions = {
     preserveDrawingBuffer?: boolean,
     fileEncoding?: string
     renderer?: THREE.WebGLRenderer | null,
+    /** Emit the "pointermove" event. Off by default: it fires at the pointer's rate and each
+     *  one unprojects the cursor into scene coordinates.
+     */
+    pointerMoveEvent?: boolean,
 }
 
 export type DxfViewerLoadParams = {
@@ -57,7 +61,7 @@ export type LayerInfo = {
 }
 
 export type EventName = "loaded" | "cleared" | "destroyed" | "resized" | "pointerdown" |
-    "pointerup" | "viewChanged" | "message"
+    "pointerup" | "pointermove" | "viewChanged" | "message"
 
 /** A parsed DXF document. The bundled parser has no type model of its own, so its output is
  * deliberately untyped here.
@@ -90,6 +94,10 @@ export declare class DxfViewer {
     ShowLayer(name: string, show: boolean): void
     Subscribe(eventName: EventName, eventHandler: (event: any) => void): void
     Unsubscribe(eventName: EventName, eventHandler: (event: any) => void): void
+    /** Scene coordinates of a point on the canvas. Add GetOrigin() for drawing coordinates. */
+    CanvasToSceneCoord(x: number, y: number): {x: number, y: number}
+    /** Canvas coordinates of a point in the scene; may lie outside the canvas. */
+    SceneToCanvasCoord(x: number, y: number): {x: number, y: number}
 }
 
 export declare namespace DxfViewer {

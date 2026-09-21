@@ -132,6 +132,9 @@ export class DxfViewer {
 
         this.canvas.addEventListener("pointerdown", this._OnPointerEvent.bind(this))
         this.canvas.addEventListener("pointerup", this._OnPointerEvent.bind(this))
+        if (options.pointerMoveEvent) {
+            this.canvas.addEventListener("pointermove", this._OnPointerEvent.bind(this))
+        }
 
         this.Render()
 
@@ -182,6 +185,13 @@ export class DxfViewer {
      * @param {number} height New canvas height in pixels.
      */
     SetSize(width, height) {
+        if (width <= 0 || height <= 0) {
+            /* A container which has no layout yet, or which is hidden with "display: none".
+             * Scaling the camera by zero collapses the frustum, and the zero then divides into
+             * the next resize.
+             */
+            return
+        }
         this._EnsureRenderer()
 
         const hScale = width / this.canvasWidth
@@ -494,6 +504,7 @@ export class DxfViewer {
      *  * "resized" - viewport size changed. Details: {width, height}
      *  * "pointerdown" - Details: {domEvent, position:{x,y}}, position is in scene coordinates.
      *  * "pointerup"
+     *  * "pointermove" - only emitted when the `pointerMoveEvent` option is set.
      *  * "viewChanged"
      *  * "message" - Some message from the viewer. {message: string, level: string}.
      *
@@ -563,18 +574,38 @@ export class DxfViewer {
         this._Emit(e.type, {
             domEvent: e,
             canvasCoord,
-            position: this._CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
+            position: this.CanvasToSceneCoord(canvasCoord.x, canvasCoord.y)
         })
     }
 
-    /** @returns {{x: number, y: number}} Scene coordinate corresponding to the specified canvas
-     *  pixel coordinates.
+    /** Scene coordinates of a point on the canvas. The result is in the scene's coordinate
+     * system, so `GetOrigin()` has to be added to it to get the drawing's own coordinates. It is
+     * not clamped: a point outside the canvas maps to a point outside the view.
+     *
+     * @param {number} x Canvas X coordinate, in pixels from the left edge.
+     * @param {number} y Canvas Y coordinate, in pixels from the top edge.
+     * @returns {{x: number, y: number}} Scene coordinate.
      */
-    _CanvasToSceneCoord(x, y) {
+    CanvasToSceneCoord(x, y) {
         const v = new three.Vector3(x * 2 / this.canvasWidth - 1,
                                     -y * 2 / this.canvasHeight + 1,
                                     1).unproject(this.camera)
         return {x: v.x, y: v.y}
+    }
+
+    /** Canvas coordinates of a point in the scene, the inverse of `CanvasToSceneCoord()`. Takes
+     * scene coordinates, so subtract `GetOrigin()` from a drawing coordinate first. The result is
+     * not clamped and may lie outside the canvas when the point is out of view, which is what
+     * lets a caller decide for itself whether to place, clip or drop an overlay.
+     *
+     * @param {number} x Scene X coordinate.
+     * @param {number} y Scene Y coordinate.
+     * @returns {{x: number, y: number}} Canvas coordinate, in pixels from the top-left corner.
+     */
+    SceneToCanvasCoord(x, y) {
+        const v = new three.Vector3(x, y, 1).project(this.camera)
+        return {x: (v.x + 1) * this.canvasWidth / 2,
+                y: (1 - v.y) * this.canvasHeight / 2}
     }
 
     _OnResize(entry) {
@@ -860,6 +891,12 @@ DxfViewer.DefaultOptions = {
      * @default
      */
     fileEncoding: "utf-8",
+    /** Emit the "pointermove" event. It is off by default because it fires at the pointer's
+     * rate and each one unprojects the cursor into scene coordinates, which is wasted work for
+     * the majority of viewers that only care about clicks.
+     * @default
+     */
+    pointerMoveEvent: false,
     /**
      * @type {three.WebGLRenderer | undefined | null}
      * The Webgl renderer to use. If not specified, a new renderer will be created.
