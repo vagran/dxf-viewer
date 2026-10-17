@@ -1,0 +1,20 @@
+origin (10, 2.2)
+bounds (10, 2.2) (34, 8.4)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 6
+  LINES layer="0" block=- color=0000ff lineType=0 vertices=8
+  INDEXED_LINES layer="0" block=- color=00ff00 lineType=0 chunks=1 vertices=76 indices=72
+  INDEXED_LINES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=16 indices=16
+  LINES layer="0" block="FLAT" color=0000ff lineType=0 vertices=4
+  INDEXED_LINES layer="0" block="FLAT" color=00ff00 lineType=0 chunks=1 vertices=38 indices=36
+  INDEXED_LINES layer="0" block="FLAT" color=ff0000 lineType=0 chunks=1 vertices=8 indices=8
+primitives 6
+  POLYLINE layer="0" color=0000ff (10, 2.2) (14, 5.4)
+  POLYLINE layer="0" color=0000ff (30, 5.2) (34, 8.4)
+  POLYLINE layer="0" color=00ff00 (14, 3.8) (13.9696, 4.0778) (13.8794, 4.3472) (13.7321, 4.6) (13.5321, 4.8285) (13.2856, 5.0257) (13, 5.1856) (12.684, 5.3035) (12.3473, 5.3757) (12, 5.4) (11.6527, 5.3757) (11.316, 5.3035) (11, 5.1856) (10.7144, 5.0257) (10.4679, 4.8285) (10.2679, 4.6) (10.1206, 4.3472) (10.0304, 4.0778) (10, 3.8)
+  POLYLINE layer="0" color=00ff00 (34, 6.8) (33.9696, 7.0778) (33.8794, 7.3472) (33.7321, 7.6) (33.5321, 7.8285) (33.2856, 8.0257) (33, 8.1856) (32.684, 8.3035) (32.3473, 8.3757) (32, 8.4) (31.6527, 8.3757) (31.316, 8.3035) (31, 8.1856) (30.7144, 8.0257) (30.4679, 7.8285) (30.268, 7.6) (30.1206, 7.3472) (30.0304, 7.0778) (30, 6.8)
+  POLYLINE layer="0" color=ff0000 (10, 2.2) (14, 2.2) (14, 5.4) (10, 5.4) (10, 2.2)
+  POLYLINE layer="0" color=ff0000 (30, 5.2) (34, 5.2) (34, 8.4) (30, 8.4) (30, 5.2)

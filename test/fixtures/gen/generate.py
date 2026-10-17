@@ -125,7 +125,7 @@ def _Explode(doc, msp):
 
 # Fixtures whose geometry arrives through an INSERT, and can therefore also be produced with no
 # blocks at all.
-_EXPLODABLE = ("block-flattened", "block-instanced")
+_EXPLODABLE = ("block-flattened", "block-instanced", "ocs-insert")
 
 
 # --------------------------------------------------------------------------------------------
@@ -965,6 +965,123 @@ def _MeshPolyface(doc, msp):
         [(20, 0, 0), (30, 0, 0), (20, 10, 0)],
     ])
     mesh.optimize()
+
+
+# --------------------------------------------------------------------------------------------
+# Object coordinate systems.
+#
+# Every fixture here but the last uses one tilted extrusion direction, chosen so that the
+# arbitrary axis algorithm gives OCS axes that read at a glance: X = (1, 0, 0) and
+# Y = (0, 0.8, 0.6). Seen from the top, an OCS point (x, y) in the plane at elevation e is at
+# (x, 0.8 * y - 0.6 * e), which is what every one of their goldens can be checked against.
+# --------------------------------------------------------------------------------------------
+
+_TILTED = (0, -0.6, 0.8)
+
+
+@Fixture("ocs-curves")
+def _OcsCurves(doc, msp):
+    """CIRCLE and ARC in a tilted OCS at elevation 10, and an ELLIPSE in the same plane.
+
+    The CIRCLE and ARC are drawn in OCS and the whole result projected. The ELLIPSE is not an OCS
+    entity: its center and major axis are WCS, and the extrusion direction only says which way its
+    minor axis points -- along (0, 0.8, 0.6), so it projects 0.8 as long.
+    """
+    msp.add_circle((0, 0, 10), radius=10, dxfattribs={"color": 1, "extrusion": _TILTED})
+    msp.add_arc((30, 0, 10), radius=10, start_angle=0, end_angle=90,
+                dxfattribs={"color": 3, "extrusion": _TILTED})
+    msp.add_ellipse((60, 0, 0), major_axis=(10, 0, 0), ratio=0.5,
+                    dxfattribs={"color": 5, "extrusion": _TILTED})
+
+
+@Fixture("ocs-polyline")
+def _OcsPolyline(doc, msp):
+    """LWPOLYLINE and 2D POLYLINE in a tilted OCS, each at an elevation, and a mirrored bulge.
+
+    The two POLYLINE types keep their elevation in different places (group 38, and the Z of the
+    POLYLINE's own group 10); the drawing of issue #105 depends on the second. The bulges must be
+    tessellated in OCS before the projection, which the third entity is the case for: a negative Z
+    extrusion mirrors X, and mirroring the vertices but not the bulge swings the arc to the other
+    side of its chord.
+    """
+    msp.add_lwpolyline([(0, 0, 0, 0, 1), (10, 0), (10, 10), (0, 10)], format="xyseb",
+                       close=True,
+                       dxfattribs={"color": 1, "elevation": 10, "extrusion": _TILTED})
+    msp.add_polyline2d([(20, 0), (30, 0), (30, 10)],
+                       dxfattribs={"color": 3, "elevation": (0, 0, -5), "extrusion": _TILTED})
+    msp.add_lwpolyline([(40, 0, 0, 0, 0.5), (50, 0)], format="xyseb",
+                       dxfattribs={"color": 5, "extrusion": (0, 0, -1)})
+
+
+@Fixture("ocs-faces")
+def _OcsFaces(doc, msp):
+    """SOLID and solid HATCH in a tilted OCS at elevation 10.
+
+    The hatch is triangulated in OCS, and only the triangles are projected.
+    """
+    msp.add_solid([(0, 0, 10), (10, 0, 10), (0, 10, 10), (10, 10, 10)],
+                  dxfattribs={"color": 1, "extrusion": _TILTED})
+    hatch = msp.add_hatch(color=3, dxfattribs={"extrusion": _TILTED, "elevation": (0, 0, 10)})
+    hatch.paths.add_polyline_path([(20, 0), (40, 0), (40, 20), (20, 20)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_EXTERNAL)
+    hatch.paths.add_polyline_path([(25, 5), (35, 5), (35, 15), (25, 15)], is_closed=True,
+                                  flags=ezdxf.const.BOUNDARY_PATH_OUTERMOST)
+
+
+@Fixture("ocs-text")
+def _OcsText(doc, msp):
+    """TEXT and MTEXT in a tilted plane.
+
+    TEXT is an OCS entity, at elevation 10 here. MTEXT is not: its insertion point is WCS, and the
+    extrusion direction says which plane it lies in, with the rotation measured from the OCS X
+    axis -- 30 degrees here, so that the rotation has to be applied before the projection.
+    """
+    msp.add_text("ABI", height=2,
+                 dxfattribs={"color": 1, "extrusion": _TILTED}).set_placement((0, 0, 10))
+    msp.add_mtext("AB", dxfattribs={"char_height": 2, "color": 3, "insert": (20, 0, 0),
+                                    "rotation": 30, "extrusion": _TILTED})
+
+
+@Fixture("ocs-dimension")
+def _OcsDimension(doc, msp):
+    """A synthesized linear DIMENSION in a tilted plane: `dimension-linear` seen at an angle.
+
+    The definition points are WCS, so they are given in the plane through the origin that the
+    extrusion direction is normal to, where z = 0.75 * y. In OCS they are (0, 0), (10, 0) and
+    (0, 6.25), and the dimension line projects to y = 5 -- the same place as in `dimension-linear`,
+    with everything across it 0.8 as tall.
+    """
+    msp.add_linear_dim(base=(0, 5, 3.75), p1=(0, 0, 0), p2=(10, 0, 0),
+                       dxfattribs={"color": 1, "extrusion": _TILTED})
+
+
+@Fixture("ocs-insert")
+def _OcsInsert(doc, msp):
+    """A flat block inserted twice with a tilted extrusion direction, at two elevations.
+
+    The insertion point is OCS, so its Z is the elevation. Exploded by ezdxf, the block content
+    becomes entities with that extrusion direction of their own, and a LINE in WCS -- the
+    independent rendering `invariants.test.mjs` compares this one against. There is no full
+    CIRCLE in the block, because a circle is tessellated from the X axis of whichever OCS it is
+    in, which exploding changes.
+    """
+    block = doc.blocks.new(name="FLAT")
+    block.add_lwpolyline([(0, 0), (4, 0), (4, 4), (0, 4)], close=True, dxfattribs={"color": 1})
+    block.add_arc((2, 2), radius=2, start_angle=0, end_angle=180, dxfattribs={"color": 3})
+    block.add_line((0, 0), (4, 4), dxfattribs={"color": 5})
+    msp.add_blockref("FLAT", (10, 5, 3), dxfattribs={"extrusion": _TILTED})
+    msp.add_blockref("FLAT", (30, 5, -2), dxfattribs={"extrusion": _TILTED})
+
+
+@Fixture("ocs-vertical")
+def _OcsVertical(doc, msp):
+    """A CIRCLE whose plane is vertical, extrusion along X. Seen from the top it is a segment.
+
+    The OCS axes are X = (0, 1, 0) and Y = (0, 0, 1), so the circle projects onto the line
+    x = elevation = 5, over y in [-10, 10]. Taking any extrusion without a positive Z as the
+    negative-Z mirror would draw the whole circle instead.
+    """
+    msp.add_circle((0, 0, 5), radius=10, dxfattribs={"color": 1, "extrusion": (1, 0, 0)})
 
 
 # --------------------------------------------------------------------------------------------

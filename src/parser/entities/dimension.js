@@ -61,6 +61,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             //direction of the dimension line)
             entity.textRotation = curr.value
             break
+        case 210:
+            entity.extrusionDirection = helpers.parsePoint(scanner)
+            break
 
         default: // check common entity attributes
             helpers.checkCommonEntityProperties(entity, curr, scanner)

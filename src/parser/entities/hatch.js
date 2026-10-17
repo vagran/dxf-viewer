@@ -108,6 +108,10 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
             }
             break
 
+        case 10: // Elevation point, only its Z is meaningful
+            entity.elevation = helpers.parsePoint(scanner).z ?? 0
+            break
+
         case 210:
             entity.extrusionDirection = helpers.parsePoint(scanner)
             break

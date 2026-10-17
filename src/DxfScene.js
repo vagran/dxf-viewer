@@ -1,7 +1,8 @@
 import {DynamicBuffer, NativeType} from "./DynamicBuffer.js"
 import {BatchingKey} from "./BatchingKey.js"
-import {Matrix3, Vector2} from "three"
+import {Matrix3, Vector2, Vector3} from "three"
 import {MatrixRotateCW, MatrixScale, MatrixTranslate} from "./math/utils.js"
+import {OcsBasis, OcsToWcsMatrix, WcsToOcs} from "./math/Ocs.js"
 import {TextRenderer, ParseSpecialChars, HAlign, VAlign} from "./TextRenderer.js"
 import {DefaultTextOptions} from "./TextRendererOptions.js"
 import {RBTree} from "./RBTree.js"
@@ -77,6 +78,14 @@ function CheckFinitePoint(v, what) {
     if (!Number.isFinite(v?.x) || !Number.isFinite(v?.y)) {
         throw new Error(`Non-finite ${what} (${v?.x}, ${v?.y})`)
     }
+}
+
+/** @param {Array<{x: number, y: number}>} vertices
+ * @param {Matrix3} transform
+ * @returns {Vector2[]} New vertices, the source ones are left untouched.
+ */
+function TransformVertices(vertices, transform) {
+    return vertices.map(v => new Vector2(v.x, v.y).applyMatrix3(transform))
 }
 
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
@@ -400,7 +409,16 @@ export class DxfScene {
         }
         /* Materialized so that a throw part way through leaves nothing written. */
         renderEntities = Array.from(renderEntities)
+        /* Decomposers work in the entity's OCS; this is the one place it is mapped to WCS. Fresh
+         * vertices are made rather than transforming in place, because render entities may hold
+         * the parsed vertex objects themselves, and a block definition is decomposed again for
+         * every nested insert of it.
+         */
+        const ocsTransform = this._GetEntityOcsTransform(entity)
         for (const renderEntity of renderEntities) {
+            if (ocsTransform) {
+                renderEntity.vertices = TransformVertices(renderEntity.vertices, ocsTransform)
+            }
             renderEntity.Validate()
         }
         return renderEntities
@@ -619,8 +637,7 @@ export class DxfScene {
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
         this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
-                                   startAngle: entity.startAngle, endAngle: entity.endAngle,
-                                   transform: this._GetEntityExtrusionTransform(entity)})
+                                   startAngle: entity.startAngle, endAngle: entity.endAngle})
         yield new Entity({
             type: Entity.Type.POLYLINE,
             vertices, layer, color, lineType,
@@ -633,8 +650,7 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
-        this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius,
-                                   transform: this._GetEntityExtrusionTransform(entity)})
+        this._GenerateArcVertices({vertices, center: entity.center, radius: entity.radius})
         yield new Entity({
             type: Entity.Type.POLYLINE,
             vertices, layer, color, lineType,
@@ -647,10 +663,24 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const lineType = this._GetLineType(entity, null, blockCtx)
         const vertices = []
-        const xR = Math.sqrt(entity.majorAxisEndPoint.x * entity.majorAxisEndPoint.x +
-                                 entity.majorAxisEndPoint.y * entity.majorAxisEndPoint.y)
+        /* Center and major axis are in WCS, but the ellipse lies in the plane its extrusion
+         * direction is normal to. It is generated in its own frame - X along the major axis, Y
+         * along the minor one - and that frame is projected onto WCS XY.
+         */
+        const center = entity.center
+        if (!center) {
+            return
+        }
+        const major = new Vector3(entity.majorAxisEndPoint.x, entity.majorAxisEndPoint.y,
+                                  entity.majorAxisEndPoint.z ?? 0)
+        const xR = major.length()
         const yR = xR * entity.axisRatio
-        const rotation = Math.atan2(entity.majorAxisEndPoint.y, entity.majorAxisEndPoint.x)
+        const xAxis = major.divideScalar(xR)
+        const normal = OcsBasis(entity.extrusionDirection)?.az ?? new Vector3(0, 0, 1)
+        const yAxis = new Vector3().crossVectors(normal, xAxis)
+        const transform = new Matrix3().set(xAxis.x, yAxis.x, center.x,
+                                            xAxis.y, yAxis.y, center.y,
+                                            0, 0, 1)
 
         const startAngle = entity.startAngle ?? 0
         let endAngle = entity.endAngle ?? startAngle + 2 * Math.PI
@@ -660,15 +690,11 @@ export class DxfScene {
         const isClosed = (entity.endAngle ?? null) === null ||
             Math.abs(endAngle - startAngle - 2 * Math.PI) < 1e-6
 
-        this._GenerateArcVertices({vertices, center: entity.center, radius: xR,
+        this._GenerateArcVertices({vertices, center: {x: 0, y: 0}, radius: xR,
                                    startAngle: entity.startAngle,
                                    endAngle: isClosed ? null : entity.endAngle,
                                    yRadius: yR,
-                                   rotation,
-                                   /* Assuming mirror transform if present, for ellipse it just
-                                    * reverses angle direction.
-                                    */
-                                   ccwAngleDir: !this._GetEntityExtrusionTransform(entity)})
+                                   transform})
 
         yield new Entity({
             type: Entity.Type.POLYLINE,
@@ -881,11 +907,10 @@ export class DxfScene {
     }
 
     *_DecomposeSolid(entity, blockCtx) {
-        yield *this._DecomposeFace(entity, entity.points, blockCtx, false,
-                                   this._GetEntityExtrusionTransform(entity))
+        yield *this._DecomposeFace(entity, entity.points, blockCtx, false)
     }
 
-    *_DecomposeFace(entity, vertices, blockCtx, wireframe, transform = null) {
+    *_DecomposeFace(entity, vertices, blockCtx, wireframe) {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
 
@@ -911,14 +936,6 @@ export class DxfScene {
 
             v3 = new Vector2(vertices[3].x, vertices[3].y)
             hasSecondTriangle = IsValidTriangle(v1, v3, v2)
-            if (transform) {
-                v3.applyMatrix3(transform)
-            }
-        }
-        if (transform) {
-            v0.applyMatrix3(transform)
-            v1.applyMatrix3(transform)
-            v2.applyMatrix3(transform)
         }
 
         if (!hasFirstTriangle && !hasSecondTriangle) {
@@ -994,18 +1011,54 @@ export class DxfScene {
         const fixedHeight = style?.fixedTextHeight === 0 ? null : style?.fixedTextHeight
         const parser = new MTextFormatParser()
         parser.Parse(ParseSpecialChars(entity.text))
-        yield* this.textRenderer.RenderMText({
+
+        let position = entity.position
+        let rotation = entity.rotation
+        let direction = entity.direction
+        let transform = null
+        const basis = OcsBasis(entity.extrusionDirection)
+        if (basis) {
+            /* The text plane is tilted. The insertion point and direction are in WCS, while a
+             * rotation angle is measured from the OCS X axis. The text is laid out unrotated at
+             * zero, and that layout frame is projected onto WCS XY.
+             */
+            let xAxis = null
+            if (direction) {
+                xAxis = new Vector3(direction.x, direction.y, direction.z ?? 0)
+            }
+            if (!xAxis || xAxis.lengthSq() === 0) {
+                const angle = (rotation ?? 0) * Math.PI / 180
+                xAxis = basis.ax.clone().multiplyScalar(Math.cos(angle))
+                    .addScaledVector(basis.ay, Math.sin(angle))
+            }
+            xAxis.normalize()
+            const yAxis = new Vector3().crossVectors(basis.az, xAxis)
+            transform = new Matrix3().set(xAxis.x, yAxis.x, position.x,
+                                          xAxis.y, yAxis.y, position.y,
+                                          0, 0, 1)
+            position = {x: 0, y: 0}
+            rotation = 0
+            direction = null
+        }
+
+        const renderEntities = this.textRenderer.RenderMText({
             formattedText: parser.GetContent(),
             // May still be overwritten by inline formatting codes
             fontSize: entity.height ?? fixedHeight,
-            position: entity.position,
-            rotation: entity.rotation,
-            direction: entity.direction,
+            position, rotation, direction,
             attachment: entity.attachmentPoint,
             lineSpacing: entity.lineSpacing,
             width: entity.width,
             color, layer
         })
+        if (!transform) {
+            yield* renderEntities
+            return
+        }
+        for (const renderEntity of renderEntities) {
+            renderEntity.vertices = TransformVertices(renderEntity.vertices, transform)
+            yield renderEntity
+        }
     }
 
     /**
@@ -1031,10 +1084,16 @@ export class DxfScene {
             style = this.dimStyles.get(entity.styleName)
         }
 
+        /* The definition points are in WCS while the layout is made in the dimension's OCS, like
+         * the text midpoint, and taken to WCS along with everything else the entity produces.
+         */
+        const basis = OcsBasis(entity.extrusionDirection)
+        const ToOcs = p => new Vector2().copy(basis ? WcsToOcs(basis, p) : p)
+
         const dim = new LinearDimension({
-            p1: new Vector2().copy(entity.linearOrAngularPoint1),
-            p2: new Vector2().copy(entity.linearOrAngularPoint2),
-            anchor: new Vector2().copy(entity.anchorPoint),
+            p1: ToOcs(entity.linearOrAngularPoint1),
+            p2: ToOcs(entity.linearOrAngularPoint2),
+            anchor: ToOcs(entity.anchorPoint),
             isAligned: type == 1,
             angle: entity.angle,
             text: entity.text,
@@ -1105,11 +1164,16 @@ export class DxfScene {
             /* Dimension may have pre-rendered block attached. Then just render this block instead
              * of synthesizing dimension geometry from parameters.
              *
-             * Create dummy INSERT entity.
+             * Create dummy INSERT entity. The block content is in the dimension's OCS, at the
+             * elevation of its text midpoint.
              */
             const insert = {
                 name: entity.block,
-                position: {x: 0, y: 0},
+                position: {
+                    x: 0, y: 0,
+                    z: this._GetDimensionElevation(entity, OcsBasis(entity.extrusionDirection))
+                },
+                extrusionDirection: entity.extrusionDirection,
                 layer: entity.layer,
                 color: entity.color,
                 colorIndex: entity.colorIndex
@@ -1129,18 +1193,11 @@ export class DxfScene {
 
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
-        const transform = this._GetEntityExtrusionTransform(entity)
 
         const layout = dim.GenerateLayout()
 
         for (const line of layout.lines) {
-            const vertices = []
-
-            if (transform) {
-                line.start.applyMatrix3(transform)
-                line.end.applyMatrix3(transform)
-            }
-            vertices.push(line.start, line.end)
+            const vertices = [line.start, line.end]
 
             yield new Entity({
                 type: Entity.Type.LINE_SEGMENTS,
@@ -1151,12 +1208,6 @@ export class DxfScene {
         }
 
         for (const triangle of layout.triangles) {
-            if (transform) {
-                for (const v of triangle.vertices) {
-                    v.applyMatrix3(transform)
-                }
-            }
-
             yield new Entity({
                 type: Entity.Type.TRIANGLES,
                 vertices: triangle.vertices,
@@ -1168,10 +1219,6 @@ export class DxfScene {
 
         if (this.textRenderer.canRender) {
             for (const text of layout.texts) {
-                if (transform) {
-                    //XXX does not affect text rotation and mirroring
-                    text.position.applyMatrix3(transform)
-                }
                 yield* this.textRenderer.Render({
                     text: text.text,
                     fontSize: text.size,
@@ -1188,20 +1235,16 @@ export class DxfScene {
 
 
     /**
-     * @param {Vector2[]} loop Loop vertices. Transformed in-place if transform specified.
-     * @param {Matrix3 | null} transform
+     * @param {Vector2[]} loop Loop vertices.
      * @param {number[] | null} result Resulting coordinates appended to this array.
      * @returns {number[]} Each pair of numbers form vertex coordinate. This format is required for
      *  `earcut` library.
      */
-    _TransformBoundaryLoop(loop, transform, result) {
+    _GetBoundaryLoopCoords(loop, result) {
         if (!result) {
             result = []
         }
         for (const v of loop) {
-            if (transform) {
-                v.applyMatrix3(transform)
-            }
             result.push(v.x)
             result.push(v.y)
         }
@@ -1219,7 +1262,6 @@ export class DxfScene {
         const style = entity.hatchStyle ?? 0
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
-        const transform = this._GetEntityExtrusionTransform(entity)
 
         let filteredBoundaryLoops = null
 
@@ -1275,12 +1317,12 @@ export class DxfScene {
              * areas rather than a single contour with its islands.
              */
             for (const {contour, holes} of calc.GetSolidRegions()) {
-                const coords = this._TransformBoundaryLoop(contour, transform)
+                const coords = this._GetBoundaryLoopCoords(contour)
                 const vertices = [...contour]
                 const holeIndices = []
                 for (const hole of holes) {
                     holeIndices.push(coords.length / 2)
-                    this._TransformBoundaryLoop(hole, transform, coords)
+                    this._GetBoundaryLoopCoords(hole, coords)
                     vertices.push(...hole)
                 }
                 const indices = earcut(coords, holeIndices)
@@ -1340,7 +1382,7 @@ export class DxfScene {
             for (const line of pattern.lines) {
                 yield* this._DecomposeHatchPatternLine(line, calc, patTransform,
                                                        pattern.offsetInLineSpace,
-                                                       {layer, color, transform})
+                                                       {layer, color})
             }
         }
     }
@@ -1354,7 +1396,7 @@ export class DxfScene {
      * @param {Matrix3} patTransform Pattern transform, identity matrix when the pattern is taken
      *  from the lines definition embedded into the HATCH entity.
      * @param {Boolean} offsetInLineSpace Pattern offsets are already rotated by the line angle.
-     * @param {Object} renderParams `layer`, `color` and OCS `transform` for produced entities.
+     * @param {Object} renderParams `layer` and `color` for produced entities.
      */
     *_DecomposeHatchPatternLine(line, calc, patTransform, offsetInLineSpace, renderParams) {
         let offsetX
@@ -1440,10 +1482,10 @@ export class DxfScene {
      * @param {HatchCalculator} calc
      * @param {Object} lineParams Position of the line in line space (`y`, `xBase`, `xStart`,
      *  `xEnd`), `ocsTransform` back into OCS, and `dashPatLength` (null for a solid line).
-     * @param {Object} renderParams `layer`, `color` and OCS `transform` for produced entities.
+     * @param {Object} renderParams `layer` and `color` for produced entities.
      */
     *_DecomposeHatchLine(dashes, calc, {y, xBase, xStart, xEnd, ocsTransform, dashPatLength},
-                         {layer, color, transform}) {
+                         {layer, color}) {
 
         const lineLength = xEnd - xStart
         const start = new Vector2(xStart, y).applyMatrix3(ocsTransform)
@@ -1458,10 +1500,6 @@ export class DxfScene {
         function RenderSegment(seg) {
             const p1 = lineVec.clone().multiplyScalar(seg[0]).add(start)
             const p2 = lineVec.clone().multiplyScalar(seg[1]).add(start)
-            if (transform) {
-                p1.applyMatrix3(transform)
-                p2.applyMatrix3(transform)
-            }
             if (seg[1] - seg[0] <= Number.EPSILON) {
                 return new Entity({
                     type: Entity.Type.POINTS,
@@ -1772,7 +1810,6 @@ export class DxfScene {
         const layer = this._GetEntityLayer(entity, null)
         const color = this._GetEntityColor(entity, null)
         const lineType = this._GetLineType(entity, null, null)
-        //XXX apply extrusion direction
         const transform = block.InstantiationContext().GetInsertionTransform(entity)
 
         /* Update bounding box and origin with transformed block bounds corner points. */
@@ -1839,38 +1876,6 @@ export class DxfScene {
         })
     }
 
-    /** Mirror entity vertices if necessary in case of extrusionDirection with negative Z specified.
-     *
-     * @param {object} entity Entity to check.
-     * @param {?Array<{x: number, y: number}>} vertices Vertices array to use instead of entity
-     *  vertices attribute.
-     * @returns {Array<{x: number, y: number}>} Vertices array with mirrored X if necessary. All
-     *  attributes preserved.
-     */
-    _MirrorEntityVertices(entity, vertices = null) {
-        if (!entity.extrusionDirection || entity.extrusionDirection.z >= 0) {
-            return vertices ?? entity.vertices
-        }
-        if (!vertices || vertices === entity.vertices) {
-            vertices = entity.vertices.slice()
-        }
-        const n = vertices.length
-        for (let i = 0; i < n; i++) {
-            const v = vertices[i]
-            const _v = {x: -v.x}
-            for (const propName in v) {
-                if (!v.hasOwnProperty(propName)) {
-                    continue
-                }
-                if (propName !== "x") {
-                    _v[propName] = v[propName]
-                }
-            }
-            vertices[i] = _v
-        }
-        return vertices
-    }
-
     *_DecomposePolyline(entity, blockCtx = null) {
 
         if (entity.isPolyfaceMesh) {
@@ -1889,7 +1894,6 @@ export class DxfScene {
         if (verticesCount < 2) {
             return
         }
-        entityVertices = this._MirrorEntityVertices(entity, entityVertices)
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const _this = this
@@ -2120,7 +2124,6 @@ export class DxfScene {
                                                entity.knotValues)
             vertices.push({x: pt[0], y: pt[1]})
         }
-        //XXX extrusionDirection (normalVector) transform?
         yield new Entity({type: Entity.Type.POLYLINE, vertices, layer, color, lineType})
     }
 
@@ -2400,20 +2403,69 @@ export class DxfScene {
         return null
     }
 
-    /** Check extrusionDirection property of the entity and return corresponding transform matrix.
+    /** The OCS Z of the plane a DIMENSION lies in. The text midpoint is in OCS and carries it,
+     * which is where AutoCAD and ezdxf take it from; a dimension written without one still has
+     * its definition point, which is in WCS but in the same plane.
      *
-     * @returns {?Matrix3} Null if not transform required.
+     * @param {object} entity Raw DXF DIMENSION entity.
+     * @param {?Object} basis The entity's OCS axes from OcsBasis(), null for the default OCS.
+     * @returns {number}
      */
-    _GetEntityExtrusionTransform(entity) {
-        //XXX For now just mirror X axis if extrusion Z is negative. No full support for arbitrary
-        // OCS yet.
-        if (!entity.hasOwnProperty("extrusionDirection")) {
+    _GetDimensionElevation(entity, basis) {
+        if (entity.middleOfText) {
+            return entity.middleOfText.z ?? 0
+        }
+        if (basis && entity.anchorPoint) {
+            return WcsToOcs(basis, entity.anchorPoint).z
+        }
+        return entity.anchorPoint?.z ?? 0
+    }
+
+    /** Transform from the entity's OCS to WCS XY, applied to everything its decomposer produces.
+     *
+     * Only the entity types whose coordinates are in OCS have one. LINE, POINT, 3DFACE, SPLINE and
+     * 3D polylines and meshes are in WCS already; ELLIPSE and MTEXT are in WCS too, but lie in a
+     * plane their extrusion direction tilts, so their decomposers account for it themselves. Each
+     * type keeps its elevation - the OCS Z of its plane - somewhere different.
+     *
+     * @param {object} entity Raw DXF entity.
+     * @returns {?Matrix3} Null if no transform is required.
+     */
+    _GetEntityOcsTransform(entity) {
+        const basis = OcsBasis(entity.extrusionDirection)
+        if (!basis) {
             return null
         }
-        if (entity.extrusionDirection.z > 0) {
+        let elevation
+        switch (entity.type) {
+        case "ARC":
+        case "CIRCLE":
+            elevation = entity.center?.z
+            break
+        case "LWPOLYLINE":
+        case "HATCH":
+            elevation = entity.elevation
+            break
+        case "POLYLINE":
+            if (entity.is3dPolyline || entity.is3dPolygonMesh || entity.isPolyfaceMesh) {
+                return null
+            }
+            elevation = entity.elevation
+            break
+        case "SOLID":
+            elevation = entity.points?.[0]?.z
+            break
+        case "TEXT":
+        case "ATTRIB":
+            elevation = entity.startPoint?.z
+            break
+        case "DIMENSION":
+            elevation = this._GetDimensionElevation(entity, basis)
+            break
+        default:
             return null
         }
-        return new Matrix3().makeScale(-1, 1)
+        return OcsToWcsMatrix(basis, elevation ?? 0)
     }
 
     /** @returns {RenderBatch} */
@@ -2869,8 +2921,16 @@ class BlockContext {
         MatrixScale(mInsert, xScale, yScale)
         MatrixRotateCW(mInsert, rotation)
         MatrixTranslate(mInsert, x, y)
-        if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
-            MatrixScale(mInsert, -1, 1)
+        /* XXX Exact only while the block content is flat at z = 0 of the block: a tilted insert
+         * also maps block-local Z into WCS X and Y, and that Z is dropped when the block
+         * definition is decomposed. Elevated or tilted entities inside a block inserted with a
+         * tilted extrusion direction - directly or through a nested INSERT - land off their true
+         * position.
+         */
+        const ocsTransform = OcsToWcsMatrix(OcsBasis(entity.extrusionDirection),
+                                            entity.position.z ?? 0)
+        if (ocsTransform) {
+            mInsert.premultiply(ocsTransform)
         }
         if (this.type === BlockContext.Type.INSTANTIATION) {
             mInsert.multiply(new Matrix3().makeTranslation(this.block.offset.x,

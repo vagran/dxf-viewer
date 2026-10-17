@@ -42,6 +42,9 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 73: // Vertical alignment
             entity.valign = curr.value
             break
+        case 210:
+            entity.extrusionDirection = helpers.parsePoint(scanner)
+            break
         default: // check common entity attributes
             helpers.checkCommonEntityProperties(entity, curr, scanner)
             break

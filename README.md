@@ -79,9 +79,9 @@ time. Most significant reason for missing implementation is lack of correspondin
  * Non-UTF-8 file encoding support. Currently, such files are displayed incorrectly. `$DWGCODEPAGE`
    parameter is ignored. MIF encoded characters (`\M+nXXXX`) are decoded, except for the Johab code
    page which the browser cannot decode.
- * Full OCS support. Currently, it is assumed that entity extrusion direction is either +Z or -Z
-   (which is commonly used for features mirroring in CAD). Arbitrary directions is not properly
-   processed.
+ * Full OCS support. Arbitrary extrusion directions and elevations are supported for entities and
+   for block references, except a block reference with a tilted extrusion direction whose block
+   contains geometry outside of its XY plane.
  * Paper space, layouts (sheets), viewports.
  * Many less commonly used DXF features.
 

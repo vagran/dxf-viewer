@@ -20,6 +20,7 @@ EntityParser.prototype.parseEntity = function(scanner, curr) {
         case 20: // always 0
             break
         case 30: // elevation
+            entity.elevation = curr.value
             break
         case 39: // thickness
             entity.thickness = curr.value
