@@ -35,34 +35,41 @@ test("a wireframe polyface draws the edges of its faces", async () => {
             edges.add(Edge(primitive.vertices[i - 1], primitive.vertices[i]))
         }
     }
-    /* See _MeshPolyface in fixtures/gen/generate.py: two 10x10 quads side by side, and a triangle
-     * against the second one. Shared edges count once. */
+    /* See _MeshPolyface in fixtures/gen/generate.py: two 10x10 quads side by side, a triangle
+     * against the second one, and a chevron. Shared edges count once. */
     assert.deepStrictEqual([...edges].sort(), [
         Edge([0, 0], [10, 0]), Edge([10, 0], [10, 10]), Edge([10, 10], [0, 10]),
         Edge([0, 10], [0, 0]),
         Edge([10, 0], [20, 0]), Edge([20, 0], [20, 10]), Edge([20, 10], [10, 10]),
-        Edge([20, 0], [30, 0]), Edge([30, 0], [20, 10])
+        Edge([20, 0], [30, 0]), Edge([30, 0], [20, 10]),
+        Edge([40, 0], [45, 3]), Edge([45, 3], [50, 0]), Edge([50, 0], [45, 10]),
+        Edge([45, 10], [40, 0])
     ].sort())
 })
 
-test("a wireframe 3DFACE draws its outline", async () => {
+test("a wireframe 3DFACE draws its visible edges, each once", async () => {
     const scene = await BuildScene(path.join(fixturesDir, "mesh-3dface.dxf"),
                                    {sceneOptions: {wireframeMesh: true}})
     assert.deepStrictEqual(ValidateScene(scene), [])
-    const edges = new Set()
+    /* A list rather than a set: no two faces share an edge here, so a repeat is a segment drawn
+     * twice. */
+    const edges = []
     for (const primitive of new SceneReader(scene).ReadPrimitives()) {
         assert.strictEqual(primitive.type, PrimitiveType.POLYLINE)
         for (let i = 1; i < primitive.vertices.length; i++) {
-            edges.add(Edge(primitive.vertices[i - 1], primitive.vertices[i]))
+            edges.push(Edge(primitive.vertices[i - 1], primitive.vertices[i]))
         }
     }
-    /* See _Mesh3dFace in fixtures/gen/generate.py: a square, a triangle and a chevron. */
-    assert.deepStrictEqual([...edges].sort(), [
+    /* See _Mesh3dFace in fixtures/gen/generate.py: a square, a triangle and a chevron, a square
+     * with its bottom and top edges hidden, and a wall seen edge-on. */
+    assert.deepStrictEqual(edges.sort(), [
         Edge([0, 0], [10, 0]), Edge([10, 0], [10, 10]), Edge([10, 10], [0, 10]),
         Edge([0, 10], [0, 0]),
         Edge([20, 0], [30, 0]), Edge([30, 0], [30, 10]), Edge([30, 10], [20, 0]),
         Edge([40, 0], [45, 3]), Edge([45, 3], [50, 0]), Edge([50, 0], [45, 10]),
-        Edge([45, 10], [40, 0])
+        Edge([45, 10], [40, 0]),
+        Edge([70, 0], [70, 10]), Edge([60, 10], [60, 0]),
+        Edge([80, 0], [90, 0])
     ].sort())
 })
 

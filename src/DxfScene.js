@@ -88,6 +88,33 @@ function TransformVertices(vertices, transform) {
     return vertices.map(v => new Vector2(v.x, v.y).applyMatrix3(transform))
 }
 
+/** @param {{x: number, y: number}} a
+ * @param {{x: number, y: number}} b
+ * @param {{x: number, y: number}} c
+ * @returns {number} Twice the signed area of the triangle, positive when it is counter-clockwise.
+ */
+function DoubledSignedArea(a, b, c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+}
+
+const QUAD_SPLIT_02 = Object.freeze([[0, 1, 2], [0, 2, 3]])
+const QUAD_SPLIT_13 = Object.freeze([[0, 1, 3], [1, 2, 3]])
+
+/** Split a quad into two triangles along whichever diagonal lies inside it.
+ *
+ * Either diagonal does for a convex quad. A concave one has a single inner diagonal, the one from
+ * its reflex corner, and when corners 1 and 3 lie on the same side of the 0-2 diagonal the reflex
+ * corner is one of them.
+ *
+ * @param {Array<{x: number, y: number}>} corners Four corners in outline order.
+ * @returns {Array<number[]>} Two triangles, as indices into `corners`. Shared, not to be modified.
+ */
+function SplitQuad(corners) {
+    const [c0, c1, c2, c3] = corners
+    return DoubledSignedArea(c0, c1, c2) * DoubledSignedArea(c0, c2, c3) >= 0 ?
+        QUAD_SPLIT_02 : QUAD_SPLIT_13
+}
+
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
  * transfer it to the main thread, and easily apply it to a Three.js scene there.
@@ -920,7 +947,7 @@ export class DxfScene {
      * @param {Array<{x: number, y: number}>} vertices Three or four corners, in outline order. The
      *  fourth one may repeat one of the others, which makes the face a triangle.
      * @param {?BlockContext} blockCtx
-     * @param {boolean} wireframe Yield the outline instead of the triangles.
+     * @param {boolean} wireframe Yield the visible edges instead of the triangles.
      * @returns {Generator<Entity>}
      */
     *_DecomposeFace(entity, vertices, blockCtx, wireframe) {
@@ -928,27 +955,18 @@ export class DxfScene {
         const color = this._GetEntityColor(entity, blockCtx)
 
         const corners = vertices.slice(0, 4).map(v => new Vector2(v.x, v.y))
-
-        /* Twice the signed area. */
-        function Area(i1, i2, i3) {
-            const e1 = new Vector2().subVectors(corners[i2], corners[i1])
-            const e2 = new Vector2().subVectors(corners[i3], corners[i1])
-            return e1.cross(e2)
+        if (corners.length < 3) {
+            throw new Error(`Face with ${corners.length} corners`)
         }
 
-        let triangles
-        if (corners.length < 4) {
-            triangles = [[0, 1, 2]]
-        } else if (Area(0, 1, 2) * Area(0, 2, 3) >= 0) {
-            triangles = [[0, 1, 2], [0, 2, 3]]
-        } else {
-            /* Corners 1 and 3 are on the same side of the 0-2 diagonal, so the quad is concave at
-             * one of them, and only the 1-3 diagonal is inside it.
-             */
-            triangles = [[0, 1, 3], [1, 2, 3]]
+        if (wireframe) {
+            yield* this._GenerateFaceOutline(corners, entity.invisibleEdges ?? 0, layer, color)
+            return
         }
+
         /* A repeated corner leaves a triangle with no area. */
-        triangles = triangles.filter(t => Math.abs(Area(...t)) > Number.EPSILON)
+        const triangles = (corners.length == 4 ? SplitQuad(corners) : [[0, 1, 2]])
+            .filter(t => Math.abs(DoubledSignedArea(...t.map(i => corners[i]))) > Number.EPSILON)
         if (triangles.length == 0) {
             return
         }
@@ -957,20 +975,9 @@ export class DxfScene {
          * made of nothing but three-corner faces.
          */
         if (triangles.length == 1) {
-            const triangle = triangles[0].map(i => corners[i])
-            if (wireframe) {
-                yield new Entity({
-                    type: Entity.Type.POLYLINE, vertices: triangle, layer, color, shape: true
-                })
-            } else {
-                yield new Entity({
-                    type: Entity.Type.TRIANGLES,
-                    vertices: triangle, indices: [0, 1, 2], layer, color
-                })
-            }
-        } else if (wireframe) {
             yield new Entity({
-                type: Entity.Type.POLYLINE, vertices: corners, layer, color, shape: true
+                type: Entity.Type.TRIANGLES,
+                vertices: triangles[0].map(i => corners[i]), indices: [0, 1, 2], layer, color
             })
         } else {
             yield new Entity({
@@ -2048,7 +2055,55 @@ export class DxfScene {
             yield* this._GeneratePolyfaceTriangles(vertices, faces, layer, color)
             return
         }
+        yield* this._GenerateFaceEdges(vertices, faces, layer, color)
+    }
 
+    /** The outline of a single face, 3DFACE in wireframe mode, without its invisible edges.
+     *
+     * A face seen edge-on still has its edges drawn, as AutoCAD draws them in a plan view.
+     *
+     * @param {Vector2[]} corners Three or four corners, in outline order.
+     * @param {number} invisibleEdges Bit 1 hides the edge from the first corner to the second,
+     *  bit 2 the one from the second to the third, and so on.
+     * @param {?string} layer
+     * @param {number} color
+     * @returns {Generator<Entity>}
+     */
+    *_GenerateFaceOutline(corners, invisibleEdges, layer, color) {
+        /* A repeated corner is dropped along with the zero-length edge it starts, so that a
+         * triangle given as four corners draws as one.
+         */
+        const outline = []
+        const hiddenEdges = []
+        for (let i = 0; i < corners.length; i++) {
+            if (corners[i].equals(corners[(i + 1) % corners.length])) {
+                continue
+            }
+            outline.push(corners[i])
+            hiddenEdges.push((invisibleEdges & (1 << i)) != 0)
+        }
+        if (outline.length < 2) {
+            return
+        }
+        if (outline.length == 2) {
+            /* Both edges are the same segment, so it is drawn once if either of them is visible. */
+            hiddenEdges[0] &&= hiddenEdges[1]
+            hiddenEdges[1] = true
+        }
+        yield* this._GenerateFaceEdges(outline, [{indices: [...outline.keys()], hiddenEdges}],
+                                       layer, color)
+    }
+
+    /** Visible edges of mesh faces, as polylines.
+     *
+     * @param {Vector2[]} vertices All vertices of the mesh.
+     * @param {Array<{indices: number[], hiddenEdges: boolean[]}>} faces Faces as indices into
+     *  `vertices`, in outline order. `hiddenEdges[i]` hides the edge starting at `indices[i]`.
+     * @param {?string} layer
+     * @param {number} color
+     * @returns {Generator<Entity>}
+     */
+    *_GenerateFaceEdges(vertices, faces, layer, color) {
         /* Runs of mesh vertex indices. A face edge extends the previous run when it starts where
          * that one ends, so a face with every edge visible comes out as one run with its first
          * vertex repeated at the end. That repeat is what closes it; flagging the run as a closed
@@ -2117,7 +2172,9 @@ export class DxfScene {
             if (idx.length == 3) {
                 indices.push(idx[0], idx[1], idx[2])
             } else {
-                indices.push(idx[0], idx[1], idx[2], idx[0], idx[2], idx[3])
+                for (const t of SplitQuad(idx.map(i => meshVertices[i]))) {
+                    indices.push(idx[t[0]], idx[t[1]], idx[t[2]])
+                }
             }
         }
         if (indices.length > 0) {

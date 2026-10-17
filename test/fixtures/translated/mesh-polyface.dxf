@@ -505,7 +505,7 @@ $SPLINESEGS
   9
 $HANDSEED
   5
-42
+47
   9
 $SURFTAB1
  70
@@ -1463,7 +1463,7 @@ ACAD
   0
 APPID
   5
-3F
+44
 330
 3
 100
@@ -1477,7 +1477,7 @@ HATCHBACKGROUNDCOLOR
   0
 APPID
   5
-40
+45
 330
 3
 100
@@ -1793,9 +1793,9 @@ AcDbPolyFaceMesh
  70
 64
  71
-7
+11
  72
-3
+4
   0
 VERTEX
   5
@@ -1953,6 +1953,94 @@ AcDbPolyFaceMeshVertex
   0
 VERTEX
   5
+3F
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbVertex
+100
+AcDbPolyFaceMeshVertex
+ 10
+1000040.0
+ 20
+500000.0
+ 30
+0.0
+ 70
+192
+  0
+VERTEX
+  5
+40
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbVertex
+100
+AcDbPolyFaceMeshVertex
+ 10
+1000045.0
+ 20
+500003.0
+ 30
+0.0
+ 70
+192
+  0
+VERTEX
+  5
+41
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbVertex
+100
+AcDbPolyFaceMeshVertex
+ 10
+1000050.0
+ 20
+500000.0
+ 30
+0.0
+ 70
+192
+  0
+VERTEX
+  5
+42
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbVertex
+100
+AcDbPolyFaceMeshVertex
+ 10
+1000045.0
+ 20
+500010.0
+ 30
+0.0
+ 70
+192
+  0
+VERTEX
+  5
 35
 330
 17
@@ -2032,6 +2120,34 @@ AcDbFaceRecord
 7
  73
 6
+  0
+VERTEX
+  5
+43
+330
+17
+100
+AcDbEntity
+  8
+0
+100
+AcDbFaceRecord
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+128
+ 71
+8
+ 72
+9
+ 73
+10
+ 74
+11
   0
 SEQEND
   5
@@ -3033,7 +3149,7 @@ CREATED_BY_EZDXF
   3
 WRITTEN_BY_EZDXF
 350
-41
+46
   0
 DICTIONARYVAR
   5
@@ -3049,7 +3165,7 @@ dxf-viewer fixture
   0
 DICTIONARYVAR
   5
-41
+46
 330
 2D
 100

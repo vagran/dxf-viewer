@@ -969,10 +969,17 @@ def _Mesh3dFace(doc, msp):
     The corners go round the outline, so the square is split along its 0-2 diagonal. The chevron
     is concave at its second corner, where that diagonal runs outside it, so it has to be split
     along 1-3 instead. The triangle repeats its third corner, as a three-corner 3DFACE does.
+
+    The second square hides its first and third edges, which only the wireframe form shows; group
+    70 follows its corners, which is where a parser can lose the fourth one. The last face is a
+    vertical wall, seen edge-on from the top: no area to fill, one segment to outline.
     """
     msp.add_3dface([(0, 0), (10, 0), (10, 10), (0, 10)], dxfattribs={"color": 2})
     msp.add_3dface([(20, 0), (30, 0), (30, 10), (30, 10)], dxfattribs={"color": 4})
     msp.add_3dface([(40, 0), (45, 3), (50, 0), (45, 10)], dxfattribs={"color": 3})
+    msp.add_3dface([(60, 0), (70, 0), (70, 10), (60, 10)],
+                   dxfattribs={"color": 5, "invisible_edges": 0b0101})
+    msp.add_3dface([(80, 0, 0), (90, 0, 0), (90, 0, 10), (80, 0, 10)], dxfattribs={"color": 6})
 
 
 @Fixture("solid")
@@ -987,9 +994,10 @@ def _Solid(doc, msp):
 
 @Fixture("mesh-polyface")
 def _MeshPolyface(doc, msp):
-    """A polyface mesh: two quads sharing an edge, and a triangle sharing the next one.
+    """A polyface mesh: two quads sharing an edge, a triangle sharing the next one, and apart from
+    them a chevron, a quad concave at its second corner and so split along its 1-3 diagonal.
 
-    The faces index a shared vertex list, merged by optimize() to the seven distinct points. The
+    The faces index a shared vertex list, merged by optimize() to the eleven distinct points. The
     scene must hold each of them once, in one chunk, rather than the whole list once per face.
     """
     mesh = msp.add_polyface(dxfattribs={"color": 3})
@@ -997,6 +1005,7 @@ def _MeshPolyface(doc, msp):
         [(0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0)],
         [(10, 0, 0), (20, 0, 0), (20, 10, 0), (10, 10, 0)],
         [(20, 0, 0), (30, 0, 0), (20, 10, 0)],
+        [(40, 0, 0), (45, 3, 0), (50, 0, 0), (45, 10, 0)],
     ])
     mesh.optimize()
 
