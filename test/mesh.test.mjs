@@ -1,6 +1,7 @@
-/** Polyface meshes, beyond what the golden of fixtures/mesh-polyface.dxf pins.
+/** Polyface meshes and 3DFACE, beyond what the goldens of fixtures/mesh-polyface.dxf and
+ * fixtures/mesh-3dface.dxf pin.
  *
- * The golden covers the filled form under default options. The wireframe form is opt-in, so it is
+ * The goldens cover the filled form under default options. The wireframe form is opt-in, so it is
  * checked here, and so is a mesh too large for one indexed chunk, which no fixture can afford to
  * be.
  */
@@ -41,6 +42,27 @@ test("a wireframe polyface draws the edges of its faces", async () => {
         Edge([0, 10], [0, 0]),
         Edge([10, 0], [20, 0]), Edge([20, 0], [20, 10]), Edge([20, 10], [10, 10]),
         Edge([20, 0], [30, 0]), Edge([30, 0], [20, 10])
+    ].sort())
+})
+
+test("a wireframe 3DFACE draws its outline", async () => {
+    const scene = await BuildScene(path.join(fixturesDir, "mesh-3dface.dxf"),
+                                   {sceneOptions: {wireframeMesh: true}})
+    assert.deepStrictEqual(ValidateScene(scene), [])
+    const edges = new Set()
+    for (const primitive of new SceneReader(scene).ReadPrimitives()) {
+        assert.strictEqual(primitive.type, PrimitiveType.POLYLINE)
+        for (let i = 1; i < primitive.vertices.length; i++) {
+            edges.add(Edge(primitive.vertices[i - 1], primitive.vertices[i]))
+        }
+    }
+    /* See _Mesh3dFace in fixtures/gen/generate.py: a square, a triangle and a chevron. */
+    assert.deepStrictEqual([...edges].sort(), [
+        Edge([0, 0], [10, 0]), Edge([10, 0], [10, 10]), Edge([10, 10], [0, 10]),
+        Edge([0, 10], [0, 0]),
+        Edge([20, 0], [30, 0]), Edge([30, 0], [30, 10]), Edge([30, 10], [20, 0]),
+        Edge([40, 0], [45, 3]), Edge([45, 3], [50, 0]), Edge([50, 0], [45, 10]),
+        Edge([45, 10], [40, 0])
     ].sort())
 })
 

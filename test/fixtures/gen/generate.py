@@ -964,9 +964,25 @@ def _LayersOff(doc, msp):
 
 @Fixture("mesh-3dface")
 def _Mesh3dFace(doc, msp):
-    """3DFACE, which decomposes into triangles rather than lines."""
+    """3DFACE, which decomposes into triangles rather than lines.
+
+    The corners go round the outline, so the square is split along its 0-2 diagonal. The chevron
+    is concave at its second corner, where that diagonal runs outside it, so it has to be split
+    along 1-3 instead. The triangle repeats its third corner, as a three-corner 3DFACE does.
+    """
     msp.add_3dface([(0, 0), (10, 0), (10, 10), (0, 10)], dxfattribs={"color": 2})
     msp.add_3dface([(20, 0), (30, 0), (30, 10), (30, 10)], dxfattribs={"color": 4})
+    msp.add_3dface([(40, 0), (45, 3), (50, 0), (45, 10)], dxfattribs={"color": 3})
+
+
+@Fixture("solid")
+def _Solid(doc, msp):
+    """SOLID, whose corners go in "Z" order rather than round the outline: the square's corners
+    are written bottom left, bottom right, top left, top right. The triangle gives three corners
+    only.
+    """
+    msp.add_solid([(0, 0), (10, 0), (0, 10), (10, 10)], dxfattribs={"color": 2})
+    msp.add_solid([(20, 0), (30, 0), (30, 10)], dxfattribs={"color": 4})
 
 
 @Fixture("mesh-polyface")

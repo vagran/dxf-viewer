@@ -907,75 +907,75 @@ export class DxfScene {
     }
 
     *_DecomposeSolid(entity, blockCtx) {
-        yield *this._DecomposeFace(entity, entity.points, blockCtx, false)
+        /* SOLID corners go in "Z" order: the third and the fourth are swapped against the outline,
+         * which is the order 3DFACE uses.
+         */
+        const p = entity.points
+        const vertices = p.length > 3 ? [p[0], p[1], p[3], p[2]] : p
+        yield *this._DecomposeFace(entity, vertices, blockCtx, false)
     }
 
+    /**
+     * @param {object} entity
+     * @param {Array<{x: number, y: number}>} vertices Three or four corners, in outline order. The
+     *  fourth one may repeat one of the others, which makes the face a triangle.
+     * @param {?BlockContext} blockCtx
+     * @param {boolean} wireframe Yield the outline instead of the triangles.
+     * @returns {Generator<Entity>}
+     */
     *_DecomposeFace(entity, vertices, blockCtx, wireframe) {
         const layer = this._GetEntityLayer(entity, blockCtx)
         const color = this._GetEntityColor(entity, blockCtx)
 
-        function IsValidTriangle(v1, v2, v3) {
-            const e1 = new Vector2().subVectors(v2, v1)
-            const e2 = new Vector2().subVectors(v3, v1)
-            const area = Math.abs(e1.cross(e2))
-            return area > Number.EPSILON
+        const corners = vertices.slice(0, 4).map(v => new Vector2(v.x, v.y))
+
+        /* Twice the signed area. */
+        function Area(i1, i2, i3) {
+            const e1 = new Vector2().subVectors(corners[i2], corners[i1])
+            const e2 = new Vector2().subVectors(corners[i3], corners[i1])
+            return e1.cross(e2)
         }
 
-        const v0 = new Vector2(vertices[0].x, vertices[0].y)
-        const v1 = new Vector2(vertices[1].x, vertices[1].y)
-        const v2 = new Vector2(vertices[2].x, vertices[2].y)
-        let v3 = null
-
-        let hasFirstTriangle = IsValidTriangle(v0, v1, v2)
-        let hasSecondTriangle = false
-
-        if (vertices.length > 3) {
-            /* Fourth vertex may be the same as one of the previous vertices, so additional triangle
-             * for degeneration.
+        let triangles
+        if (corners.length < 4) {
+            triangles = [[0, 1, 2]]
+        } else if (Area(0, 1, 2) * Area(0, 2, 3) >= 0) {
+            triangles = [[0, 1, 2], [0, 2, 3]]
+        } else {
+            /* Corners 1 and 3 are on the same side of the 0-2 diagonal, so the quad is concave at
+             * one of them, and only the 1-3 diagonal is inside it.
              */
-
-            v3 = new Vector2(vertices[3].x, vertices[3].y)
-            hasSecondTriangle = IsValidTriangle(v1, v3, v2)
+            triangles = [[0, 1, 3], [1, 2, 3]]
         }
-
-        if (!hasFirstTriangle && !hasSecondTriangle) {
+        /* A repeated corner leaves a triangle with no area. */
+        triangles = triangles.filter(t => Math.abs(Area(...t)) > Number.EPSILON)
+        if (triangles.length == 0) {
             return
         }
 
-        if (wireframe) {
-            const _vertices = []
-            if (hasFirstTriangle && !hasSecondTriangle) {
-                _vertices.push(v0, v1, v2)
-            } else if (!hasFirstTriangle && hasSecondTriangle) {
-                _vertices.push(v1, v3, v2)
+        /* A single triangle leaves a corner unused, which is not worth storing: a TIN is often
+         * made of nothing but three-corner faces.
+         */
+        if (triangles.length == 1) {
+            const triangle = triangles[0].map(i => corners[i])
+            if (wireframe) {
+                yield new Entity({
+                    type: Entity.Type.POLYLINE, vertices: triangle, layer, color, shape: true
+                })
             } else {
-                _vertices.push(v0, v1, v3, v2)
+                yield new Entity({
+                    type: Entity.Type.TRIANGLES,
+                    vertices: triangle, indices: [0, 1, 2], layer, color
+                })
             }
+        } else if (wireframe) {
             yield new Entity({
-                type: Entity.Type.POLYLINE,
-                vertices: _vertices, layer, color,
-                shape: true
+                type: Entity.Type.POLYLINE, vertices: corners, layer, color, shape: true
             })
-
         } else {
-            const _vertices = []
-            const indices = []
-            if (hasFirstTriangle) {
-                _vertices.push(v0, v1, v2)
-                indices.push(0, 1, 2)
-            }
-            if (hasSecondTriangle) {
-                if (!hasFirstTriangle) {
-                    _vertices.push(v1, v2)
-                    indices.push(0, 1, 2)
-                } else {
-                    indices.push(1, 2, 3)
-                }
-                _vertices.push(v3)
-            }
             yield new Entity({
                 type: Entity.Type.TRIANGLES,
-                vertices: _vertices, indices, layer, color
+                vertices: corners, indices: triangles.flat(), layer, color
             })
         }
     }

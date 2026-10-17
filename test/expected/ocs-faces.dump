@@ -16,5 +16,5 @@ primitives 10
   TRIANGLE layer="0" color=00ff00 (35, -2) (40, -6) (40, 10)
   TRIANGLE layer="0" color=00ff00 (35, 6) (35, -2) (40, 10)
   TRIANGLE layer="0" color=00ff00 (35, 6) (40, 10) (20, 10)
-  TRIANGLE layer="0" color=ff0000 (0, -6) (10, -6) (0, 2)
-  TRIANGLE layer="0" color=ff0000 (10, -6) (0, 2) (10, 2)
+  TRIANGLE layer="0" color=ff0000 (0, -6) (10, -6) (10, 2)
+  TRIANGLE layer="0" color=ff0000 (0, -6) (10, 2) (0, 2)
