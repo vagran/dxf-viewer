@@ -68,6 +68,17 @@ const DEFAULT_VARS = {
     DIMZIN: 8 //XXX 0 for imperial,
 }
 
+/** @param {?{x: number, y: number}} v
+ * @param {string} what Names the point in the error message.
+ * @throws {Error} When the point is missing or has a non-finite coordinate, as one does when a
+ *  file lacks the group code, or spells it "nan".
+ */
+function CheckFinitePoint(v, what) {
+    if (!Number.isFinite(v?.x) || !Number.isFinite(v?.y)) {
+        throw new Error(`Non-finite ${what} (${v?.x}, ${v?.y})`)
+    }
+}
+
 /** This class prepares an internal representation of a DXF file, optimized fo WebGL rendering. It
  * is decoupled in such a way so that it should be possible to build it in a web-worker, effectively
  * transfer it to the main thread, and easily apply it to a Three.js scene there.
@@ -101,6 +112,8 @@ export class DxfScene {
         this.pointShapeBlock = null
         this.numBlocksFlattened = 0
         this.numEntitiesFiltered = 0
+        /* Entities dropped because they are malformed, see _ProcessDxfEntity(). */
+        this.numEntitiesSkipped = 0
     }
 
     /** Build the scene from the provided parsed DXF.
@@ -197,6 +210,9 @@ export class DxfScene {
             this._ProcessDxfEntity(entity)
         }
         console.log(`${this.numEntitiesFiltered} entities filtered`)
+        if (this.numEntitiesSkipped > 0) {
+            console.warn(`${this.numEntitiesSkipped} malformed entities skipped`)
+        }
 
         this.scene = this._BuildScene()
 
@@ -229,50 +245,45 @@ export class DxfScene {
                    entity.type === "ATTRIB"
         }
 
+        /** @returns {string[]} The strings a text entity renders. */
+        const GetTexts = (entity) => {
+            if (entity.type === "TEXT" || entity.type === "ATTRIB" || entity.type === "ATTDEF") {
+                return [ParseSpecialChars(entity.text)]
+            }
+            if (entity.type === "MTEXT") {
+                const parser = new MTextFormatParser()
+                parser.Parse(entity.text)
+                //XXX formatted MTEXT may specify some fonts explicitly, this is not yet supported
+                return Array.from(parser.GetText(), text => ParseSpecialChars(text))
+            }
+            /* DIMENSION. No block context: this pre-scan only wants the texts, and resolved colors
+             * are discarded with the rest of the dimension. Whether the geometry is renderable is
+             * reported when it is rendered, not here.
+             */
+            return this._CreateLinearDimension(entity, null, false)?.GetTexts() ?? []
+        }
+
         /* Should return false if unable to resolve some characters, true otherwise. */
         const ProcessEntity = async (entity) => {
             if (!this._FilterEntity(entity)) {
                 return true
             }
-            let ret
-            if (entity.type === "TEXT" || entity.type === "ATTRIB" || entity.type === "ATTDEF") {
-                ret = await this.textRenderer.FetchFonts(ParseSpecialChars(entity.text))
-
-            } else if (entity.type === "MTEXT") {
-                const parser = new MTextFormatParser()
-                parser.Parse(entity.text)
-                ret = true
-                //XXX formatted MTEXT may specify some fonts explicitly, this is not yet supported
-                for (const text of parser.GetText()) {
-                    if (!await this.textRenderer.FetchFonts(ParseSpecialChars(text))) {
-                        ret = false
-                        break
-                    }
-                }
-
-            } else if (entity.type === "DIMENSION") {
-                ret = true
-                /* No block context: this pre-scan only wants the texts, and resolved colors are
-                 * discarded with the rest of the dimension. Whether the geometry is renderable is
-                 * reported when it is rendered, not here.
+            let texts
+            try {
+                texts = GetTexts(entity)
+            } catch {
+                /* Malformed, e.g. no text at all. Decomposition fails on it the same way, and that
+                 * is where it is reported and skipped.
                  */
-                const dim = this._CreateLinearDimension(entity, null, false)
-                if (dim) {
-                    for (const text of dim.GetTexts()) {
-                        if (!await this.textRenderer.FetchFonts(text)) {
-                            ret = false
-                            break
-                        }
-                    }
+                return true
+            }
+            for (const text of texts) {
+                if (!await this.textRenderer.FetchFonts(text)) {
+                    this.hasMissingChars = true
+                    return false
                 }
-
-            } else {
-                throw new Error("Bad entity type")
             }
-            if (!ret) {
-                this.hasMissingChars = true
-            }
-            return ret
+            return true
         }
 
         for (const entity of dxf.entities) {
@@ -301,7 +312,39 @@ export class DxfScene {
         }
     }
 
+    /** Render one DXF entity into the batches.
+     *
+     * A malformed entity is skipped rather than failing the whole drawing. Everything that can
+     * fail on bad input happens in _DecomposeDxfEntity(), before anything is written to a batch,
+     * so a skipped entity never leaves part of itself behind. A throw from the writes themselves
+     * is a bug here, not in the file, and is deliberately left to fail the build.
+     *
+     * @param {object} entity Raw DXF entity.
+     * @param {?BlockContext} blockCtx
+     */
     _ProcessDxfEntity(entity, blockCtx = null) {
+        let renderEntities
+        try {
+            renderEntities = this._DecomposeDxfEntity(entity, blockCtx)
+        } catch (error) {
+            this.numEntitiesSkipped++
+            const handle = entity.handle !== undefined ? ` ${entity.handle}` : ""
+            const block = blockCtx ? ` in block ${blockCtx.name}` : ""
+            console.warn(`Skipped malformed ${entity.type} entity${handle}${block}:`, error)
+            return
+        }
+        for (const renderEntity of renderEntities) {
+            this._ProcessEntity(renderEntity, blockCtx)
+        }
+    }
+
+    /**
+     * @param {object} entity Raw DXF entity.
+     * @param {?BlockContext} blockCtx
+     * @returns {Entity[]} Validated render entities, still to be written to the batches.
+     * @throws {Error} When the entity is malformed.
+     */
+    _DecomposeDxfEntity(entity, blockCtx) {
         let renderEntities
         switch (entity.type) {
         case "LINE":
@@ -329,7 +372,7 @@ export class DxfScene {
         case "INSERT":
             /* Works with rendering batches without intermediate entities. */
             this._ProcessInsert(entity, blockCtx)
-            return
+            return []
         case "TEXT":
             renderEntities = this._DecomposeText(entity, blockCtx)
             break
@@ -353,11 +396,14 @@ export class DxfScene {
             break
         default:
             console.log("Unhandled entity type: " + entity.type)
-            return
+            return []
         }
+        /* Materialized so that a throw part way through leaves nothing written. */
+        renderEntities = Array.from(renderEntities)
         for (const renderEntity of renderEntities) {
-            this._ProcessEntity(renderEntity, blockCtx)
+            renderEntity.Validate()
         }
+        return renderEntities
     }
     /**
      * @param {Entity} entity
@@ -640,6 +686,10 @@ export class DxfScene {
             /* Currently not supported. */
             return
         }
+        /* Checked up front: the instanced path below writes the position without a render entity
+         * to validate, and _CreatePointMarker() would draw a missing one at zero.
+         */
+        CheckFinitePoint(entity.position, "position")
         const color = this._GetEntityColor(entity, blockCtx)
         const layer = this._GetEntityLayer(entity, blockCtx)
         const markType = this.pdMode & PdMode.MARK_MASK
@@ -2420,7 +2470,8 @@ export class DxfScene {
             layers: [],
             origin: this.origin,
             bounds: this.bounds,
-            hasMissingChars: this.hasMissingChars
+            hasMissingChars: this.hasMissingChars,
+            numEntitiesSkipped: this.numEntitiesSkipped
         }
 
         const buffers = {
@@ -2785,8 +2836,11 @@ class BlockContext {
      * Get transform for block instance.
      * @param {object} entity Raw DXF INSERT entity.
      * @returns {Matrix3} Transform matrix for block instance to apply to the block definition.
+     * @throws {Error} When the transform comes out non-finite.
      */
     GetInsertionTransform(entity) {
+        CheckFinitePoint(this.origin, "block base point")
+        CheckFinitePoint(entity.position, "insertion point")
         const mInsert = new Matrix3().makeTranslation(-this.origin.x, -this.origin.y)
         const yScale = entity.yScale || 1
         const xScale = entity.xScale || 1
@@ -2799,11 +2853,17 @@ class BlockContext {
         if (entity.extrusionDirection && entity.extrusionDirection.z < 0) {
             MatrixScale(mInsert, -1, 1)
         }
-        if (this.type !== BlockContext.Type.INSTANTIATION) {
-            return mInsert
+        if (this.type === BlockContext.Type.INSTANTIATION) {
+            mInsert.multiply(new Matrix3().makeTranslation(this.block.offset.x,
+                                                           this.block.offset.y))
         }
-        const mOffset = new Matrix3().makeTranslation(this.block.offset.x, this.block.offset.y)
-        return mInsert.multiply(mOffset)
+        /* An infinite scale gets past the fallbacks above, and an instance written with a
+         * non-finite transform poisons the scene bounds the same way a NaN vertex does.
+         */
+        if (!mInsert.elements.every(Number.isFinite)) {
+            throw new Error("Non-finite insertion transform")
+        }
+        return mInsert
     }
 
     /**
@@ -2913,6 +2973,26 @@ export class Entity {
         this.color = color
         this.lineType = lineType
         this.shape = shape
+    }
+
+    /** Check the entity can be written to a batch. A non-finite vertex would otherwise poison the
+     * scene origin and bounds, which blanks the whole drawing, and an index past the vertices
+     * draws garbage.
+     *
+     * @throws {Error} When the entity is not valid.
+     */
+    Validate() {
+        for (const v of this.vertices) {
+            CheckFinitePoint(v, "vertex")
+        }
+        if (this.indices) {
+            const n = this.vertices.length
+            for (const idx of this.indices) {
+                if (!Number.isInteger(idx) || idx < 0 || idx >= n) {
+                    throw new Error(`Index ${idx} out of range of ${n} vertices`)
+                }
+            }
+        }
     }
 
     *_IterateVertices(startIndex, count) {

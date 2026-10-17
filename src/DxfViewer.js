@@ -303,6 +303,11 @@ export class DxfViewer {
                           MessageLevel.WARN)
         }
 
+        if (scene.numEntitiesSkipped > 0) {
+            this._Message(`${scene.numEntitiesSkipped} malformed entities were skipped`,
+                          MessageLevel.WARN)
+        }
+
         this._CreateControls()
         this.Render()
     }

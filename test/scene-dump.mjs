@@ -140,6 +140,10 @@ export function FormatDump(scene) {
                `bounds ${Point([bounds.minX, bounds.minY])} ${Point([bounds.maxX, bounds.maxY])}`)
 
     lines.push(`hasMissingChars ${scene.hasMissingChars ? "yes" : "no"}`)
+    /* Only when non-zero, so the drawings that have none keep their dumps unchanged. */
+    if (scene.numEntitiesSkipped > 0) {
+        lines.push(`numEntitiesSkipped ${scene.numEntitiesSkipped}`)
+    }
 
     const layers = [...reader.GetLayers()]
     lines.push(`layers ${layers.length}`)
