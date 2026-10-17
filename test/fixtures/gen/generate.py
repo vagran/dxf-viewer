@@ -149,6 +149,24 @@ def _Polyline(doc, msp):
                        dxfattribs={"color": 3})
 
 
+@Fixture("polyline-closed-repeated")
+def _PolylineClosedRepeated(doc, msp):
+    """Closed LWPOLYLINEs whose vertex lists end where they start.
+
+    The first two repeat their first vertex at the end, closed explicitly as well as by the flag,
+    which real files do; the repeat must be dropped, not drawn as a zero-length closing segment.
+    The second has a bulge, which makes the decomposer build its own vertex list and so takes the
+    other path. The third repeats nothing, but its closing segment is the bulged one, which the
+    decomposer then generates itself -- ending, again, on the first vertex.
+    """
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], close=True,
+                       dxfattribs={"color": 1})
+    msp.add_lwpolyline([(20, 0, 0, 0, 1), (30, 0), (30, 10), (20, 10), (20, 0)], format="xyseb",
+                       close=True, dxfattribs={"color": 3})
+    msp.add_lwpolyline([(40, 0), (50, 0), (50, 10, 0, 0, 0.5)], format="xyseb", close=True,
+                       dxfattribs={"color": 5})
+
+
 def _DropSeqEnd(text):
     """Deletes every SEQEND entity, leaving the POLYLINE before it unterminated.
 

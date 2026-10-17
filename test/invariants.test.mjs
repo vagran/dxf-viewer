@@ -98,6 +98,35 @@ for (const fixture of fs.readdirSync(explodedDir).filter(n => n.endsWith(".dxf")
 }
 
 /* ---------------------------------------------------------------------------------------------
+ * No zero-length segments.
+ *
+ * A closed polyline reaches its first vertex again through its closing index, so a vertex list
+ * that ends on a copy of the first one draws a segment of zero length and stores a vertex for it.
+ * Two ways lead there: the file closing the polyline explicitly as well as by the flag, and the
+ * decomposer generating the closing segment itself once a bulge has made it build its own
+ * vertices. `polyline-closed-repeated` has both, and the rest of the fixtures keep the rule from
+ * being broken somewhere else.
+ * ------------------------------------------------------------------------------------------- */
+
+for (const fixture of fixtures) {
+    const name = path.basename(fixture, ".dxf")
+    test(`no polyline repeats a vertex: ${name}`, async () => {
+        const scene = await BuildScene(path.join(fixturesDir, fixture))
+        for (const primitive of new SceneReader(scene).ReadPrimitives()) {
+            if (primitive.type !== PrimitiveType.POLYLINE) {
+                continue
+            }
+            for (let i = 1; i < primitive.vertices.length; i++) {
+                const [x0, y0] = primitive.vertices[i - 1]
+                const [x1, y1] = primitive.vertices[i]
+                assert.ok(x0 !== x1 || y0 !== y1,
+                          `(${x1}, ${y1}) repeated in ${JSON.stringify(primitive.vertices)}`)
+            }
+        }
+    })
+}
+
+/* ---------------------------------------------------------------------------------------------
  * Hatch containment.
  *
  * Every hatch line the clipper emits has to lie inside the region the hatch covers. The concave

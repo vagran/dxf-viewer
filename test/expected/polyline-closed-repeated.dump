@@ -1,0 +1,14 @@
+origin (0, 0)
+bounds (0, -5) (50, 10.0804)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 3
+  INDEXED_LINES layer="0" block=- color=0000ff lineType=0 chunks=1 vertices=24 indices=24
+  INDEXED_LINES layer="0" block=- color=00ff00 lineType=0 chunks=1 vertices=42 indices=42
+  INDEXED_LINES layer="0" block=- color=ff0000 lineType=0 chunks=1 vertices=8 indices=8
+primitives 3
+  POLYLINE layer="0" color=0000ff (40, 0) (50, 0) (50, 10) (48.3651, 10.0805) (46.7434, 9.858) (45.1905, 9.3404) (43.7597, 8.5453) (42.5, 7.5) (41.4547, 6.2403) (40.6596, 4.8095) (40.142, 3.2566) (39.9196, 1.6349) (40, 0)
+  POLYLINE layer="0" color=00ff00 (20, 0) (20.076, -0.8682) (20.3015, -1.7101) (20.6699, -2.5) (21.1698, -3.2139) (21.7861, -3.8302) (22.5, -4.3301) (23.2899, -4.6985) (24.1318, -4.924) (25, -5) (25.8682, -4.924) (26.7101, -4.6985) (27.5, -4.3301) (28.2139, -3.8302) (28.8302, -3.2139) (29.3301, -2.5) (29.6985, -1.7101) (29.924, -0.8682) (30, 0) (30, 10) (20, 10) (20, 0)
+  POLYLINE layer="0" color=ff0000 (0, 0) (10, 0) (10, 10) (0, 10) (0, 0)

@@ -1891,6 +1891,18 @@ export class DxfScene {
             entityVertices = entity.vertices
             verticesCount = entity.vertices.length
         }
+        if (entity.shape && verticesCount > 1) {
+            const first = entityVertices[0]
+            const last = entityVertices[verticesCount - 1]
+            if (last.x === first.x && last.y === first.y) {
+                /* Closed explicitly as well as by the flag. A closed shape returns to its first
+                 * vertex by itself, and the segment from the repeated one is zero-length, so its
+                 * bulge and widths do not matter either.
+                 */
+                entityVertices = entityVertices.slice(0, -1)
+                verticesCount--
+            }
+        }
         if (verticesCount < 2) {
             return
         }
