@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Query DXF files in bulk: "which of these has X".
 
-    python3 test/tools/dxfq.py [options] <expression>
+    uv run test/tools/dxfq.py [options] <expression>
     npm run query -- [options] <expression>
 
 The expression is Python, evaluated once per file, and whatever it returns is printed next to the
@@ -18,7 +18,7 @@ failure mode worth engineering away. This pairs the codes properly and normalize
 Two modes, because the questions genuinely differ:
 
   default   ezdxf parses the file. Ask about entities, blocks, layers, header variables -- what
-            the drawing *means*. Needs ezdxf: `pip install -r test/fixtures/requirements.txt`.
+            the drawing *means*. Needs ezdxf, which `uv run` provides from the root pyproject.toml.
             Note ezdxf is stricter than this project's own parser, so a file dxf-viewer reads may
             fail here; those are reported per file, never skipped silently.
   --raw     the file is tokenized into (code, value) pairs and nothing is interpreted. Ask what is
@@ -181,7 +181,7 @@ def Main():
             import ezdxf  # noqa: F401
         except ImportError:
             sys.exit("This mode parses with ezdxf, which is not installed.\n"
-                     "  pip install -r test/fixtures/requirements.txt\n"
+                     "  uv run test/tools/dxfq.py ...   (or npm run query)\n"
                      "Or use --raw, which needs nothing but Python.")
 
     code = compile(args.expression, "<expression>", "eval")

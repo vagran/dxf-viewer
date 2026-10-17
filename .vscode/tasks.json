@@ -67,8 +67,8 @@
             // expression vocabulary; --raw needs nothing but Python.
             "label": "query corpus",
             "type": "process",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["test/tools/dxfq.py", "${input:dxfQuery}"],
+            "command": "uv",
+            "args": ["run", "test/tools/dxfq.py", "${input:dxfQuery}"],
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -138,12 +138,12 @@
             "problemMatcher": []
         },
         {
-            // Rewrites test/fixtures/*.dxf from their generator. Needs the venv; see
-            // test/fixtures/README.md.
+            // Rewrites test/fixtures/*.dxf from their generator. `uv run` provides the pinned
+            // ezdxf; see test/fixtures/README.md.
             "label": "fixtures (regenerate)",
             "type": "process",
-            "command": "${workspaceFolder}/.venv/bin/python",
-            "args": ["test/fixtures/gen/generate.py"],
+            "command": "uv",
+            "args": ["run", "test/fixtures/gen/generate.py"],
             "options": {
                 "cwd": "${workspaceFolder}"
             },

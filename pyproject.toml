@@ -1,0 +1,20 @@
+# Python tooling for the tests, not part of the npm package: test/fixtures/gen/generate.py writes
+# the fixtures, test/tools/dxfq.py queries the corpus. `uv sync` builds .venv from this and
+# uv.lock; `uv run <script>` does the same on demand.
+[project]
+name = "dxf-viewer-test-tools"
+version = "0"
+requires-python = ">=3.14"
+dependencies = [
+    # Pinned: the fixtures are committed and CI checks that regenerating them changes nothing, so
+    # a different version of either would fail that check rather than quietly produce different
+    # files. uv.lock pins the rest of the tree for the same reason.
+    "ezdxf==1.4.4",
+    # A transitive dependency of ezdxf, but the font generator imports it directly, so it is
+    # named here too rather than relied on by accident.
+    "fonttools==4.65.0",
+]
+
+[tool.uv]
+# Scripts only; there is nothing to build or install.
+package = false

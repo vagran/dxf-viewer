@@ -3,7 +3,7 @@
 
 Run it from anywhere:
 
-    .venv/bin/python test/fixtures/gen/generate.py
+    uv run test/fixtures/gen/generate.py
 
 The generated files are committed. Running this must be a no-op on an unchanged checkout, which CI
 enforces with `git diff --exit-code`, so the output has to be byte-stable: see `_Normalize`.
