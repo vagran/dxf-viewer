@@ -457,7 +457,7 @@ export class DxfScene {
             type: Entity.Type.LINE_SEGMENTS,
             vertices: entity.vertices,
             layer, color,
-            lineType: this._GetLineType(entity, entity.vertices[0])
+            lineType: this._GetLineType(entity, entity.vertices[0], blockCtx)
         })
     }
 
@@ -1938,7 +1938,7 @@ export class DxfScene {
             startIdx = endIdx
             if (endIdx !== verticesCount) {
                 curPlainLine = _this._IsPlainLine(entityVertices[endIdx])
-                curLineType = _this._GetLineType(entity, entityVertices[endIdx])
+                curLineType = _this._GetLineType(entity, entityVertices[endIdx], blockCtx)
             }
             curVertices = null
         }
@@ -1971,7 +1971,7 @@ export class DxfScene {
             }
 
             const isPlainLine = this._IsPlainLine(vtx)
-            const lineType = this._GetLineType(entity, vtx)
+            const lineType = this._GetLineType(entity, vtx, blockCtx)
             if (isPlainLine !== curPlainLine ||
                 /* Line type is accounted for plain lines only. */
                 (curPlainLine && lineType !== curLineType)) {

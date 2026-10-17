@@ -55,6 +55,13 @@ test("the xref bits leave visibility alone", () => {
     assert.strictEqual(Layer(64).frozen, false)
 })
 
+test("group 6 is the layer's linetype", () => {
+    /* An entity whose linetype is BYLAYER, or which names none, is drawn with this one. */
+    const dxf = Dxf(0).replace("62\n7", "62\n7\n6\nDASHED")
+    assert.strictEqual(new DxfParser().parseSync(dxf).tables.layer.layers.L1.lineType, "DASHED")
+    assert.strictEqual(Layer(0).lineType, undefined, "no group 6, no linetype")
+})
+
 test("a negative color marks the layer off but does not freeze it", () => {
     /* Layer visibility has two independent switches in DXF: the freeze flag and the sign of the
      * color. The parser reports them separately. */
