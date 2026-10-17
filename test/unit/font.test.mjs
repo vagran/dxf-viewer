@@ -46,6 +46,22 @@ test("the font loads and reports the characters it has", async () => {
     assert.strictEqual(font.HasChar("Z"), false, "Z is deliberately absent from the test font")
 })
 
+test("a glyph shared by several code points is found by each of them", async () => {
+    /* U+2F00, the Kangxi radical, and U+4E00, the ideograph, map to one glyph in the test font,
+     * as they do in real CJK fonts. opentype.js names only the lower code point in
+     * `glyph.unicode`, which is the radical -- the character drawings almost never contain.
+     */
+    const renderer = new TextRenderer([async () => LoadFont()])
+    assert.strictEqual(await renderer.FetchFonts("一⼀"), true,
+                       "neither character falls back")
+    const font = renderer.fonts[0]
+    for (const char of ["一", "⼀"]) {
+        const path = font.GetCharPath(char)
+        assert.notStrictEqual(path, null, `${char} has a path`)
+        Close(path.advance, 720 / UNIT, `${char} is the cjkOne glyph`)
+    }
+})
+
 test("fetching fonts reports whether every character resolved", async () => {
     const font = LoadFont()
     const renderer = new TextRenderer([async () => font])

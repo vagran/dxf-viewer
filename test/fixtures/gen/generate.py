@@ -975,7 +975,9 @@ def _WriteFont():
     "Z" is deliberately absent, to exercise the missing-glyph path and `hasMissingChars`.
 
     U+4E00, U+4E8C and U+3001 are there so that line breaking in a script written without spaces
-    has something to break.
+    has something to break. U+4E00 shares its glyph with U+2F00, its Kangxi radical, as it does in
+    real CJK fonts: the radical is the lower code point, so a reader that indexes a glyph by its
+    first code point only loses the ideograph, and the MTEXT wrapping fixture with it.
     """
     glyphs = {}
 
@@ -1035,7 +1037,8 @@ def _WriteFont():
     fb.setupGlyphOrder(order)
     fb.setupCharacterMap({0x20: "space", 0x41: "A", 0x42: "B", 0x49: "I",
                           0x2E: "period", 0x2D: "hyphen",
-                          0x4E00: "cjkOne", 0x4E8C: "cjkTwo", 0x3001: "cjkComma",
+                          0x2F00: "cjkOne", 0x4E00: "cjkOne", 0x4E8C: "cjkTwo",
+                          0x3001: "cjkComma",
                           **{0x30 + d: digit_names[str(d)] for d in range(10)}})
     fb.setupGlyf(glyphs)
     fb.setupHorizontalMetrics({name: (advances[name], 100) for name in order})

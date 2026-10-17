@@ -394,7 +394,13 @@ class Font {
             if (glyph.unicode === undefined) {
                 continue
             }
-            this.charMap.set(String.fromCodePoint(glyph.unicode), glyph)
+            /* `unicode` is only the lowest of the code points mapped to the glyph, and fonts
+             * share glyphs routinely: a CJK font gives an ideograph and its Kangxi radical one
+             * glyph, and many fonts give space the same blank glyph as the control characters.
+             */
+            for (const unicode of glyph.unicodes) {
+                this.charMap.set(String.fromCodePoint(unicode), glyph)
+            }
         }
         /* Scale to transform the paths to size 1. */
         //XXX not really clear what is the resulting unit, check, review and comment it later
