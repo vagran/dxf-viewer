@@ -10,7 +10,7 @@ batches 6
   LINES layer="0" block="_ARCHTICK" color=BYBLOCK lineType=0 vertices=4
   INDEXED_TRIANGLES layer="0" block="_CLOSEDFILLED" color=BYBLOCK lineType=0 chunks=1 vertices=6 indices=3
   LINES layer="0" block="_DOT" color=BYBLOCK lineType=0 vertices=4
-  INDEXED_LINES layer="0" block="_DOT" color=BYBLOCK lineType=0 chunks=1 vertices=74 indices=74
+  INDEXED_LINES layer="0" block="_DOT" color=BYBLOCK lineType=0 chunks=1 vertices=72 indices=72
 primitives 34
   POLYLINE layer="0" color=ff0000 (0, 0.625) (0, 6.25)
   POLYLINE layer="0" color=ff0000 (0, 20.625) (0, 26.25)

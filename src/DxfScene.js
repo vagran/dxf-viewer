@@ -1912,6 +1912,15 @@ export class DxfScene {
                 isClosed = true
                 if (vertices === null) {
                     vertices = entityVertices
+                } else {
+                    /* Generated vertices include the closing segment, so they end back at the
+                     * first vertex - which a closed shape returns to by itself.
+                     */
+                    const first = vertices[0]
+                    const last = vertices[vertices.length - 1]
+                    if (last.x === first.x && last.y === first.y) {
+                        vertices.pop()
+                    }
                 }
             } else if (endIdx === verticesCount - 1 && startIdx === 0) {
                 if (vertices === null) {
