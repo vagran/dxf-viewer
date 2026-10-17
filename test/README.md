@@ -53,8 +53,8 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
   pinned without a fixture.
 - **`invariants.test.mjs`** — properties that need no expected output: a translated drawing
   produces the same geometry shifted, a drawing with its blocks exploded produces the same geometry
-  as one with blocks, hatch lines stay inside their boundary, and a polyline over 0x10000 vertices
-  chunks correctly. Two of these work by building the same drawing two ways and requiring the
+  as one with blocks, hatch lines stay inside their boundary, and a polyline or a solid hatch over 0x10000
+  vertices chunks correctly. Two of these work by building the same drawing two ways and requiring the
   results to agree, so neither side has to be known correct in advance.
 - **`validate.test.mjs`** — runs `ValidateScene` over every fixture, and separately proves that
   `ValidateScene` can fail, by corrupting a scene seven different ways and requiring each one to be

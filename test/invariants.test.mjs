@@ -238,6 +238,97 @@ for (const [vertexCount, closed] of CHUNK_SEAM_CASES) {
          }))
 }
 
+/* Triangles are split by Entity._IterateTriangleChunks, and a solid hatch is the one thing large
+ * enough to need it. Area is the oracle: whatever the chunking did, the triangles must cover the
+ * boundary's area exactly once, so a dropped or a doubled triangle shows.
+ */
+
+/** Minimal DXF holding one solid HATCH with a polyline loop per entry of `loops`, each a circle of
+ * the given vertex count and radius.
+ */
+function SolidHatchDxf(loops) {
+    const parts = ["0", "SECTION", "2", "ENTITIES",
+                   "0", "HATCH", "8", "0", "2", "SOLID", "70", "1", "71", "0",
+                   "91", String(loops.length)]
+    for (const {vertexCount, radius} of loops) {
+        parts.push("92", "2", "72", "0", "73", "1", "93", String(vertexCount))
+        for (const [x, y] of Circle(vertexCount, radius)) {
+            parts.push("10", String(x), "20", String(y))
+        }
+        parts.push("97", "0")
+    }
+    parts.push("75", "0", "98", "0", "0", "ENDSEC", "0", "EOF")
+    return parts.join("\n") + "\n"
+}
+
+/** Rounded to three decimals, as a drawing's coordinates are. The rounding is what makes the
+ * order of earcut's triangles expensive to split: it leaves vertices reflex all along the
+ * boundary, and earcut then emits fans of thousands of triangles around one vertex.
+ */
+function Circle(vertexCount, radius) {
+    const result = []
+    for (let i = 0; i < vertexCount; i++) {
+        const a = 2 * Math.PI * i / vertexCount
+        result.push([Number((radius * Math.cos(a)).toFixed(3)),
+                     Number((radius * Math.sin(a)).toFixed(3))])
+    }
+    return result
+}
+
+function PolygonArea(vertices) {
+    let area = 0
+    for (let i = 0; i < vertices.length; i++) {
+        const [x0, y0] = vertices[i]
+        const [x1, y1] = vertices[(i + 1) % vertices.length]
+        area += x0 * y1 - x1 * y0
+    }
+    return Math.abs(area) / 2
+}
+
+const TRIANGLE_CHUNK_CASES = [
+    [{vertexCount: 0x10000, radius: 100}],
+    [{vertexCount: 0x10000 + 1, radius: 100}],
+    [{vertexCount: 2 * 0x10000 + 5, radius: 100}],
+    /* A hole, with the boundary crossing the limit only in total. */
+    [{vertexCount: 0x8000 + 0x1000, radius: 100}, {vertexCount: 0x8000 + 0x1000, radius: 50}]
+]
+
+for (const loops of TRIANGLE_CHUNK_CASES) {
+    const counts = loops.map(loop => loop.vertexCount).join(" + ")
+    test(`solid hatch of ${counts} vertices splits into chunks covering its area`, async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dxf-chunk-"))
+        const file = path.join(dir, "h.dxf")
+        fs.writeFileSync(file, SolidHatchDxf(loops))
+        let scene
+        try {
+            scene = await BuildScene(file)
+        } finally {
+            fs.rmSync(dir, {recursive: true, force: true})
+        }
+        assert.deepStrictEqual(ValidateScene(scene), [])
+
+        const chunks = scene.batches.flatMap(batch => batch.chunks ?? [])
+        const vertexCount = loops.reduce((n, loop) => n + loop.vertexCount, 0)
+        /* A vertex is stored once per chunk using it, so some duplication is inherent, but taking
+         * triangles in earcut's order costs 39% here, and in order of their lowest vertex 10%.
+         */
+        const stored = chunks.reduce((n, chunk) => n + chunk.verticesSize / 2, 0)
+        assert.ok(stored <= vertexCount * 1.01, `${stored} vertices stored for ${vertexCount}`)
+        assert.strictEqual(chunks.length, Math.ceil(stored / 0x10000))
+
+        let area = 0
+        for (const primitive of new SceneReader(scene).ReadPrimitives()) {
+            assert.strictEqual(primitive.type, PrimitiveType.TRIANGLE)
+            const [[x0, y0], [x1, y1], [x2, y2]] = primitive.vertices
+            area += Math.abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)) / 2
+        }
+        const [outer, ...holes] = loops.map(loop => PolygonArea(Circle(loop.vertexCount,
+                                                                       loop.radius)))
+        const expected = holes.reduce((a, hole) => a - hole, outer)
+        assert.ok(Math.abs(area - expected) < expected * 1e-5, `area ${area}, expected ${expected}`)
+    })
+}
+
 /* ---------------------------------------------------------------------------------------------
  * Diagnostics are reported once per entity.
  *

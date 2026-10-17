@@ -2072,31 +2072,14 @@ export class DxfScene {
      * @returns {Generator<Entity>}
      */
     *_GeneratePolyfaceTriangles(vertices, faces, layer, color) {
-        let meshVertices = []
-        let indices = []
+        const meshVertices = []
+        const indices = []
         /* Mesh vertex index -> index in meshVertices. Unreferenced vertices are left out, so they
          * do not extend the bounds either.
          */
-        let remap = new Map()
-
-        const Flush = () => {
-            const entity = new Entity({
-                type: Entity.Type.TRIANGLES,
-                vertices: meshVertices, indices, layer, color
-            })
-            meshVertices = []
-            indices = []
-            remap = new Map()
-            return entity
-        }
+        const remap = new Map()
 
         for (const face of faces) {
-            /* A face index is a 16-bit group code, so a well-formed mesh always fits in one chunk.
-             * The limit is still enforced here, because nothing splits triangles further down.
-             */
-            if (meshVertices.length + face.indices.length > INDEXED_CHUNK_SIZE) {
-                yield Flush()
-            }
             const idx = face.indices.map(meshIdx => {
                 let i = remap.get(meshIdx)
                 if (i === undefined) {
@@ -2113,7 +2096,10 @@ export class DxfScene {
             }
         }
         if (indices.length > 0) {
-            yield Flush()
+            yield new Entity({
+                type: Entity.Type.TRIANGLES,
+                vertices: meshVertices, indices, layer, color
+            })
         }
     }
 
@@ -2330,15 +2316,17 @@ export class DxfScene {
                                     BatchingKey.GeometryType.INDEXED_TRIANGLES,
                                     entity.color, 0)
         const batch = this._GetBatch(key)
-        //XXX splitting into chunks is not yet implemented.
-        const chunk = batch.PushChunk(entity.vertices.length)
-        for (const v of entity.vertices) {
-            chunk.PushVertex(this._TransformVertex(v, blockCtx))
+        /* A large solid hatch may exceed the chunk limit. */
+        for (const triChunk of entity._IterateTriangleChunks()) {
+            const chunk = batch.PushChunk(triChunk.verticesCount)
+            for (const v of triChunk.vertices) {
+                chunk.PushVertex(this._TransformVertex(v, blockCtx))
+            }
+            for (const idx of triChunk.indices) {
+                chunk.PushIndex(idx)
+            }
+            chunk.Finish()
         }
-        for (const idx of entity.indices) {
-            chunk.PushIndex(idx)
-        }
-        chunk.Finish()
     }
 
     /** Resolve entity color.
@@ -3113,6 +3101,76 @@ export class Entity {
         }
     }
 
+    /** Split triangles into chunks with at most INDEXED_CHUNK_SIZE vertices in each one, in the
+     * same form as _IterateLineChunks() yields. Triangles are independent, so unlike line chunks
+     * these need no overlap; a vertex shared by triangles on both sides of a split is stored in
+     * each chunk referring to it.
+     *
+     * Triangles are taken in the order of their median vertex index rather than as given. Earcut
+     * emits a large polygon's triangles in z-order, so a chunk filled in that order references
+     * vertices from all along the boundary, each of them stored again by a later chunk - over a
+     * third of the vertices for a 500k-vertex hatch. Boundary order keeps each chunk to a
+     * contiguous run of the boundary instead. The median rather than the lowest index, because
+     * on a boundary with rounding noise in its coordinates earcut leaves fans of tens of thousands
+     * of triangles around one vertex: by lowest index the whole fan lands in its hub's chunk and
+     * drags its spokes in from all around the boundary, while by median each fan triangle goes
+     * with its spokes and only the hub is repeated.
+     */
+    *_IterateTriangleChunks() {
+        if (this.vertices.length <= INDEXED_CHUNK_SIZE) {
+            /* Everything but a large solid hatch, so no remapping for the common case. */
+            yield {
+                verticesCount: this.vertices.length,
+                vertices: this.vertices,
+                indices: this.indices
+            }
+            return
+        }
+        const numTriangles = this.indices.length / 3
+        const medianIndices = new Uint32Array(numTriangles)
+        const order = new Uint32Array(numTriangles)
+        for (let i = 0; i < numTriangles; i++) {
+            const a = this.indices[i * 3]
+            const b = this.indices[i * 3 + 1]
+            const c = this.indices[i * 3 + 2]
+            medianIndices[i] = a + b + c - Math.min(a, b, c) - Math.max(a, b, c)
+            order[i] = i
+        }
+        order.sort((a, b) => medianIndices[a] - medianIndices[b])
+
+        let vertices = []
+        let indices = []
+        /* Entity vertex index -> index in the current chunk. */
+        let remap = new Map()
+        for (const triangle of order) {
+            const base = triangle * 3
+            let numNew = 0
+            for (let j = base; j < base + 3; j++) {
+                if (!remap.has(this.indices[j])) {
+                    numNew++
+                }
+            }
+            if (vertices.length + numNew > INDEXED_CHUNK_SIZE) {
+                yield {verticesCount: vertices.length, vertices, indices}
+                vertices = []
+                indices = []
+                remap = new Map()
+            }
+            for (let j = base; j < base + 3; j++) {
+                const idx = this.indices[j]
+                let chunkIdx = remap.get(idx)
+                if (chunkIdx === undefined) {
+                    chunkIdx = vertices.length
+                    remap.set(idx, chunkIdx)
+                    vertices.push(this.vertices[idx])
+                }
+                indices.push(chunkIdx)
+            }
+        }
+        if (indices.length > 0) {
+            yield {verticesCount: vertices.length, vertices, indices}
+        }
+    }
 }
 
 Entity.Type = Object.freeze({
