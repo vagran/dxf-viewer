@@ -60,6 +60,11 @@ In VS Code the same things are tasks: `test` (bound to *Tasks: Run Test Task*),
   `ValidateScene` can fail, by corrupting a scene seven different ways and requiring each one to be
   caught. Without that second half a validator that checks nothing would look identical to one that
   works.
+- **`malformed.test.mjs`** — splices a malformed record (a missing group code, a coordinate spelled
+  `nan`) into a small drawing and requires the result to equal the drawing without it, with one
+  entity reported skipped. The records are written as DXF text because ezdxf refuses to write them.
+- **`mesh.test.mjs`** — polyface meshes beyond the `mesh-polyface` golden: the opt-in wireframe
+  form, and a mesh too large for one indexed chunk, which no fixture could afford to be.
 
 `consumer.ts` is an inventory of the public API, so a new public method or option belongs there in
 the same change that adds it.

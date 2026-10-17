@@ -1,0 +1,14 @@
+origin (0, 0)
+bounds (0, 0) (30, 10)
+hasMissingChars no
+layers 2
+  "0" color=ffffff
+  "Defpoints" color=ffffff
+batches 1
+  INDEXED_TRIANGLES layer="0" block=- color=00ff00 lineType=0 chunks=1 vertices=14 indices=15
+primitives 5
+  TRIANGLE layer="0" color=00ff00 (0, 0) (10, 0) (10, 10)
+  TRIANGLE layer="0" color=00ff00 (0, 0) (10, 10) (0, 10)
+  TRIANGLE layer="0" color=00ff00 (10, 0) (20, 0) (20, 10)
+  TRIANGLE layer="0" color=00ff00 (10, 0) (20, 10) (10, 10)
+  TRIANGLE layer="0" color=00ff00 (20, 0) (30, 0) (20, 10)

@@ -914,6 +914,22 @@ def _Mesh3dFace(doc, msp):
     msp.add_3dface([(20, 0), (30, 0), (30, 10), (30, 10)], dxfattribs={"color": 4})
 
 
+@Fixture("mesh-polyface")
+def _MeshPolyface(doc, msp):
+    """A polyface mesh: two quads sharing an edge, and a triangle sharing the next one.
+
+    The faces index a shared vertex list, merged by optimize() to the seven distinct points. The
+    scene must hold each of them once, in one chunk, rather than the whole list once per face.
+    """
+    mesh = msp.add_polyface(dxfattribs={"color": 3})
+    mesh.append_faces([
+        [(0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0)],
+        [(10, 0, 0), (20, 0, 0), (20, 10, 0), (10, 10, 0)],
+        [(20, 0, 0), (30, 0, 0), (20, 10, 0)],
+    ])
+    mesh.optimize()
+
+
 # --------------------------------------------------------------------------------------------
 # Test font.
 #

@@ -2019,70 +2019,101 @@ export class DxfScene {
             }
         }
 
-        const polylines = []
-        const CommitLineSegment = (startIdx, endIdx) => {
-            if (polylines.length > 0) {
-                const prev = polylines[polylines.length - 1]
-                if (prev.indices[prev.indices.length - 1] == startIdx) {
-                    prev.indices.push(endIdx)
-                    return
+        if (!this.options.wireframeMesh) {
+            yield* this._GeneratePolyfaceTriangles(vertices, faces, layer, color)
+            return
+        }
+
+        /* Runs of mesh vertex indices. A face edge extends the previous run when it starts where
+         * that one ends, so a face with every edge visible comes out as one run with its first
+         * vertex repeated at the end. That repeat is what closes it; flagging the run as a closed
+         * shape as well would add a zero-length closing segment.
+         */
+        const runs = []
+        for (const face of faces) {
+            for (let i = 0; i < face.indices.length; i++) {
+                if (face.hiddenEdges[i]) {
+                    continue
                 }
-                if (prev.indices[0] == prev.indices[prev.indices.length - 1]) {
-                    prev.isClosed = true
+                const startIdx = face.indices[i]
+                const endIdx = face.indices[i < face.indices.length - 1 ? i + 1 : 0]
+                const prev = runs.at(-1)
+                if (prev?.at(-1) === startIdx) {
+                    prev.push(endIdx)
+                } else {
+                    runs.push([startIdx, endIdx])
                 }
             }
-            polylines.push({
-                indices: [startIdx, endIdx],
-                isClosed: false
+        }
+
+        /* A two-vertex run needs no special case: _ProcessPolyline() already writes short
+         * polylines un-indexed.
+         */
+        for (const run of runs) {
+            yield new Entity({
+                type: Entity.Type.POLYLINE,
+                vertices: run.map(vIdx => vertices[vIdx]),
+                layer, color
             })
+        }
+    }
+
+    /** Triangles for the faces of a polyface mesh, as few entities as the chunk size allows.
+     *
+     * Faces share the mesh vertices, so they go into one entity holding each referenced vertex
+     * once. Emitting one entity per face would have to hand each of them the whole vertex array,
+     * which is then written in full per face -- vertices times faces.
+     *
+     * @param {Vector2[]} vertices All vertices of the mesh.
+     * @param {Array<{indices: number[]}>} faces Faces of three or four zero-based indices into
+     *  `vertices`.
+     * @param {?string} layer
+     * @param {number} color
+     * @returns {Generator<Entity>}
+     */
+    *_GeneratePolyfaceTriangles(vertices, faces, layer, color) {
+        let meshVertices = []
+        let indices = []
+        /* Mesh vertex index -> index in meshVertices. Unreferenced vertices are left out, so they
+         * do not extend the bounds either.
+         */
+        let remap = new Map()
+
+        const Flush = () => {
+            const entity = new Entity({
+                type: Entity.Type.TRIANGLES,
+                vertices: meshVertices, indices, layer, color
+            })
+            meshVertices = []
+            indices = []
+            remap = new Map()
+            return entity
         }
 
         for (const face of faces) {
-
-            if (this.options.wireframeMesh) {
-                for (let i = 0; i < face.indices.length; i++) {
-                    if (face.hiddenEdges[i]) {
-                        continue
-                    }
-                    const nextIdx = i < face.indices.length - 1 ? i + 1 : 0
-                    CommitLineSegment(face.indices[i], face.indices[nextIdx])
+            /* A face index is a 16-bit group code, so a well-formed mesh always fits in one chunk.
+             * The limit is still enforced here, because nothing splits triangles further down.
+             */
+            if (meshVertices.length + face.indices.length > INDEXED_CHUNK_SIZE) {
+                yield Flush()
+            }
+            const idx = face.indices.map(meshIdx => {
+                let i = remap.get(meshIdx)
+                if (i === undefined) {
+                    i = meshVertices.length
+                    remap.set(meshIdx, i)
+                    meshVertices.push(vertices[meshIdx])
                 }
-
+                return i
+            })
+            if (idx.length == 3) {
+                indices.push(idx[0], idx[1], idx[2])
             } else {
-                let indices
-                if (face.indices.length == 3) {
-                    indices = face.indices
-                } else {
-                    indices = [face.indices[0], face.indices[1], face.indices[2],
-                               face.indices[0], face.indices[2], face.indices[3]]
-                }
-                yield new Entity({
-                    type: Entity.Type.TRIANGLES,
-                    vertices, indices, layer, color
-                })
+                indices.push(idx[0], idx[1], idx[2], idx[0], idx[2], idx[3])
             }
         }
-
-        if (this.options.wireframeMesh) {
-            for (const pl of polylines) {
-                if (pl.length == 2) {
-                    yield new Entity({
-                        type: Entity.Type.LINE_SEGMENTS,
-                        vertices: [vertices[pl.indices[0]], vertices[pl.indices[1]]],
-                        layer, color
-                    })
-                } else {
-                    const _vertices = []
-                    for (const vIdx of pl.indices) {
-                        _vertices.push(vertices[vIdx])
-                    }
-                    yield new Entity({
-                        type: Entity.Type.POLYLINE,
-                        vertices: _vertices, layer, color,
-                        shape: pl.isClosed
-                    })
-                }
-            }
+        if (indices.length > 0) {
+            yield Flush()
         }
     }
 
