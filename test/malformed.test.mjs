@@ -103,7 +103,19 @@ const CASES = [
     /* The same, inside a block definition, where the instances must keep the rest of the block. */
     ["LINE with a NaN coordinate, first in a block", {block: "0 LINE 8 0 10 nan 20 0 11 1 21 1"}],
     ["ELLIPSE with no major axis in a block", {block: "0 ELLIPSE 8 0 10 0 20 0 40 0.5"}],
-    ["nested INSERT with no position", {block: "0 INSERT 8 0 2 C"}]
+    ["nested INSERT with no position", {block: "0 INSERT 8 0 2 C"}],
+    /* #178: a knot vector of the wrong length, as LibreDWG's dwg2dxf writes when the DWG record
+     * has one. Degree 3 with four control points needs eight knots; these carry five. */
+    ["SPLINE with too few knots", {entities: `
+        0 SPLINE 8 0 70 8 71 3 72 5 73 4 40 0 40 0 40 1 40 1 40 1
+        10 -10 20 -5 10 -3 20 8 10 3 20 -8 10 10 20 5`}, "Bad knot vector length"],
+    ["HATCH with a spline edge with too few knots", {entities: `
+        0 HATCH 8 0 2 SOLID 70 1 71 0 91 1
+        92 0 93 2
+        72 4 94 3 73 0 74 0 95 5 96 4 40 0 40 0 40 1 40 1 40 1
+        10 -10 20 -5 10 -3 20 8 10 3 20 -8 10 10 20 5
+        72 1 10 10 20 5 11 -10 21 -5
+        97 0 75 0 76 1 98 0`}, "Bad knot vector length"]
 ]
 
 const good = await Build(Dxf())
@@ -113,12 +125,13 @@ test("the reference drawing has nothing to skip", () => {
     assert.deepStrictEqual(good.warnings, [])
 })
 
-for (const [name, bad] of CASES) {
+for (const [name, bad, reason = ""] of CASES) {
     test(`${name} is skipped, and the rest of the drawing is intact`, async () => {
         const result = await Build(Dxf(bad))
         assert.strictEqual(result.skipped, 1)
         assert.strictEqual(result.dump, good.dump)
-        assert.ok(result.warnings.some(w => w.startsWith("Skipped malformed")), result.warnings)
+        assert.ok(result.warnings.some(w => w.startsWith("Skipped malformed") && w.includes(reason)),
+                  result.warnings)
     })
 }
 

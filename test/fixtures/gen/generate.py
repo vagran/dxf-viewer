@@ -660,6 +660,40 @@ def _MTextParagraphAlign(doc, msp):
     msp.add_mtext("\\pq*;AA", dxfattribs={**attribs, "insert": (0, -10)})
 
 
+# Written by the mtext-attachment builder as the value of a group 71 which _DropMTextAttachment
+# then deletes. Out of range, so it cannot be mistaken for an attachment point ezdxf chose.
+_DROP_ATTACHMENT = -1
+
+
+def _DropMTextAttachment(text):
+    """Deletes the group 71 written with the value _DROP_ATTACHMENT.
+
+    ezdxf always writes an MTEXT attachment point, so an MTEXT without one cannot be built with it
+    -- but real files do omit the group.
+    """
+    marked = f" 71\n{_DROP_ATTACHMENT}\n"
+    assert text.count(marked) == 1, "the marked attachment point is not in the output"
+    return text.replace(marked, "")
+
+
+@Fixture("mtext-attachment", postprocess=_DropMTextAttachment)
+def _MTextAttachment(doc, msp):
+    """MTEXT whose attachment point is absent or out of range, beside one that is top left.
+
+    Group 71 defaults to top left, so neither is malformed: the text is laid out as if the group
+    said 1, rather than the entity being skipped. All three have to place the text identically, ten
+    units apart; any other attachment point would move the text off its insertion point.
+    """
+    attribs = {"char_height": 2}
+    msp.add_mtext("AA", dxfattribs={**attribs, "color": 1, "insert": (0, 20),
+                                    "attachment_point": 1})
+    # ezdxf validates the attribute, and both values below are outside what it accepts.
+    absent = msp.add_mtext("AA", dxfattribs={**attribs, "color": 3, "insert": (0, 10)})
+    absent.dxf.unprotected_set("attachment_point", _DROP_ATTACHMENT)
+    zero = msp.add_mtext("AA", dxfattribs={**attribs, "color": 5, "insert": (0, 0)})
+    zero.dxf.unprotected_set("attachment_point", 0)
+
+
 @Fixture("mtext-wrap-spacing")
 def _MTextWrapSpacing(doc, msp):
     """MTEXT whose wrapped line begins with a chunk that carries leading spaces.

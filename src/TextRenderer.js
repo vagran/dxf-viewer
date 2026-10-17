@@ -257,7 +257,8 @@ export class TextRenderer {
      * @param {?Number} params.rotation Text block rotation in degrees.
      * @param {?{x: number, y: number}} params.direction Text block orientation defined as direction
      *  vector. Takes a precedence over rotation if both provided.
-     * @param {number} params.attachment Attachment point, one of MTextAttachment values.
+     * @param {?number} params.attachment Attachment point, one of MTextAttachment values. Anything
+     *  else, absent included, is TOP_LEFT, which is what an MTEXT without group 71 means.
      * @param {?number} params.lineSpacing Line spacing ratio relative to default one (5/3 of font
      *  size).
      * @param {number} params.color
@@ -741,10 +742,12 @@ class TextBox {
         }
         height *= lineHeight
 
+        /* TOP_LEFT is the box origin itself. It is also the default for group 71, so an attachment
+         * point which is absent or out of range gets it, as it gets left alignment above. ezdxf
+         * reads the group the same way.
+         */
         let origin = new Vector2()
         switch (attachment) {
-        case MTextAttachment.TOP_LEFT:
-            break
         case MTextAttachment.TOP_CENTER:
             origin.x = width / 2
             break
@@ -773,8 +776,6 @@ class TextBox {
             origin.x = width
             origin.y = -height
             break
-        default:
-            throw new Error("Unhandled alignment")
         }
 
         /* Transform for each chunk insertion point. */
