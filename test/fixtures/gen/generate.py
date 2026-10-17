@@ -711,6 +711,9 @@ def _MTextCaret(doc, msp):
     # Consecutive tabulators each advance a whole stop, to 16 -- which is how a drawing that has
     # no table entity builds one out of MTEXT.
     msp.add_mtext("A^I^IB", dxfattribs={**attribs, "insert": (0, 0)})
+    # A literal tab character, which some producers write instead of "^I" and which must land at
+    # the same stop, 8, rather than be looked up as a glyph.
+    msp.add_mtext("A\tB", dxfattribs={**attribs, "insert": (0, -10)})
 
 
 @Fixture("text-missing-glyph")

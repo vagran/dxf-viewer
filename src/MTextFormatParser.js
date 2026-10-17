@@ -40,7 +40,7 @@ const EntityType = Object.freeze({
      * fraction, "#" for a diagonal one.
      */
     STACK: 6,
-    /** "^I" tabulator control code. Advances to the next tab stop. */
+    /** "^I" tabulator control code, or a literal tab character. Advances to the next tab stop. */
     TAB: 7
     /* Many others are not yet implemented. */
 })
@@ -202,6 +202,15 @@ export class MTextFormatParser {
                 if (c === "^") {
                     EmitText()
                     state = State.CARET
+                    continue
+                }
+                if (c === "\t") {
+                    /* A literal tab is the character "^I" encodes, and some producers write it
+                     * as such.
+                     */
+                    EmitText()
+                    EmitEntity(EntityType.TAB)
+                    textStart = curPos + 1
                     continue
                 }
                 continue

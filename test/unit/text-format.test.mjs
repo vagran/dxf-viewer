@@ -201,6 +201,15 @@ test("^I is a tabulator", () => {
                            "consecutive tabulators each stand on their own")
 })
 
+test("a literal tab character is a tabulator as well", () => {
+    assert.deepStrictEqual(Parse("a\tb"), [{text: "a"}, "tab", {text: "b"}])
+    assert.deepStrictEqual(Parse("\t\ta"), ["tab", "tab", {text: "a"}],
+                           "consecutive tabs each stand on their own")
+    assert.deepStrictEqual(Parse("{a\tb}c"),
+                           [{scope: [{text: "a"}, "tab", {text: "b"}]}, {text: "c"}],
+                           "inside a scope too")
+})
+
 test("^ is how a literal caret is written", () => {
     assert.deepStrictEqual(Parse("a^ b"), [{text: "a"}, {text: "^"}, {text: "b"}],
                            "the space belongs to the encoding, not to the text")
